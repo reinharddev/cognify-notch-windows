@@ -5,7 +5,7 @@
   import { hotkey, HOTKEYS } from '../hotkey.svelte';
   let ics = $state(agenda.url);
   import { L } from '../i18n';
-  import { checkUpdate, update } from '../update.svelte';
+  import { checkUpdate, installNow, update } from '../update.svelte';
   import { weather } from '../weather.svelte';
   let city = $state(weather.city);
 
@@ -24,6 +24,7 @@
     ['keys', L('Kabar Caps Lock dan bahasa keyboard', 'Caps Lock and keyboard language news')],
     ['network', L('Kabar internet putus', 'Offline news')],
     ['updates', L('Periksa versi baru tiap hari', 'Check for new versions daily')],
+    ['autoInstall', L('Pasang pembaruan otomatis', 'Install updates automatically')],
     ['hideFullscreen', L('Sembunyi saat layar penuh', 'Hide in fullscreen')],
   ] as const;
 </script>
@@ -50,7 +51,8 @@
     {#if inTauri}<label class="row" style="cursor:pointer"><input type="checkbox" bind:checked={autostart} onchange={setAuto} /> {L('Buka saat Windows dinyalakan', 'Open when Windows starts')}</label>{/if}
     <button class="btn" onclick={() => checkUpdate()}>{L('Cek pembaruan', 'Check for updates')}</button>
     {#if update.text}<span class="dim">{update.text}</span>{/if}
-    {#if update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Unduh versi baru', 'Download new version')}</button>{/if}
+    {#if update.selfUpdate && (update.stage === 'found' || update.stage === 'ready')}<button class="btn on" onclick={installNow}>{L('Perbarui dan mulai ulang', 'Update and restart')}</button>{/if}
+    {#if !update.selfUpdate && update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Buka halaman unduh', 'Open download page')}</button>{/if}
     <span class="dim" style="margin-top:auto">Cognify Notch {update.current}</span>
   </div>
 </div>

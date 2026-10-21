@@ -6,6 +6,7 @@
 //! Semua yang bicara langsung dengan Windows ada di `winsys`; file ini hanya menyambungkannya
 //! ke antarmuka lewat perintah dan peristiwa.
 
+mod updater;
 mod winsys;
 
 use std::collections::HashMap;
@@ -174,6 +175,29 @@ fn set_volume(value: f32) {
         winsys::init_thread();
         winsys::set_volume(value);
     });
+}
+
+#[tauri::command]
+fn update_supported() -> bool {
+    updater::supported()
+}
+
+#[tauri::command]
+async fn update_check(state: State<'_, updater::Pending>) -> Result<Option<String>, String> {
+    let pending = state.inner().clone_handle();
+    tauri::async_runtime::spawn_blocking(move || updater::check(&pending)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn update_download(state: State<'_, updater::Pending>) -> Result<(), String> {
+    let pending = state.inner().clone_handle();
+    tauri::async_runtime::spawn_blocking(move || updater::download(&pending)).await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+async fn update_apply(state: State<'_, updater::Pending>) -> Result<(), String> {
+    let pending = state.inner().clone_handle();
+    tauri::async_runtime::spawn_blocking(move || updater::apply(&pending)).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -405,6 +429,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .manage(Shared::default())
+        .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
             set_pinned,
@@ -422,6 +447,10 @@ pub fn run() {
             media_cmd,
             media_seek,
             set_volume,
+            update_supported,
+            update_check,
+            update_download,
+            update_apply,
             autostart_get,
             autostart_set
         ])

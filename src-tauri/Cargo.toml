@@ -1,6 +1,6 @@
 [package]
 name = "cognify-notch"
-version = "0.1.0"
+version = "0.1.1"
 description = "Cognify Notch untuk Windows"
 license = "AGPL-3.0-only"
 edition = "2021"
@@ -21,6 +21,7 @@ tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
 ureq = "3"
 dirs = "6"
+velopack = "1.2.161"
 
 [target.'cfg(windows)'.dependencies]
 arboard = "3"

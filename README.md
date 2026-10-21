@@ -27,9 +27,10 @@ npm run dev
 
 ## Membangun installer
 
-Installer dibangun oleh GitHub Actions di server Windows (`.github/workflows/build.yml`), lalu
-diunduh dari halaman Actions. Di Windows sendiri: `npm run tauri -- build`, hasilnya
-`src-tauri/target/release/bundle/nsis/`.
+Installer dibuat [Velopack](https://velopack.io) oleh GitHub Actions di server Windows
+(`.github/workflows/build.yml`; salinan acuannya ada di `ci/build.yml`). Hasilnya: `Setup.exe` satu klik,
+paket pembaruan, dan `releases.win.json`. Semua file itu diunggah ke rilis GitHub yang ditandai Latest.
+App yang terpasang memeriksa rilis Latest itu dan memperbarui dirinya sendiri.
 
 Installer belum ditandatangani, jadi Windows menampilkan peringatan SmartScreen: klik More info,
 lalu Run anyway.

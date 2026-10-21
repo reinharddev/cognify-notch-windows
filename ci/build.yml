@@ -1,0 +1,54 @@
+# Membangun installer Windows (Velopack) di server GitHub. Berjalan manual (Actions > Run workflow)
+# atau saat tag v* didorong. Hasilnya diunggah sebagai artifact; rilis ke Releases dilakukan
+# secara manual (isinya: Setup.exe, paket penuh atau selisih, dan releases.win.json).
+name: Build Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: npm ci
+      - run: npm run check
+      # Hanya exe-nya; installer dibuat Velopack, bukan NSIS bawaan Tauri.
+      - run: npm run tauri -- build --no-bundle
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.x
+      - run: dotnet tool install -g vpk
+      - name: Siapkan folder paket
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force pack | Out-Null
+          Copy-Item src-tauri/target/release/cognify-notch.exe pack/
+      - name: Unduh rilis sebelumnya (untuk paket selisih)
+        shell: pwsh
+        continue-on-error: true
+        run: vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}"
+      - name: Bangun installer
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          vpk pack --packId CognifyNotch --packVersion $version --packDir pack --mainExe cognify-notch.exe `
+            --packTitle "Cognify Notch" --packAuthors "Reinhard Dave Yunardi" `
+            --icon src-tauri/icons/icon.ico --splashImage src-tauri/installer/splash.png --outputDir Releases
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cognify-notch-windows
+          path: Releases/*
+          if-no-files-found: error
