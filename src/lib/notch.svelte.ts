@@ -21,10 +21,13 @@ class Notch {
   forward = $state(true); // arah pindah halaman terakhir, untuk arah geser animasinya
   pinned = $state(false);
   private closeTimer = 0;
+  /** Lebar jendela yang sebenarnya (piksel CSS). Biasanya 720, tetapi bisa berbeda bila layar berubah. */
+  viewport = $state(typeof window === 'undefined' ? WINDOW.w : window.innerWidth || WINDOW.w);
 
   constructor() {
     // Jendela Pengaturan ikut memuat modul ini, tetapi tidak boleh mengatur jendela notch.
     if (windowKind !== 'notch') return;
+    window.addEventListener('resize', () => (this.viewport = window.innerWidth || WINDOW.w));
     onHover((inside) => (inside ? this.enter() : this.leave()));
     on('hotkey', () => this.togglePinned());
     // Area sentuh mengikuti bentuk yang sedang dituju.
@@ -34,7 +37,7 @@ class Notch {
         const { w, h } = this.size;
         // Saat diam, area sambutan sedikit lebih lebar dari pil supaya mudah dikenai kursor.
         const pad = this.open ? 0 : 28;
-        reportRect((WINDOW.w - w) / 2 - pad, 0, w + pad * 2, h + (this.open ? 0 : 10));
+        reportRect((this.viewport - w) / 2 - pad, 0, w + pad * 2, h + (this.open ? 0 : 10));
       });
     });
   }

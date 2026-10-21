@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { notch, WINDOW, SIZES } from './lib/notch.svelte';
+  import { notch, SIZES } from './lib/notch.svelte';
   import { Spring, springEase } from './lib/spring';
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
@@ -104,7 +104,7 @@
 
 <!-- Di browser biasa hover memakai pointer; di Tauri hover datang dari Rust. -->
 <main
-  style:width="{WINDOW.w}px"
+  style:width="100%"
   style:opacity={device.hidden ? 0 : 1}
   onpointerenter={() => { if (!inTauri) notch.enter(); }}
   onpointerleave={() => { if (!inTauri) notch.leave(); }}
