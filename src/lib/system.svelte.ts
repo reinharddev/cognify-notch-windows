@@ -16,12 +16,13 @@ class Features {
   media = $state(true); lyrics = $state(true); clipboard = $state(false); weather = $state(false);
   charger = $state(true); devices = $state(true); downloads = $state(true); keys = $state(true); network = $state(true);
   hideFullscreen = $state(true);
+  updates = $state(true);
   constructor() {
     Object.assign(this, load('features', {}));
   }
   persist() {
     save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, weather: this.weather, charger: this.charger,
-      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen });
+      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, updates: this.updates });
     void cmd('set_clipboard_watch', { on: this.clipboard });
     void cmd('set_hide_fullscreen', { on: this.hideFullscreen });
   }

@@ -23,6 +23,7 @@
     ['downloads', L('Kabar unduhan selesai', 'Finished downloads news')],
     ['keys', L('Kabar Caps Lock dan bahasa keyboard', 'Caps Lock and keyboard language news')],
     ['network', L('Kabar internet putus', 'Offline news')],
+    ['updates', L('Periksa versi baru tiap hari', 'Check for new versions daily')],
     ['hideFullscreen', L('Sembunyi saat layar penuh', 'Hide in fullscreen')],
   ] as const;
 </script>
@@ -47,9 +48,9 @@
         <select bind:value={hotkey.choice} onchange={() => hotkey.apply()}>{#each HOTKEYS as [id, label]}<option value={id}>{label}</option>{/each}</select></label>
     {/if}
     {#if inTauri}<label class="row" style="cursor:pointer"><input type="checkbox" bind:checked={autostart} onchange={setAuto} /> {L('Buka saat Windows dinyalakan', 'Open when Windows starts')}</label>{/if}
-    <button class="btn" onclick={checkUpdate}>{L('Cek pembaruan', 'Check for updates')}</button>
+    <button class="btn" onclick={() => checkUpdate()}>{L('Cek pembaruan', 'Check for updates')}</button>
     {#if update.text}<span class="dim">{update.text}</span>{/if}
-    {#if update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Buka halaman unduh', 'Open download page')}</button>{/if}
+    {#if update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Unduh versi baru', 'Download new version')}</button>{/if}
     <span class="dim" style="margin-top:auto">Cognify Notch {update.current}</span>
   </div>
 </div>

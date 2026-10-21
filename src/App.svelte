@@ -23,9 +23,11 @@
   import { weather } from './lib/weather.svelte';
   import { agenda } from './lib/agenda.svelte';
   import { hotkey } from './lib/hotkey.svelte';
+  import { startAutoCheck } from './lib/update.svelte';
   weather.restart();
   agenda.restart();
   hotkey.apply();
+  startAutoCheck();
 
   const page = $derived(PAGES[notch.page]);
   const time = $derived(new Date(ticker.now).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
