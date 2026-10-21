@@ -41,6 +41,22 @@ export async function cmd<T = void>(name: string, args?: Record<string, unknown>
   }
 }
 
+/** Seperti `cmd`, tetapi galatnya dikembalikan (bukan ditelan) supaya bisa ditampilkan dan dicoba lagi. */
+export async function cmdTry<T = void>(name: string, args?: Record<string, unknown>): Promise<{ ok: true; value: T | undefined } | { ok: false; error: string }> {
+  if (!inTauri) return { ok: true, value: undefined };
+  try {
+    return { ok: true, value: await invoke<T>(name, args) };
+  } catch (e) {
+    console.warn(name, e);
+    return { ok: false, error: typeof e === 'string' ? e : (e as Error)?.message ?? String(e) };
+  }
+}
+
+/** Kirim peristiwa ke jendela lain. */
+export function send(event: string, payload?: unknown) {
+  if (inTauri) void emit(event, payload);
+}
+
 /** Dengarkan peristiwa dari Rust. */
 export function on<T>(event: string, handler: (payload: T) => void) {
   if (inTauri) void listen<T>(event, (e) => handler(e.payload));
