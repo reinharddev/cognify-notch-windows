@@ -18,7 +18,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, DragDropEvent, Emitter, LogicalSize, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, PhysicalSize, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -255,29 +255,46 @@ fn autostart_set(app: AppHandle, on: bool) {
     let _ = if on { launcher.enable() } else { launcher.disable() };
 }
 
-/// Dipanggil berkala: bila layar utama berubah (skala tampilan, resolusi, monitor dicolok atau dicabut, laptop
-/// di-dock), ukuran jendela dikembalikan ke 720 x 300 menurut skala yang berlaku sekarang dan jendela diletakkan
-/// di tengah lagi. Tanpa ini jendela tertinggal di ukuran atau posisi saat app dibuka dan panelnya bisa terpotong.
-fn ensure_docked(window: &WebviewWindow, last: &mut Option<(i32, i32, u32, u32, f64)>) {
-    let Ok(Some(m)) = window.primary_monitor() else { return };
-    let key = (m.position().x, m.position().y, m.size().width, m.size().height, m.scale_factor());
-    if *last == Some(key) {
-        return;
-    }
-    *last = Some(key);
-    let _ = window.set_size(LogicalSize::new(720.0, 300.0));
-    let _ = dock(window);
+/// Ukuran jendela notch dalam piksel CSS (sama dengan tauri.conf.json dan WINDOW di notch.svelte.ts).
+const WIN_W: f64 = 720.0;
+const WIN_H: f64 = 300.0;
+
+/// Ukuran dan tempat jendela seharusnya: 720 x 300 piksel CSS dikalikan skala layar utama (di 150% itu 1080 x 450
+/// piksel fisik), menempel di tengah atas. Menghitung dengan angka 720 mentah membuat jendela bergeser ke kanan
+/// di skala di atas 100%, dan di layar sempit bagian kanannya keluar dari tepi layar.
+fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, PhysicalSize<u32>)> {
+    let monitor = window.primary_monitor().ok()??;
+    let scale = monitor.scale_factor();
+    let size = PhysicalSize::new((WIN_W * scale).round() as u32, (WIN_H * scale).round() as u32);
+    let origin = monitor.position();
+    let x = origin.x + (monitor.size().width as i32 - size.width as i32) / 2;
+    Some((PhysicalPosition::new(x, origin.y), size))
 }
 
 /// Letakkan jendela di tengah atas layar utama.
 fn dock(window: &WebviewWindow) -> tauri::Result<()> {
-    if let Some(monitor) = window.primary_monitor()? {
-        let size = window.outer_size()?;
-        let origin = monitor.position();
-        let x = origin.x + (monitor.size().width as i32 - size.width as i32) / 2;
-        window.set_position(PhysicalPosition::new(x, origin.y))?;
+    let Some(monitor) = window.primary_monitor()? else { return Ok(()) };
+    let origin = *monitor.position();
+    // Pindah dulu ke layar utama supaya skala jendela mengikuti layar itu, baru ukuran dan posisi akhirnya.
+    window.set_position(origin)?;
+    if let Some((pos, size)) = dock_target(window) {
+        window.set_size(size)?;
+        window.set_position(pos)?;
     }
     Ok(())
+}
+
+/// Dipanggil berkala: bila ukuran atau posisi jendela tidak sama dengan yang seharusnya (skala tampilan diganti,
+/// resolusi berubah, monitor dicolok atau dicabut, laptop di-dock), jendela dipasang ulang.
+fn ensure_docked(window: &WebviewWindow) {
+    let Some((pos, size)) = dock_target(window) else { return };
+    let (Ok(cur_pos), Ok(cur_size)) = (window.outer_position(), window.outer_size()) else { return };
+    // Toleransi 2 piksel: Windows kadang membulatkan ukuran, dan tanpa toleransi jendela dipasang ulang terus-menerus.
+    let off = (cur_pos.x - pos.x).abs() > 2 || (cur_pos.y - pos.y).abs() > 2
+        || (cur_size.width as i32 - size.width as i32).abs() > 2 || (cur_size.height as i32 - size.height as i32).abs() > 2;
+    if off {
+        let _ = dock(window);
+    }
 }
 
 /// Memeriksa posisi kursor. Seberapa sering bergantung pada jaraknya ke notch: jauh = 20 kali per detik,
@@ -358,7 +375,6 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
         let (mut next_keys, mut next_bright, mut next_slow) = (start, start, start);
         let mut bright_fast_until = start;
         let mut bright_misses = 0u32;
-        let mut docked = None;
         loop {
             let playing = app.state::<Shared>().playing.load(Ordering::Relaxed);
             std::thread::sleep(Duration::from_millis(if playing { 100 } else { 250 }));
@@ -419,7 +435,7 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
 
             if now_t >= next_slow {
                 next_slow = now_t + Duration::from_secs(2);
-                ensure_docked(&window, &mut docked);
+                ensure_docked(&window);
                 let p = winsys::power();
                 if p != power {
                     if let Some(p) = &p {
