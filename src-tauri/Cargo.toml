@@ -1,6 +1,6 @@
 [package]
 name = "cognify-notch"
-version = "0.1.4"
+version = "0.1.5"
 description = "Cognify Notch untuk Windows"
 license = "AGPL-3.0-only"
 edition = "2021"
