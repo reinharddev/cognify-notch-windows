@@ -13,9 +13,18 @@ class Agenda {
   events = $state<AgendaEvent[]>([]);
   problem = $state('');
   private timer = 0;
+  private remindTimer = 0;
   private warned = new Set<string>();
 
   get enabled() { return !!(this.url || this.file); }
+
+  /** Dipanggil jendela notch saat Pengaturan (jendela lain) mengubah sumber kalender. */
+  reload() {
+    const url = load('ics.url', ''), file = load('ics.file', '');
+    if (url === this.url && file === this.file) return;
+    this.url = url; this.file = file;
+    this.restart();
+  }
 
   setSource(url: string, file = '') {
     this.url = url.trim(); this.file = file;
@@ -25,12 +34,13 @@ class Agenda {
 
   restart() {
     clearInterval(this.timer);
+    clearInterval(this.remindTimer);
     this.events = []; this.problem = '';
     if (!this.enabled || !inTauri) return;
     void this.refresh();
     this.timer = window.setInterval(() => void this.refresh(), 15 * 60_000);
     // Pengingat 5 menit sebelum acara; cek tiap 30 detik tanpa permintaan jaringan.
-    window.setInterval(() => this.remind(), 30_000);
+    this.remindTimer = window.setInterval(() => this.remind(), 30_000);
   }
 
   async refresh() {

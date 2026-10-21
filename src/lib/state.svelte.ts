@@ -23,7 +23,13 @@ class Pomodoro {
     this.focusMin = s.focus; this.restMin = s.rest;
     this.sessions = s.day === day() ? s.sessions : 0;
     this.remainingAtPause = this.total;
-    setInterval(() => this.tick(), 250);
+  }
+
+  private timer = 0;
+  /** Pasang satu pemicu tepat saat waktu habis; tidak ada pemeriksaan berkala. */
+  private arm() {
+    clearTimeout(this.timer);
+    if (this.running) this.timer = window.setTimeout(() => this.tick(), Math.max(0, this.endAt - Date.now()) + 30);
   }
 
   get total() { return (this.mode === 'focus' ? this.focusMin : this.restMin) * 60; }
@@ -43,15 +49,17 @@ class Pomodoro {
     this.persist();
   }
   adjust(delta: number) { this.mode === 'focus' ? this.setMinutes(this.focusMin + delta) : this.setMinutes(undefined, this.restMin + delta); }
-  select(mode: 'focus' | 'rest') { this.running = false; this.mode = mode; this.remainingAtPause = this.total; }
+  select(mode: 'focus' | 'rest') { this.running = false; this.arm(); this.mode = mode; this.remainingAtPause = this.total; }
   toggle() {
-    if (this.running) { this.remainingAtPause = this.remaining; this.running = false; }
+    if (this.running) { this.remainingAtPause = Math.max(0, Math.ceil((this.endAt - Date.now()) / 1000)); this.running = false; }
     else { this.endAt = Date.now() + this.remainingAtPause * 1000; this.running = true; }
+    this.arm();
   }
-  reset() { this.running = false; this.remainingAtPause = this.total; }
+  reset() { this.running = false; this.arm(); this.remainingAtPause = this.total; }
 
   private tick() {
-    if (!this.running || Date.now() < this.endAt) return;
+    if (!this.running) return;
+    if (Date.now() < this.endAt) { this.arm(); return; }
     const finished = this.mode;
     this.running = false;
     if (finished === 'focus') { this.sessions++; this.persist(); }
@@ -71,7 +79,14 @@ class ClockTools {
   laps = $state<number[]>([]);
   countdowns = $state<Countdown[]>(load<Countdown[]>('countdowns', []).filter((c) => c.end > Date.now()));
 
-  constructor() { setInterval(() => this.fire(), 500); }
+  private fireTimer = 0;
+  constructor() { this.arm(); }
+  /** Pasang satu pemicu menjelang hitung mundur terdekat selesai; tanpa hitung mundur tidak ada timer. */
+  private arm() {
+    clearTimeout(this.fireTimer);
+    const n = this.nearest;
+    if (n) this.fireTimer = window.setTimeout(() => this.fire(), Math.max(0, n.end - Date.now() - 200));
+  }
 
   get running() { return this.started > 0; }
   get elapsed() { return this.accumulated + (this.started ? (ticker.now - this.started) / 1000 : 0); }
@@ -88,17 +103,19 @@ class ClockTools {
     const label = minutes < 60 ? L(`${minutes} menit`, `${minutes} min`) : L(`${minutes / 60} jam`, `${minutes / 60} h`);
     this.countdowns = [...this.countdowns, { id: uid(), label, end: Date.now() + total * 1000, total }];
     this.persist();
+    this.arm();
   }
-  cancel(id: string) { this.countdowns = this.countdowns.filter((c) => c.id !== id); this.persist(); }
+  cancel(id: string) { this.countdowns = this.countdowns.filter((c) => c.id !== id); this.persist(); this.arm(); }
   get nearest() { return [...this.countdowns].sort((a, b) => a.end - b.end)[0]; }
   private persist() { save('countdowns', this.countdowns); }
 
   private fire() {
     const done = this.countdowns.filter((c) => c.end <= Date.now() + 200);
-    if (!done.length) return;
+    if (!done.length) { this.arm(); return; }
     this.countdowns = this.countdowns.filter((c) => !done.includes(c));
     this.persist();
     for (const c of done) news.announce(doneText(c.label), L('Hitung mundur', 'Countdown'));
+    this.arm();
   }
 }
 export const clockTools = new ClockTools();

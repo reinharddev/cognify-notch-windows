@@ -16,9 +16,9 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -38,6 +38,38 @@ struct Shared {
     hide_fullscreen: AtomicBool,
     /// Dibuka lewat pintasan keyboard: tetap terbuka walau kursor di luar.
     pinned: AtomicBool,
+    /// Disembunyikan lewat ikon tray. Hanya berlaku selama app berjalan.
+    user_hidden: AtomicBool,
+    /// App layar penuh sedang tampil dan "sembunyi saat layar penuh" menyala.
+    covered: AtomicBool,
+    /// Ada lagu yang sedang diputar (dari pemantau media). Pemantau lain bekerja lebih jarang saat tidak ada musik.
+    playing: AtomicBool,
+}
+
+/// Jendela notch tampil bila tidak disembunyikan pengguna dan tidak tertutup app layar penuh.
+fn sync_visibility(app: &AppHandle, window: &WebviewWindow) {
+    let s = app.state::<Shared>();
+    let visible = !s.user_hidden.load(Ordering::Relaxed) && !s.covered.load(Ordering::Relaxed);
+    let _ = if visible { window.show() } else { window.hide() };
+}
+
+/// Buka jendela Pengaturan (atau bawa ke depan bila sudah terbuka). Pengaturan ada di jendela sendiri,
+/// bukan di dalam notch, karena notch sempit dan hilang saat kursor menjauh.
+#[tauri::command]
+fn open_settings(app: AppHandle) {
+    if let Some(w) = app.get_webview_window("settings") {
+        let _ = w.unminimize();
+        let _ = w.show();
+        let _ = w.set_focus();
+        return;
+    }
+    let _ = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("index.html".into()))
+        .title("Pengaturan Cognify Notch")
+        .inner_size(640.0, 740.0)
+        .min_inner_size(520.0, 480.0)
+        .center()
+        .initialization_script("window.__CN_WINDOW__ = 'settings';")
+        .build();
 }
 
 /// Antarmuka melaporkan ukuran notch tiap kali bentuknya berubah.
@@ -222,23 +254,33 @@ fn dock(window: &WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Memeriksa posisi kursor sekitar 20 kali per detik. Hanya saat status masuk/keluar berubah,
+/// Memeriksa posisi kursor. Seberapa sering bergantung pada jaraknya ke notch: jauh = 20 kali per detik,
+/// dekat (±120 px di sekitar notch) atau di dalamnya = 125 kali per detik supaya notch bereaksi hampir
+/// seketika, dan saat notch disembunyikan = 4 kali per detik. Hanya saat status masuk/keluar berubah,
 /// jendela diubah antara tembus klik dan menerima klik, dan antarmuka diberi tahu.
 fn watch_cursor(app: AppHandle, window: WebviewWindow) {
     std::thread::spawn(move || {
         let mut inside = false;
+        let mut wait = 50u64;
         loop {
-            std::thread::sleep(Duration::from_millis(50));
+            std::thread::sleep(Duration::from_millis(wait));
+            let shared = app.state::<Shared>();
+            if shared.user_hidden.load(Ordering::Relaxed) || shared.covered.load(Ordering::Relaxed) {
+                wait = 250;
+                continue;
+            }
             let (Ok(cursor), Ok(origin), Ok(scale)) =
                 (window.cursor_position(), window.outer_position(), window.scale_factor())
             else {
                 continue;
             };
-            let rect = *app.state::<Shared>().rect.lock().unwrap();
+            let rect = *shared.rect.lock().unwrap();
             let x = (cursor.x - origin.x as f64) / scale;
             let y = (cursor.y - origin.y as f64) / scale;
-            let pinned = app.state::<Shared>().pinned.load(Ordering::Relaxed);
+            let pinned = shared.pinned.load(Ordering::Relaxed);
             let now = pinned || rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= 0.0 && y <= rect.y + rect.h;
+            let near = now || (rect.w > 0.0 && x >= rect.x - 120.0 && x <= rect.x + rect.w + 120.0 && y <= rect.y + rect.h + 100.0);
+            wait = if near { 8 } else { 50 };
             if now != inside {
                 inside = now;
                 let _ = window.set_ignore_cursor_events(!now);
@@ -249,23 +291,36 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
 }
 
 /// Keadaan perangkat: suara, baterai, keyboard, internet, layar penuh. Hanya mengirim saat berubah.
+/// Tiap jenis dibaca menurut jadwalnya sendiri, dan putaran dasarnya melambat saat tidak ada musik
+/// (pengukur keras suara hanya berguna untuk equalizer).
 fn watch_system(app: AppHandle, window: WebviewWindow) {
     std::thread::spawn(move || {
         winsys::init_thread();
         let (mut level, mut volume, mut power, mut caps, mut layout, mut output) = (0.0f32, None, None, false, None, None);
         let (mut online, mut covered) = (true, false);
         let mut brightness = (winsys::BrightnessReader::new(), None::<u8>);
-        let mut tick = 0u64;
+        let start = Instant::now();
+        let (mut next_keys, mut next_bright, mut next_slow) = (start, start, start);
+        let mut bright_fast_until = start;
+        let mut bright_misses = 0u32;
         loop {
-            std::thread::sleep(Duration::from_millis(100));
-            tick += 1;
+            let playing = app.state::<Shared>().playing.load(Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(if playing { 100 } else { 250 }));
+            let now_t = Instant::now();
 
-            let now = winsys::peak();
-            if (now - level).abs() > 0.03 || (now == 0.0 && level != 0.0) {
-                level = now;
-                let _ = app.emit("level", now);
+            if playing {
+                let now = winsys::peak();
+                if (now - level).abs() > 0.03 || (now == 0.0 && level != 0.0) {
+                    level = now;
+                    let _ = app.emit("level", now);
+                }
+            } else if level != 0.0 {
+                level = 0.0;
+                let _ = app.emit("level", 0.0f32);
             }
-            if tick % 5 == 0 {
+
+            if now_t >= next_keys {
+                next_keys = now_t + Duration::from_millis(500);
                 let v = winsys::volume();
                 if v != volume {
                     if let Some(v) = &v {
@@ -286,16 +341,28 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
                     layout = l;
                 }
             }
-            if tick % 5 == 0 {
+
+            // Kecerahan lewat WMI itu mahal. Diam: tiap 1,5 detik; 3 detik setelah berubah: tiap 0,3 detik
+            // supaya bar mengikuti tombol; PC tanpa layar yang bisa diatur (desktop): tiap 20 detik.
+            if now_t >= next_bright {
                 let b = brightness.0.read();
+                let mut fast = now_t < bright_fast_until;
                 if b != brightness.1 {
+                    if brightness.1.is_some() {
+                        bright_fast_until = now_t + Duration::from_secs(3);
+                        fast = true;
+                    }
                     if let Some(b) = b {
                         let _ = app.emit("brightness", b);
                     }
                     brightness.1 = b;
                 }
+                bright_misses = if b.is_none() { (bright_misses + 1).min(5) } else { 0 };
+                next_bright = now_t + Duration::from_millis(if bright_misses >= 5 { 20_000 } else if fast { 300 } else { 1500 });
             }
-            if tick % 20 == 0 {
+
+            if now_t >= next_slow {
+                next_slow = now_t + Duration::from_secs(2);
                 let p = winsys::power();
                 if p != power {
                     if let Some(p) = &p {
@@ -318,7 +385,8 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
                 let busy = winsys::fullscreen_busy() && app.state::<Shared>().hide_fullscreen.load(Ordering::Relaxed);
                 if busy != covered {
                     covered = busy;
-                    let _ = if busy { window.hide() } else { window.show() };
+                    app.state::<Shared>().covered.store(busy, Ordering::Relaxed);
+                    sync_visibility(&app, &window);
                     let _ = app.emit("fullscreen", busy);
                 }
             }
@@ -334,8 +402,11 @@ fn watch_media(app: AppHandle) {
         let mut poller = winsys::MediaPoller::new();
         let mut last: Option<(winsys::Media, Instant)> = None;
         loop {
-            std::thread::sleep(Duration::from_millis(500));
+            // Setengah detik saat musik diputar; lebih jarang bila tidak ada apa-apa yang diputar.
+            let playing_now = app.state::<Shared>().playing.load(Ordering::Relaxed);
+            std::thread::sleep(Duration::from_millis(if playing_now { 500 } else { 1000 }));
             let now = poller.poll();
+            app.state::<Shared>().playing.store(now.as_ref().map(|m| m.playing).unwrap_or(false), Ordering::Relaxed);
             let changed = match (&now, &last) {
                 (None, None) => false,
                 (Some(n), Some((l, at))) => {
@@ -363,7 +434,9 @@ fn watch_clipboard(app: AppHandle) {
         let mut seq = 0u32;
         let mut was_on = false;
         loop {
-            std::thread::sleep(Duration::from_millis(700));
+            let on = app.state::<Shared>().clipboard_on.load(Ordering::Relaxed);
+            // Mati: cukup melihat saklarnya tiap 2 detik.
+            std::thread::sleep(Duration::from_millis(if on { 700 } else { 2000 }));
             let on = app.state::<Shared>().clipboard_on.load(Ordering::Relaxed);
             if !on {
                 was_on = false;
@@ -402,8 +475,18 @@ fn watch_downloads(app: AppHandle) {
         };
         let mut known = snapshot(&dir);
         let mut pending: HashMap<String, u64> = HashMap::new();
+        // Memeriksa semua file (satu panggilan sistem per file) mahal bila foldernya besar. Waktu ubah folder
+        // berubah tiap ada file baru, dihapus, atau diganti nama (browser mengganti nama .crdownload saat selesai),
+        // jadi isi folder hanya dibaca bila waktu itu berubah atau masih ada unduhan yang ditunggu.
+        let stamp = |dir: &Path| std::fs::metadata(dir).and_then(|m| m.modified()).ok();
+        let mut last_stamp = stamp(&dir);
         loop {
             std::thread::sleep(Duration::from_secs(2));
+            let current = stamp(&dir);
+            if pending.is_empty() && current.is_some() && current == last_stamp {
+                continue;
+            }
+            last_stamp = current;
             let now = snapshot(&dir);
             for (name, size) in &now {
                 if known.contains_key(name) || temp(name) {
@@ -432,6 +515,7 @@ pub fn run() {
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
+            open_settings,
             set_pinned,
             set_hotkey,
             fetch_text,
@@ -455,7 +539,10 @@ pub fn run() {
             autostart_set
         ])
         .on_window_event(|window, event| {
-            // File yang dijatuhkan ke notch masuk Tray.
+            // File yang dijatuhkan ke notch masuk Tray (bukan yang dijatuhkan ke jendela lain).
+            if window.label() != "notch" {
+                return;
+            }
             if let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event {
                 let list: Vec<String> = paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
                 let _ = window.emit("files-dropped", list);
@@ -467,15 +554,37 @@ pub fn run() {
             window.set_ignore_cursor_events(true)?;
             window.show()?;
 
+            // Ikon di area ikon tersembunyi taskbar: klik kiri menyembunyikan atau menampilkan notch,
+            // klik kanan membuka menu.
+            let toggle = MenuItem::with_id(app, "toggle", "Sembunyikan notch", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Pengaturan…", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Keluar", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit])?;
+            let menu = Menu::with_items(app, &[&toggle, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
+            let toggle_label = toggle.clone();
+            let flip = move |app: &AppHandle| {
+                let s = app.state::<Shared>();
+                let hidden = !s.user_hidden.load(Ordering::Relaxed);
+                s.user_hidden.store(hidden, Ordering::Relaxed);
+                let _ = toggle_label.set_text(if hidden { "Tampilkan notch" } else { "Sembunyikan notch" });
+                if let Some(w) = app.get_webview_window("notch") {
+                    sync_visibility(app, &w);
+                }
+            };
+            let flip_menu = flip.clone();
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().cloned().expect("ikon tidak ada"))
                 .tooltip("Cognify Notch")
                 .menu(&menu)
-                .on_menu_event(|app, event| {
-                    if event.id() == "quit" {
-                        app.exit(0);
+                .show_menu_on_left_click(false)
+                .on_menu_event(move |app, event| match event.id().as_ref() {
+                    "toggle" => flip_menu(app),
+                    "settings" => open_settings(app.clone()),
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .on_tray_icon_event(move |tray, event| {
+                    if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
+                        flip(tray.app_handle());
                     }
                 })
                 .build(app)?;

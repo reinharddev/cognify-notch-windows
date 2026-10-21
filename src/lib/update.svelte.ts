@@ -97,6 +97,11 @@ export async function installNow() {
   await cmd('update_apply');
 }
 
+/** Jendela Pengaturan: cukup tahu apakah app bisa memperbarui dirinya, tanpa memulai pemeriksaan otomatis. */
+export async function initUpdate() {
+  update.selfUpdate = !!(await cmd<boolean>('update_supported'));
+}
+
 /** Pemeriksaan otomatis: 20 detik setelah app dibuka, lalu sekali sehari. */
 export async function startAutoCheck() {
   update.selfUpdate = !!(await cmd<boolean>('update_supported'));

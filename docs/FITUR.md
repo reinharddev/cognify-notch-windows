@@ -38,6 +38,9 @@ Sinkron Pengingat Apple dan Siri Shortcuts tidak ada di Windows: Daftar tugas ha
 | Buka saat Windows dinyalakan | Registry Run (build GitHub) atau StartupTask (build Store) |  | ditulis |
 | Update otomatis | Pengecek versi dari Releases (build GitHub); tidak ada di build Store |  | ditulis (cek versi, buka halaman unduh) |
 | Output suara | Tombol Output di halaman Musik membuka pengaturan suara Windows | API pengganti output tidak resmi (kebijakan Store 10.2.8) | selesai |
+| Pengaturan | Jendela sendiri (bukan di dalam notch): tampilan, umum, fitur, kota dan kalender, pembaruan; terbuka dari tombol gigi atau menu tray | Notch sempit dan menutup saat kursor menjauh. Perubahan dibagikan ke jendela notch lewat penyimpanan bersama dan peristiwa `prefs-changed` | diuji di browser (`?w=settings`); jendela Tauri belum diuji di Windows |
+| Lebar notch saat tertutup | Slider 70 sampai 200 px (bawaan 130); sayap musik selalu 80 px lebih lebar; panel terbuka tidak berubah | Windows tidak punya poni, jadi pil lebar menutupi tab browser | diuji di browser |
+| Ikon tray | Klik kiri menyembunyikan atau menampilkan notch; menu klik kanan: sembunyikan/tampilkan, Pengaturan, Keluar | Status sembunyi tidak disimpan; setelah app dibuka ulang notch tampil lagi. Bersama "sembunyi saat layar penuh": tampil hanya bila keduanya tidak menyembunyikan | cek kompilasi lolos; belum diuji di Windows |
 
 Dua build dari kode yang sama: build GitHub (installer NSIS, ada updater, tanpa signing atau
 SignPath) dan build Store (MSIX, tanpa updater, startup lewat StartupTask).

@@ -8,6 +8,7 @@ export const HOTKEYS = [
 // Pintasan keyboard global yang membuka notch; tekan lagi atau Esc untuk menutup.
 class Hotkey {
   choice = $state(load('hotkey', 'ctrl_alt_n'));
+  reload() { this.choice = load('hotkey', 'ctrl_alt_n'); }
   apply() { save('hotkey', this.choice); void cmd('set_hotkey', { choice: this.choice }); }
 }
 export const hotkey = new Hotkey();

@@ -14,11 +14,20 @@ export function save(key: string, value: unknown) {
   } catch {}
 }
 
-// Detik yang berdetak, dipakai halaman yang menampilkan jam berjalan.
+// Detik yang berdetak, dipakai halaman yang menampilkan jam berjalan. Hanya berdetak (4 kali per detik)
+// selama panel notch terbuka; saat tertutup tidak ada yang menampilkannya, jadi tidak ada timer sama sekali.
 class Ticker {
   now = $state(Date.now());
-  constructor() {
-    setInterval(() => (this.now = Date.now()), 250);
+  private timer = 0;
+  setActive(on: boolean) {
+    if (on === !!this.timer) return;
+    if (on) {
+      this.now = Date.now();
+      this.timer = window.setInterval(() => (this.now = Date.now()), 250);
+    } else {
+      clearInterval(this.timer);
+      this.timer = 0;
+    }
   }
 }
 export const ticker = new Ticker();

@@ -1,4 +1,6 @@
-import { reportRect, onHover, on, cmd } from './bridge';
+import { reportRect, onHover, on, cmd, windowKind } from './bridge';
+import { ui } from './ui.svelte';
+import { ticker } from './store.svelte';
 import { PAGES } from './pages';
 import { news } from './news.svelte';
 import { load, save } from './store.svelte';
@@ -16,15 +18,18 @@ export const SIZES = {
 class Notch {
   open = $state(false);
   page = $state(Math.min(load('page', 0), PAGES.length - 1));
-  settings = $state(false);
+  forward = $state(true); // arah pindah halaman terakhir, untuk arah geser animasinya
   pinned = $state(false);
   private closeTimer = 0;
 
   constructor() {
+    // Jendela Pengaturan ikut memuat modul ini, tetapi tidak boleh mengatur jendela notch.
+    if (windowKind !== 'notch') return;
     onHover((inside) => (inside ? this.enter() : this.leave()));
     on('hotkey', () => this.togglePinned());
     // Area sentuh mengikuti bentuk yang sedang dituju.
     $effect.root(() => {
+      $effect(() => ticker.setActive(this.open));
       $effect(() => {
         const { w, h } = this.size;
         // Saat diam, area sambutan sedikit lebih lebar dari pil supaya mudah dikenai kursor.
@@ -39,8 +44,14 @@ class Notch {
     return features.media && !!device.media?.playing;
   }
 
+  /** Ukuran saat tertutup: lebar mengikuti pilihan di Pengaturan, sayap musik selalu 80 lebih lebar. */
+  get closed() {
+    const w = ui.closedWidth;
+    return { idle: { w, h: SIZES.idle.h, r: SIZES.idle.r }, media: { w: w + 80, h: SIZES.media.h, r: SIZES.media.r } };
+  }
+
   get size() {
-    return this.open ? SIZES.open : news.current ? SIZES.news : this.wings ? SIZES.media : SIZES.idle;
+    return this.open ? SIZES.open : news.current ? SIZES.news : this.wings ? this.closed.media : this.closed.idle;
   }
 
   enter() {
@@ -68,15 +79,14 @@ class Notch {
     clearTimeout(this.closeTimer);
     this.closeTimer = window.setTimeout(() => {
       this.open = false;
-      this.settings = false;
     }, 350);
   }
 
-  go(delta: number) { this.select((this.page + delta + PAGES.length) % PAGES.length); }
+  go(delta: number) { this.select((this.page + delta + PAGES.length) % PAGES.length, delta > 0); }
 
-  select(i: number) {
+  select(i: number, forward = i > this.page) {
+    this.forward = forward;
     this.page = i;
-    this.settings = false;
     save('page', i);
   }
 }

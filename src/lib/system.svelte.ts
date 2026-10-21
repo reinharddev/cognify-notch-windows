@@ -21,6 +21,7 @@ class Features {
   constructor() {
     Object.assign(this, load('features', {}));
   }
+  reload() { Object.assign(this, load('features', {})); }
   persist() {
     save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, weather: this.weather, charger: this.charger,
       devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, updates: this.updates, autoInstall: this.autoInstall });

@@ -26,6 +26,13 @@ class Weather {
   private place: Place | null = null;
   private timer = 0;
 
+  /** Dipanggil jendela notch saat Pengaturan (jendela lain) mengubah kota atau saklar cuaca. */
+  reload() {
+    const c = load('city', '');
+    if (c !== this.city) { this.city = c; this.place = null; }
+    this.restart();
+  }
+
   setCity(city: string) {
     this.city = city.trim();
     save('city', this.city);
