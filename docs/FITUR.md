@@ -23,7 +23,7 @@ Sinkron Pengingat Apple dan Siri Shortcuts tidak ada di Windows: Daftar tugas ha
 | Pengingat Minum | Portabel, notifikasi Windows |  | selesai di browser |
 | Daftar tugas | Portabel | Sinkron ke Pengingat Apple tidak ada di Windows | selesai di browser |
 | Clipboard | Pendengar clipboard Windows | Lewati isi pengelola kata sandi (format clipboard yang dikecualikan) | ditulis |
-| Tray file | Tempel file dari File Explorer (Ctrl+C lalu Ctrl+V) dan pemilih file; seret file belum jalan | Windows menolak drop di jendela notch (kursor tanda larangan); sebab belum ditemukan, perlu Catatan diagnosis dari Windows | tempel dan pilih file teruji di Windows 11; seret belum jalan |
+| Tray file | Tempel file dari File Explorer (Ctrl+C lalu Ctrl+V) dan pemilih file; seret file belum jalan | Windows menolak drop di jendela notch (kursor tanda larangan); sebab belum ditemukan | tempel dan pilih file teruji di Windows 11; seret belum jalan |
 | Cermin | `getUserMedia` di webview | Izin kamera Windows | ditulis |
 | Pintasan keyboard membuka notch | Ctrl+Alt+N bawaan (bisa diganti di Pengaturan); tekan lagi atau Esc untuk menutup, panah untuk ganti halaman | Pintasan global lewat plugin Tauri | ditulis |
 | Pintasan | Tidak ada padanan Siri Shortcuts | Usulan: pintasan yang ditentukan pengguna (buka app, tautan) | ditulis |

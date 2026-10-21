@@ -38,7 +38,6 @@ export async function pickFiles(): Promise<string[]> {
     return Array.isArray(r) ? r : r ? [r] : [];
   } catch (e) {
     console.warn('pickFiles', e);
-    void invoke('log_note', { msg: `pickFiles gagal: ${e}` });
     return [];
   }
 }

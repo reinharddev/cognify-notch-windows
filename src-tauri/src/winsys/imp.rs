@@ -288,19 +288,6 @@ fn session() -> Option<Session> {
     idle.or_else(|| manager.GetCurrentSession().ok())
 }
 
-/// Daftar sesi media untuk diagnosis: "app | judul | status".
-pub fn media_sessions() -> Vec<String> {
-    let Some(manager) = Manager::RequestAsync().ok().and_then(|a| a.get().ok()) else { return vec!["tidak ada pengelola sesi".into()] };
-    let Ok(all) = manager.GetSessions() else { return vec!["tidak bisa membaca sesi".into()] };
-    all.into_iter()
-        .map(|s| {
-            let app = s.SourceAppUserModelId().map(|a| a.to_string()).unwrap_or_default();
-            let title = s.TryGetMediaPropertiesAsync().ok().and_then(|a| a.get().ok()).and_then(|p| p.Title().ok()).map(|t| t.to_string()).unwrap_or_default();
-            format!("{app} | {title} | {}", if is_playing(&s) { "memutar" } else { "tidak memutar" })
-        })
-        .collect()
-}
-
 fn ticks(span: TimeSpan) -> f64 {
     span.Duration as f64 / 10_000_000.0
 }

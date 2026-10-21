@@ -9,8 +9,6 @@
   import { weather } from '../weather.svelte';
   let city = $state(weather.city);
 
-  let diag = $state('');
-  const showDiag = async () => (diag = (await cmd<string>('diagnostics')) ?? 'Hanya tersedia di app.');
   let autostart = $state(false);
   void cmd<boolean>('autostart_get').then((v) => (autostart = !!v));
   const setAuto = () => void cmd('autostart_set', { on: autostart });
@@ -52,16 +50,13 @@
     <button class="btn" onclick={checkUpdate}>{L('Cek pembaruan', 'Check for updates')}</button>
     {#if update.text}<span class="dim">{update.text}</span>{/if}
     {#if update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Buka halaman unduh', 'Open download page')}</button>{/if}
-    {#if inTauri}<button class="btn" onclick={showDiag}>{L('Catatan diagnosis', 'Diagnostics')}</button>{/if}
     <span class="dim" style="margin-top:auto">Cognify Notch {update.current}</span>
   </div>
 </div>
-{#if diag}<pre class="diag" onclick={() => (diag = '')} role="presentation">{diag}</pre>{/if}
 
 <style>
   select { font: inherit; color: inherit; background: rgba(255, 255, 255, .12); border: 0; border-radius: 8px; padding: 3px 6px; }
   select option { color: #000; }
-  .diag { position: absolute; inset: 0; margin: 0; padding: 10px 12px; background: #0b0b0b; font: 10.5px/1.35 ui-monospace, Consolas, monospace; overflow: auto; white-space: pre-wrap; user-select: text; z-index: 5; }
   .tg { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 14px; align-content: start; font-size: 11.5px; }
   .tg input { margin-top: 1px; }
 </style>
