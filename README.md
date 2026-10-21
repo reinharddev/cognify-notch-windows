@@ -1,4 +1,4 @@
-# Cognify Notch untuk Windows
+# Cognify Notch untuk Windows (Beta)
 
 Notch di tengah atas layar Windows: pil kecil yang membesar menjadi panel saat kursor mendekat.
 Ini versi Windows dari Cognify Notch (macOS). Semua fitur yang bisa dipindah sudah ditulis, tetapi
