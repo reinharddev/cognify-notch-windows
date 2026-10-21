@@ -15,6 +15,7 @@
   void initUpdate();
 
   const toggles = [
+    ['companion', L('Tampilkan mata', 'Show the eyes'), L('Dua titik di notch saat diam. Matikan bila tidak ingin; kabar dan HUD tetap muncul.', 'The two dots on the idle notch. Turn off if you prefer; notices and HUDs still appear.')],
     ['media', L('Musik dan sampul', 'Music and artwork'), L('Tampilkan lagu yang diputar di sayap notch.', 'Show the playing song on the notch wings.')],
     ['lyrics', L('Lirik', 'Lyrics'), L('Diambil dari LRCLIB; mengirim judul dan nama artis.', 'Fetched from LRCLIB; sends the title and artist.')],
     ['weather', L('Cuaca', 'Weather'), L('Mengirim nama kotamu ke Open-Meteo.', 'Sends your city name to Open-Meteo.')],
@@ -31,6 +32,7 @@
 
   const changedFeature = (key: string) => { features.persist(); if (key === 'weather') weather.restart(); void emitPrefs('features'); };
   const setWidth = () => { ui.persist(); void emitPrefs('ui'); };
+  const setEyes = (m: 'blink' | 'follow') => { ui.eyesMode = m; ui.persist(); void emitPrefs('ui'); };
   const resetWidth = () => { ui.closedWidth = CLOSED_DEFAULT; setWidth(); };
 </script>
 
@@ -49,6 +51,14 @@
       </div>
       <input id="w" type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.closedWidth} oninput={setWidth} />
       <div class="preview"><span class="pill" style:width="{ui.closedWidth}px"><i></i><i></i></span></div>
+      <div class="row between eyesrow">
+        <label for="em">{L('Gerak mata', 'Eye movement')}</label>
+        <div class="seg2" role="group" id="em">
+          <button class:sel={ui.eyesMode === 'blink'} onclick={() => setEyes('blink')} disabled={!features.companion}>{L('Berkedip', 'Blink')}</button>
+          <button class:sel={ui.eyesMode === 'follow'} onclick={() => setEyes('follow')} disabled={!features.companion}>{L('Ikuti kursor', 'Follow cursor')}</button>
+        </div>
+      </div>
+      <span class="dim">{L('Mengikuti kursor sedikit lebih boros daya karena arah pandang ikut dihitung.', 'Following the cursor uses slightly more power because the gaze is calculated too.')}</span>
       <div class="row between">
         <span class="dim">{L('Lebih sempit tidak menutupi tab browser. Panel yang terbuka tidak berubah.', 'Narrower won\'t cover browser tabs. The open panel is unchanged.')}</span>
         <button class="btn" onclick={resetWidth} disabled={ui.closedWidth === CLOSED_DEFAULT}>{L('Atur ulang', 'Reset')}</button>
@@ -130,6 +140,11 @@
   select { font: inherit; color: inherit; background: rgba(255, 255, 255, .12); border: 0; border-radius: 8px; padding: 4px 8px; }
   select option { color: #000; }
   input[type=range] { width: 100%; accent-color: var(--accent); }
+  .eyesrow { margin-top: 4px; }
+  .seg2 { display: flex; padding: 2px; border-radius: 99px; background: rgba(255, 255, 255, .08); }
+  .seg2 button { border: 0; background: none; color: rgba(255, 255, 255, .6); font: inherit; font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 99px; cursor: pointer; }
+  .seg2 button.sel { background: var(--accent); color: #fff; }
+  .seg2 button:disabled { opacity: .4; cursor: default; }
   .preview { height: 54px; border-radius: 10px; background: #2b2a33; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
   .pill { height: 36px; background: #000; border-radius: 0 0 12px 12px; display: flex; align-items: center; justify-content: center; gap: 9px; }
   .pill i { width: 7px; height: 11px; background: #fff; border-radius: 50%; }

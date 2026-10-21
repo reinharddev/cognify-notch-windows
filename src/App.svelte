@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { PAGES } from './lib/pages';
-  import { inTauri, on, openSettings } from './lib/bridge';
+  import { cmd, inTauri, on, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
   import { news } from './lib/news.svelte';
@@ -22,6 +22,9 @@
   import Mirror from './lib/pages/Mirror.svelte';
   import Shortcuts from './lib/pages/Shortcuts.svelte';
   import Equalizer from './lib/Equalizer.svelte';
+  import NoticeCard from './lib/NoticeCard.svelte';
+  import Hud from './lib/Hud.svelte';
+  import Eyes from './lib/Eyes.svelte';
   import PageDock from './lib/PageDock.svelte';
   import { weather } from './lib/weather.svelte';
   import { agenda } from './lib/agenda.svelte';
@@ -32,12 +35,14 @@
   hotkey.apply();
   startAutoCheck();
   // Pengaturan ada di jendela sendiri; saat ada yang berubah, bagian itu dimuat ulang dari penyimpanan bersama.
+  const syncEyes = () => void cmd('set_eyes_follow', { on: features.companion && ui.eyesMode === 'follow' });
+  syncEyes();
   on<string>('prefs-changed', (scope) => {
-    if (scope === 'features') { features.reload(); weather.reload(); }
+    if (scope === 'features') { features.reload(); weather.reload(); syncEyes(); }
     else if (scope === 'weather') weather.reload();
     else if (scope === 'agenda') agenda.reload();
     else if (scope === 'hotkey') hotkey.reload();
-    else if (scope === 'ui') ui.reload();
+    else if (scope === 'ui') { ui.reload(); syncEyes(); }
   });
 
   const page = $derived(PAGES[notch.page]);
@@ -50,19 +55,6 @@
     if (e.key === 'ArrowRight') notch.go(1);
     if (e.key === 'ArrowLeft') notch.go(-1);
   };
-  // Kedipan mata: dijalankan sesaat tiap 5 detik. Animasi CSS yang berulang tanpa henti membuat browser
-  // menyiapkan frame terus-menerus walau tampilan tidak berubah.
-  function blink(node: HTMLElement) {
-    let timer = 0;
-    const go = () => {
-      node.querySelectorAll('i').forEach((eye) =>
-        eye.animate([{ transform: 'scaleY(1)' }, { transform: 'scaleY(.1)', offset: 0.375 }, { transform: 'scaleY(1)' }], { duration: 400 }));
-      timer = window.setTimeout(go, 5000);
-    };
-    timer = window.setTimeout(go, 4600);
-    return { destroy: () => clearTimeout(timer) };
-  }
-
   // Ukuran notch digerakkan pegas seperti di versi Mac. Isi tiap bentuk punya ukuran tetap sendiri
   // (tidak menyusut bersama notch), jadi tata letak isinya tidak dihitung ulang tiap frame.
   let shellEl: HTMLElement;
@@ -154,10 +146,14 @@
 
         <PageDock />
       </div>
+    {:else if news.level}
+      <div class="layer hudl" style:--lw="{notch.closed.hud.w}px" style:--lh="{notch.closed.hud.h}px" in:enter out:leave>
+        <Hud level={news.level} />
+      </div>
     {:else if news.current}
       {#key news.current.id}
-        <div class="layer center" style:--lw="{SIZES.news.w}px" style:--lh="{SIZES.news.h}px" in:enter out:leave>
-          <div class="news"><b>{news.current.text}</b>{#if news.current.sub}<span>{news.current.sub}</span>{/if}</div>
+        <div class="layer" style:--lw="{notch.closed.card.w}px" style:--lh="{notch.closed.card.h}px" in:enter out:leave>
+          <NoticeCard card={news.current} />
         </div>
       {/key}
     {:else if notch.wings && device.media}
@@ -170,7 +166,7 @@
       </div>
     {:else}
       <div class="layer center" style:--lw="{notch.closed.idle.w}px" style:--lh="{notch.closed.idle.h}px" in:enter out:leave>
-        <span class="eyes" use:blink><i></i><i></i></span>
+        {#if features.companion}<Eyes />{/if}
       </div>
     {/if}
   </div>
@@ -182,15 +178,10 @@
   /* Tiap bentuk punya lapisan berukuran tetap, menempel di atas tengah; notch yang membesar hanya memotongnya. */
   .layer { position: absolute; top: 0; left: 50%; width: var(--lw); height: var(--lh); margin-left: calc(var(--lw) / -2); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
   .layer.openl { flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0 22px 10px; }
-  .eyes { display: flex; gap: 9px; }
-  .eyes i { width: 7px; height: 11px; background: #fff; border-radius: 50%; }
   .wings { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
   .art { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 12px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
   .song { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(255, 255, 255, .85); }
-  .news { display: flex; gap: 10px; align-items: baseline; padding: 0 16px; max-width: 100%; white-space: nowrap; }
-  .news b { overflow: hidden; text-overflow: ellipsis; }
-  .news span { color: rgba(255, 255, 255, .5); font-size: 11px; }
   header { white-space: nowrap; height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
   .title { border: 0; background: none; padding: 0; cursor: default; font-size: 13px; }
   .right { display: flex; align-items: center; gap: 10px; }

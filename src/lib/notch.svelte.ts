@@ -47,11 +47,17 @@ class Notch {
   /** Ukuran saat tertutup: lebar mengikuti pilihan di Pengaturan, sayap musik selalu 80 lebih lebar. */
   get closed() {
     const w = ui.closedWidth;
-    return { idle: { w, h: SIZES.idle.h, r: SIZES.idle.r }, media: { w: w + 80, h: SIZES.media.h, r: SIZES.media.r } };
+    return {
+      idle: { w, h: SIZES.idle.h, r: SIZES.idle.r },
+      media: { w: w + 80, h: SIZES.media.h, r: SIZES.media.r },
+      // Sama dengan Mac: HUD = notch + sayap 76 di kiri dan kanan; kartu = 48 di bawah pita notch, lebar minimal 380.
+      hud: { w: w + 152, h: SIZES.idle.h, r: SIZES.idle.r },
+      card: { w: Math.max(w + 220, 380), h: SIZES.idle.h + 48, r: 22 },
+    };
   }
 
   get size() {
-    return this.open ? SIZES.open : news.current ? SIZES.news : this.wings ? this.closed.media : this.closed.idle;
+    return this.open ? SIZES.open : news.level ? this.closed.hud : news.current ? this.closed.card : this.wings ? this.closed.media : this.closed.idle;
   }
 
   enter() {

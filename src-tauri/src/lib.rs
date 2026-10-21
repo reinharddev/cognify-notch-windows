@@ -44,6 +44,14 @@ struct Shared {
     covered: AtomicBool,
     /// Ada lagu yang sedang diputar (dari pemantau media). Pemantau lain bekerja lebih jarang saat tidak ada musik.
     playing: AtomicBool,
+    /// Mata mengikuti kursor (pengaturan). Mati = tidak ada perhitungan arah pandang sama sekali.
+    eyes_follow: AtomicBool,
+}
+
+/// Pengaturan "ikuti kursor" untuk mata.
+#[tauri::command]
+fn set_eyes_follow(state: State<Shared>, on: bool) {
+    state.eyes_follow.store(on, Ordering::Relaxed);
 }
 
 /// Jendela notch tampil bila tidak disembunyikan pengguna dan tidak tertutup app layar penuh.
@@ -266,6 +274,12 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
     std::thread::spawn(move || {
         let mut inside = false;
         let mut wait = 50u64;
+        // Untuk mata: tidur setelah 2,5 menit tanpa gerakan kursor, bangun saat bergerak lagi, dan (bila
+        // diminta) arah pandang yang dibulatkan ke beberapa langkah, dikirim hanya saat langkahnya berubah.
+        let mut last_pos = (i32::MIN, i32::MIN);
+        let mut last_move = Instant::now();
+        let mut asleep = false;
+        let mut look = (0i8, 0i8);
         loop {
             std::thread::sleep(Duration::from_millis(wait));
             let shared = app.state::<Shared>();
@@ -281,6 +295,29 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             let rect = *shared.rect.lock().unwrap();
             let x = (cursor.x - origin.x as f64) / scale;
             let y = (cursor.y - origin.y as f64) / scale;
+            let pos = (cursor.x as i32, cursor.y as i32);
+            if pos != last_pos {
+                last_pos = pos;
+                last_move = Instant::now();
+                if asleep {
+                    asleep = false;
+                    let _ = app.emit("eyes-wake", ());
+                }
+            } else if !asleep && last_move.elapsed() > Duration::from_secs(150) {
+                asleep = true;
+                let _ = app.emit("eyes-sleep", ());
+            }
+            let want = if shared.eyes_follow.load(Ordering::Relaxed) && rect.w > 0.0 {
+                let cx = x - (rect.x + rect.w / 2.0);
+                let cy = y - 18.0;
+                ((cx / 140.0).round().clamp(-2.0, 2.0) as i8, (cy / 120.0).round().clamp(-1.0, 2.0) as i8)
+            } else {
+                (0, 0)
+            };
+            if want != look {
+                look = want;
+                let _ = app.emit("eye-look", [look.0, look.1]);
+            }
             let pinned = shared.pinned.load(Ordering::Relaxed);
             let now = pinned || rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= 0.0 && y <= rect.y + rect.h;
             let near = now || (rect.w > 0.0 && x >= rect.x - 120.0 && x <= rect.x + rect.w + 120.0 && y <= rect.y + rect.h + 100.0);
@@ -520,6 +557,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
             open_settings,
+            set_eyes_follow,
             set_pinned,
             set_hotkey,
             fetch_text,

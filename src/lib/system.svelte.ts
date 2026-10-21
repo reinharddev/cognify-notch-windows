@@ -2,6 +2,7 @@
 // layar penuh, dan perangkat suara. Di browser biasa semuanya kosong.
 import { on, cmd } from './bridge';
 import { news } from './news.svelte';
+import { TINT, type IconName } from './icons';
 import { L } from './i18n';
 import { load, save } from './store.svelte';
 
@@ -16,6 +17,7 @@ class Features {
   media = $state(true); lyrics = $state(true); clipboard = $state(false); weather = $state(false);
   charger = $state(true); devices = $state(true); downloads = $state(true); keys = $state(true); network = $state(true);
   hideFullscreen = $state(true);
+  companion = $state(true); // mata saat notch diam
   updates = $state(true);
   autoInstall = $state(true);
   constructor() {
@@ -24,12 +26,22 @@ class Features {
   reload() { Object.assign(this, load('features', {})); }
   persist() {
     save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, weather: this.weather, charger: this.charger,
-      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, updates: this.updates, autoInstall: this.autoInstall });
+      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, companion: this.companion, updates: this.updates, autoInstall: this.autoInstall });
     void cmd('set_clipboard_watch', { on: this.clipboard });
     void cmd('set_hide_fullscreen', { on: this.hideFullscreen });
   }
 }
 export const features = new Features();
+
+const batteryIcon = (p: number): IconName => (p > 62 ? 'battery-full' : p > 37 ? 'battery-medium' : p > 12 ? 'battery-low' : 'battery-warning');
+/** "AirPods Pro milik Reinhard" atau "Reinhard's AirPods Pro" menjadi "AirPods Pro" (sayap notch sempit). */
+function shortName(name: string) {
+  let n = name;
+  const i = n.indexOf(' milik '); if (i >= 0) n = n.slice(0, i);
+  for (const mark of ['’s ', "'s "]) { const j = n.indexOf(mark); if (j >= 0) n = n.slice(j + mark.length); }
+  n = n.trim();
+  return n || name;
+}
 
 class Device {
   power = $state<Power | null>(null);
@@ -45,26 +57,45 @@ class Device {
   caps = false;
   layout = '';
   outName = '';
+  private warned = new Set<number>();
 
   constructor() {
     on<Power>('power', (p) => {
       const was = this.power;
       this.power = p;
-      if (features.charger && was && p.plugged !== was.plugged) {
-        news.announce(p.plugged ? L('Charger tersambung', 'Charger connected') : L('Charger dicabut', 'Charger unplugged'), `${p.percent}%`);
+      if (!features.charger) return;
+      const pct = `${p.percent}%`;
+      if (was && p.plugged !== was.plugged) {
+        if (p.plugged) {
+          this.warned.clear();
+          const full = !p.charging && p.percent >= 95;
+          news.device(full ? L('Baterai penuh', 'Fully charged') : L('Mengisi daya', 'Charging'), L('Charger tersambung', 'Charger connected'), 'zap', TINT.green, { value: pct });
+        } else {
+          news.device(L('Charger dicabut', 'Charger unplugged'), L('Memakai baterai', 'On battery'), batteryIcon(p.percent), TINT.white, { value: pct });
+        }
+      }
+      // Baterai lemah: sekali pada 20% dan sekali pada 10% tiap pemakaian baterai.
+      if (!p.plugged) {
+        for (const level of [20, 10]) {
+          if (p.percent <= level && !this.warned.has(level)) {
+            this.warned.add(level);
+            news.device(L('Baterai lemah', 'Low battery'), L('Colok charger sebentar lagi', 'Plug in the charger soon'), 'battery-low', TINT.red, { value: pct, seconds: 6 });
+            break;
+          }
+        }
       }
     });
     on<{ volume: number; muted: boolean }>('volume', (v) => {
       const first = this.volumeSeen;
       const changed = Math.abs(v.volume - this.volume) > 0.005 || v.muted !== this.muted;
       this.volume = v.volume; this.muted = v.muted; this.volumeSeen = true;
-      if (first && changed && features.devices) news.announce(v.muted ? L('Volume senyap', 'Muted') : L(`Volume ${Math.round(v.volume * 100)}%`, `Volume ${Math.round(v.volume * 100)}%`));
+      if (first && changed && features.devices) news.showLevel({ kind: 'volume', value: v.volume, muted: v.muted });
     });
     on<number>('brightness', (b) => {
       const first = this.brightness !== null;
       const changed = b !== this.brightness;
       this.brightness = b;
-      if (first && changed && features.devices) news.announce(L(`Kecerahan ${b}%`, `Brightness ${b}%`));
+      if (first && changed && features.devices) news.showLevel({ kind: 'brightness', value: b / 100 });
     });
     on<number>('level', (v) => (this.level = v));
     on<MediaInfo | null>('media', (m) => {
@@ -79,16 +110,27 @@ class Device {
     });
     on<boolean>('fullscreen', (h) => (this.hidden = h));
     on<boolean>('online', (o) => {
-      if (features.network && o !== this.online) news.announce(o ? L('Internet tersambung lagi', 'Back online') : L('Internet terputus', 'Offline'));
+      if (features.network && o !== this.online) {
+        if (o) news.device(L('Internet tersambung', 'Back online'), L('Koneksi pulih', 'Connection restored'), 'wifi', TINT.green);
+        else news.device(L('Internet terputus', 'Offline'), L('Periksa Wi-Fi atau kabel', 'Check Wi-Fi or cable'), 'wifi-off', TINT.orange, { seconds: 4 });
+      }
       this.online = o;
     });
-    on<boolean>('caps', (c) => { if (features.keys && c !== this.caps) news.announce(c ? 'Caps Lock ON' : 'Caps Lock OFF'); this.caps = c; });
-    on<string>('layout', (l) => { if (features.keys && this.layout && l !== this.layout) news.announce(L(`Keyboard: ${l}`, `Keyboard: ${l}`)); this.layout = l; });
+    on<boolean>('caps', (c) => {
+      if (features.keys && c !== this.caps) {
+        news.device(c ? L('Caps Lock nyala', 'Caps Lock on') : L('Caps Lock mati', 'Caps Lock off'),
+          c ? L('HURUF BESAR SEMUA', 'TYPING IN CAPITALS') : L('Huruf biasa lagi', 'Back to normal'), c ? 'caps-on' : 'caps-off', c ? TINT.accent : TINT.gray);
+      }
+      this.caps = c;
+    });
+    on<string>('layout', (l) => { if (features.keys && this.layout && l !== this.layout) news.device(l, L('Bahasa keyboard', 'Keyboard language'), 'keyboard', TINT.accent); this.layout = l; });
     on<string>('output', (name) => {
-      if (features.devices && this.outName && name !== this.outName) news.announce(L('Output suara', 'Sound output'), name);
+      if (features.devices && this.outName && name !== this.outName) {
+        news.device(shortName(name), L('Tersambung', 'Connected'), 'headphones', TINT.white, { seconds: 4 });
+      }
       this.outName = name;
     });
-    on<string>('download', (name) => { if (features.downloads) news.announce(L('Unduhan selesai', 'Download finished'), name); });
+    on<string>('download', (name) => { if (features.downloads) news.device(L('Unduhan selesai', 'Download complete'), name, 'circle-check', TINT.green); });
     void cmd('set_clipboard_watch', { on: features.clipboard });
     void cmd('set_hide_fullscreen', { on: features.hideFullscreen });
   }
