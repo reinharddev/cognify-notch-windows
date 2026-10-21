@@ -13,7 +13,7 @@ Sinkron Pengingat Apple dan Siri Shortcuts tidak ada di Windows: Daftar tugas ha
 | Fitur | Cara di Windows | Catatan | Status |
 |---|---|---|---|
 | Notch, hover, 11 halaman | Jendela Tauri transparan, kursor dibaca Rust | Windows tidak punya notch fisik, jadi bentuknya pil di tengah atas | ditulis |
-| Musik dan sampul | Windows media session (SMTC), lewat crate `windows` | Spotify, browser, VLC, dan lainnya terbaca | ditulis |
+| Musik dan sampul | Windows media session (SMTC), lewat crate `windows` | Spotify, browser, VLC, dan lainnya terbaca | teruji di Windows 11 (Spotify) |
 | Lirik tersinkron | LRCLIB, sama dengan Mac | Hanya butuh internet | ditulis |
 | Equalizer mengikuti suara | WASAPI loopback | Tanpa izin tambahan | ditulis |
 | Agenda dan tombol Gabung | Sumber kalender perlu dipilih | Windows tidak punya Calendar API bersama; usulan: Outlook atau tautan ICS | belum |
@@ -23,7 +23,7 @@ Sinkron Pengingat Apple dan Siri Shortcuts tidak ada di Windows: Daftar tugas ha
 | Pengingat Minum | Portabel, notifikasi Windows |  | selesai di browser |
 | Daftar tugas | Portabel | Sinkron ke Pengingat Apple tidak ada di Windows | selesai di browser |
 | Clipboard | Pendengar clipboard Windows | Lewati isi pengelola kata sandi (format clipboard yang dikecualikan) | ditulis |
-| Tray file | Seret dan lepas Tauri |  | ditulis |
+| Tray file | Tempel file dari File Explorer (Ctrl+C lalu Ctrl+V) dan pemilih file; seret file belum jalan | Windows menolak drop di jendela notch (kursor tanda larangan); sebab belum ditemukan, perlu Catatan diagnosis dari Windows | tempel dan pilih file teruji di Windows 11; seret belum jalan |
 | Cermin | `getUserMedia` di webview | Izin kamera Windows | ditulis |
 | Pintasan | Tidak ada padanan Siri Shortcuts | Usulan: pintasan yang ditentukan pengguna (buka app, tautan) | ditulis |
 | Kabar: charger dan baterai | Windows power status |  | ditulis |
