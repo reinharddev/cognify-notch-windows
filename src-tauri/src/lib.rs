@@ -55,8 +55,12 @@ fn sync_visibility(app: &AppHandle, window: &WebviewWindow) {
 
 /// Buka jendela Pengaturan (atau bawa ke depan bila sudah terbuka). Pengaturan ada di jendela sendiri,
 /// bukan di dalam notch, karena notch sempit dan hilang saat kursor menjauh.
+///
+/// Harus `async`: di Windows, membuat jendela dari perintah sinkron atau penangan event membuat seluruh app
+/// macet (deadlock WebView2, lihat dokumentasi `WebviewWindowBuilder::build`). Perintah async berjalan di
+/// thread lain, dan dari penangan event (menu tray) dipanggil lewat `tauri::async_runtime::spawn`.
 #[tauri::command]
-fn open_settings(app: AppHandle) {
+async fn open_settings(app: AppHandle) {
     if let Some(w) = app.get_webview_window("settings") {
         let _ = w.unminimize();
         let _ = w.show();
@@ -578,7 +582,10 @@ pub fn run() {
                 .show_menu_on_left_click(false)
                 .on_menu_event(move |app, event| match event.id().as_ref() {
                     "toggle" => flip_menu(app),
-                    "settings" => open_settings(app.clone()),
+                    "settings" => {
+                        let app = app.clone();
+                        tauri::async_runtime::spawn(async move { open_settings(app).await });
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
