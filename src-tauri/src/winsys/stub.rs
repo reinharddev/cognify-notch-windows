@@ -23,3 +23,4 @@ impl MediaPoller {
 }
 pub fn media_command(_action: &str) {}
 pub fn media_seek(_seconds: f64) {}
+pub fn media_sessions() -> Vec<String> { Vec::new() }

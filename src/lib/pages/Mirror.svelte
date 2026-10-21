@@ -21,6 +21,7 @@
 {:else}<div class="wrap"><video bind:this={video} autoplay playsinline muted></video></div>{/if}
 
 <style>
-  .wrap { height: 100%; display: grid; place-items: center; }
-  video { height: 100%; max-width: 100%; border-radius: 14px; transform: scaleX(-1); object-fit: cover; background: #111; }
+  /* Isi dipaksa sebesar ruang halaman, apa pun ukuran asli kameranya (mis. OBS 1920x1080). */
+  .wrap { position: absolute; inset: 4px 0 0; display: grid; place-items: center; overflow: hidden; }
+  video { width: 100%; height: 100%; border-radius: 14px; transform: scaleX(-1); object-fit: contain; background: #111; }
 </style>

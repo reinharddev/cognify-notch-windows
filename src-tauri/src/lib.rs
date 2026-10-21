@@ -36,6 +36,32 @@ struct Shared {
     hide_fullscreen: AtomicBool,
 }
 
+/// Catatan diagnosis (seret file, perintah gagal) yang bisa dibaca di Pengaturan.
+static LOG: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+fn note(msg: impl Into<String>) {
+    let mut log = LOG.lock().unwrap();
+    log.push(msg.into());
+    let extra = log.len().saturating_sub(60);
+    log.drain(..extra);
+}
+
+#[tauri::command]
+fn log_note(msg: String) {
+    note(format!("ui: {msg}"));
+}
+
+#[tauri::command]
+fn diagnostics() -> String {
+    std::thread::spawn(|| {
+        winsys::init_thread();
+        winsys::media_sessions().join("\n")
+    })
+    .join()
+    .map(|sessions| format!("Sesi media:\n{sessions}\n\nCatatan:\n{}", LOG.lock().unwrap().join("\n")))
+    .unwrap_or_default()
+}
+
 /// Antarmuka melaporkan ukuran notch tiap kali bentuknya berubah.
 #[tauri::command]
 fn set_hit_rect(state: State<Shared>, rect: HitRect) {
@@ -143,6 +169,7 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             if now != inside {
                 inside = now;
                 let _ = window.set_ignore_cursor_events(!now);
+                note(format!("hover {}", if now { "masuk" } else { "keluar" }));
                 let _ = app.emit("notch-hover", now);
             }
         }
@@ -321,6 +348,8 @@ pub fn run() {
         .manage(Shared::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
+            log_note,
+            diagnostics,
             open_target,
             reveal,
             existing_paths,
@@ -336,9 +365,17 @@ pub fn run() {
         ])
         .on_window_event(|window, event| {
             // File yang dijatuhkan ke notch masuk Tray.
-            if let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event {
-                let list: Vec<String> = paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
-                let _ = window.emit("files-dropped", list);
+            if let WindowEvent::DragDrop(drag) = event {
+                match drag {
+                    DragDropEvent::Enter { paths, .. } => note(format!("seret masuk: {} file", paths.len())),
+                    DragDropEvent::Leave => note("seret keluar"),
+                    DragDropEvent::Drop { paths, .. } => {
+                        note(format!("file dijatuhkan: {} file", paths.len()));
+                        let list: Vec<String> = paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+                        let _ = window.emit("files-dropped", list);
+                    }
+                    _ => {}
+                }
             }
         })
         .setup(|app| {

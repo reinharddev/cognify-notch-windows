@@ -258,8 +258,38 @@ pub fn clipboard_set_image(data_url: &str) {
 }
 
 // ---------- Media (Windows media session) ----------
+fn is_playing(s: &Session) -> bool {
+    s.GetPlaybackInfo().and_then(|i| i.PlaybackStatus()).map(|p| p == Status::Playing).unwrap_or(false)
+}
+
+/// Sesi yang dipakai: yang sedang memutar; bila tidak ada, sesi pertama yang punya judul.
+/// (Sesi "terkini" dari Windows bisa menunjuk app lain, mis. Spotify yang hanya mengendalikan perangkat lain.)
 fn session() -> Option<Session> {
-    Manager::RequestAsync().ok()?.get().ok()?.GetCurrentSession().ok()
+    let manager = Manager::RequestAsync().ok()?.get().ok()?;
+    let all = manager.GetSessions().ok()?;
+    let mut idle = None;
+    for s in all {
+        if is_playing(&s) {
+            return Some(s);
+        }
+        if idle.is_none() && s.TryGetMediaPropertiesAsync().ok().and_then(|a| a.get().ok()).and_then(|p| p.Title().ok()).is_some_and(|t| !t.is_empty()) {
+            idle = Some(s);
+        }
+    }
+    idle.or_else(|| manager.GetCurrentSession().ok())
+}
+
+/// Daftar sesi media untuk diagnosis: "app | judul | status".
+pub fn media_sessions() -> Vec<String> {
+    let Some(manager) = Manager::RequestAsync().ok().and_then(|a| a.get().ok()) else { return vec!["tidak ada pengelola sesi".into()] };
+    let Ok(all) = manager.GetSessions() else { return vec!["tidak bisa membaca sesi".into()] };
+    all.into_iter()
+        .map(|s| {
+            let app = s.SourceAppUserModelId().map(|a| a.to_string()).unwrap_or_default();
+            let title = s.TryGetMediaPropertiesAsync().ok().and_then(|a| a.get().ok()).and_then(|p| p.Title().ok()).map(|t| t.to_string()).unwrap_or_default();
+            format!("{app} | {title} | {}", if is_playing(&s) { "memutar" } else { "tidak memutar" })
+        })
+        .collect()
 }
 
 fn ticks(span: TimeSpan) -> f64 {
@@ -319,7 +349,7 @@ impl MediaPoller {
             self.tries += 1;
             self.thumb = props.Thumbnail().ok().and_then(thumbnail);
         }
-        let playing = session.GetPlaybackInfo().and_then(|i| i.PlaybackStatus()).map(|s| s == Status::Playing).unwrap_or(false);
+        let playing = is_playing(&session);
         let (position, duration) = session
             .GetTimelineProperties()
             .map(|t| {

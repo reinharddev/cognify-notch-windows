@@ -19,6 +19,7 @@
   import Shortcuts from './lib/pages/Shortcuts.svelte';
   import Settings from './lib/pages/Settings.svelte';
   import Equalizer from './lib/Equalizer.svelte';
+  import PageDock from './lib/PageDock.svelte';
   import { weather } from './lib/weather.svelte';
   weather.restart();
 
@@ -85,11 +86,7 @@
         {:else if page.id === 'shortcuts'}<Shortcuts />{/if}
       </section>
 
-      <nav aria-label={L('Halaman', 'Pages')}>
-        {#each PAGES as p, i}
-          <button class:on={i === notch.page && !notch.settings} aria-label={p.title()} title={p.title()} onclick={() => notch.select(i)}></button>
-        {/each}
-      </nav>
+      <PageDock />
     {:else if news.current}
       {#key news.current.id}
         <div class="news"><b>{news.current.text}</b>{#if news.current.sub}<span>{news.current.sub}</span>{/if}</div>
@@ -124,9 +121,6 @@
   .batt.low { color: #ff6b63; }
   .gear { border: 0; background: none; cursor: pointer; opacity: .5; font-size: 14px; padding: 0 2px; }
   .gear:hover { opacity: 1; }
-  .page { flex: 1; min-height: 0; padding-top: 4px; }
-  nav { height: 22px; flex: none; display: flex; align-items: flex-end; justify-content: center; gap: 6px; }
-  nav button { width: 6px; height: 6px; border: 0; padding: 0; border-radius: 99px; background: rgba(255, 255, 255, .3); cursor: pointer; transition: width .2s, background .2s; }
-  nav button.on { width: 16px; background: #fff; }
+  .page { flex: 1; min-height: 0; padding-top: 4px; position: relative; overflow: hidden; }
   @media (prefers-reduced-motion: reduce) { .shell, .eyes i { transition: none; animation: none; } }
 </style>
