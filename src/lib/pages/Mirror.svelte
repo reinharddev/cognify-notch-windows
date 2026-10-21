@@ -18,10 +18,17 @@
 </script>
 
 {#if error}<div class="empty">{error}</div>
-{:else}<div class="wrap"><video bind:this={video} autoplay playsinline muted></video></div>{/if}
+{:else}
+  <div class="cols" style="align-items:center;gap:22px;padding-left:6px">
+    <video bind:this={video} autoplay playsinline muted></video>
+    <div class="col">
+      <b style="font-size:15px">{L('Cermin', 'Mirror')}</b>
+      <span class="dim" style="max-width:300px">{L('Lihat dirimu sebelum rapat. Kamera hanya menyala selama halaman ini terbuka dan tidak merekam apa pun.', 'Check yourself before a call. The camera is on only while this page is open and nothing is recorded.')}</span>
+    </div>
+  </div>
+{/if}
 
 <style>
-  /* Isi dipaksa sebesar ruang halaman, apa pun ukuran asli kameranya (mis. OBS 1920x1080). */
-  .wrap { position: absolute; inset: 4px 0 0; display: grid; place-items: center; overflow: hidden; }
-  video { width: 100%; height: 100%; border-radius: 14px; transform: scaleX(-1); object-fit: contain; background: #111; }
+  /* Kotak tetap di kiri, apa pun resolusi kameranya (mis. OBS 1920x1080): gambar dipotong tengahnya. */
+  video { width: 176px; height: 176px; flex: none; border-radius: 28px; transform: scaleX(-1); object-fit: cover; background: #111; }
 </style>

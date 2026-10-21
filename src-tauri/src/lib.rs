@@ -95,6 +95,11 @@ fn set_hide_fullscreen(state: State<Shared>, on: bool) {
 }
 
 #[tauri::command]
+fn clip_files() -> Vec<String> {
+    winsys::clipboard_files()
+}
+
+#[tauri::command]
 fn clip_set_text(text: String) {
     winsys::clipboard_set_text(&text);
 }
@@ -355,6 +360,7 @@ pub fn run() {
             existing_paths,
             set_clipboard_watch,
             set_hide_fullscreen,
+            clip_files,
             clip_set_text,
             clip_set_image,
             media_cmd,

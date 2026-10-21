@@ -231,6 +231,15 @@ pub fn clipboard_poll(last: &mut u32) -> Option<ClipEvent> {
     Some(ClipEvent { kind: "image", text: format!("{} x {}", img.width, img.height), image: Some(url), app })
 }
 
+/// File yang sedang disalin di File Explorer (Ctrl+C pada file).
+pub fn clipboard_files() -> Vec<String> {
+    arboard::Clipboard::new()
+        .ok()
+        .and_then(|mut b| b.get().file_list().ok())
+        .map(|list| list.into_iter().map(|p| p.to_string_lossy().into_owned()).collect())
+        .unwrap_or_default()
+}
+
 pub fn clipboard_set_text(text: &str) {
     if let Ok(mut board) = arboard::Clipboard::new() {
         let _ = board.set_text(text.to_owned());
