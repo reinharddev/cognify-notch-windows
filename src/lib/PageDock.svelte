@@ -4,57 +4,61 @@
   import { notch } from './notch.svelte';
   import { L } from './i18n';
 
-  // Titik halaman. Saat kursor mendekat, titik berubah jadi ikon seperti Dock macOS: yang paling
-  // dekat kursor membesar paling besar dan namanya muncul di atasnya. Klik untuk lompat.
+  // Titik halaman. Saat kursor masuk, titik berubah jadi deretan kotak ikon seperti Dock macOS:
+  // yang paling dekat kursor membesar paling besar dan namanya muncul di atasnya. Klik untuk lompat.
   const ICONS: Record<string, typeof House> = {
     home: House, music: Music, timer: Timer, clock: AlarmClock, water: Droplet, todo: ListChecks,
     notes: NotebookPen, clipboard: ClipboardList, tray: Inbox, mirror: ScanFace, shortcuts: Zap,
   };
+  const BASE = 20, MAX = 36, GAP = 4, SIGMA = 38;
   let mouseX = $state<number | null>(null);
   let nav: HTMLElement | undefined = $state();
-  let centers = $state<number[]>([]);
+  let origin = $state({ left: 0, center: 0 });
 
   const measure = () => {
     if (!nav) return;
-    // Pusat tiap tombol saat belum membesar: dihitung dari urutan, supaya tidak ikut bergeser.
     const r = nav.getBoundingClientRect();
-    const gap = 6, dot = 6, total = PAGES.length * dot + (PAGES.length - 1) * gap;
-    const start = r.left + r.width / 2 - total / 2;
-    centers = PAGES.map((_, i) => start + i * (dot + gap) + dot / 2);
+    origin = { left: r.left, center: r.left + r.width / 2 };
   };
-  const f = (i: number) => (mouseX === null || !centers[i] ? 0 : Math.exp(-(((mouseX - centers[i]) / 34) ** 2)));
-  const nearest = $derived(mouseX === null ? -1 : centers.reduce((best, c, i) => (Math.abs(c - mouseX!) < Math.abs(centers[best] - mouseX!) ? i : best), 0));
+  // Pusat tiap kotak pada ukuran dasar; dipakai tetap supaya posisi kursor tidak ikut bergeser saat kotak membesar.
+  const center = (i: number) => origin.center + (i - (PAGES.length - 1) / 2) * (BASE + GAP);
+  const f = (i: number) => (mouseX === null ? 0 : Math.exp(-(((mouseX - center(i)) / SIGMA) ** 2)));
+  const nearest = $derived(mouseX === null ? -1 : PAGES.reduce((best, _, i) => (Math.abs(center(i) - mouseX!) < Math.abs(center(best) - mouseX!) ? i : best), 0));
+  const hovering = $derived(mouseX !== null);
 </script>
 
 <nav
   bind:this={nav}
+  class:hovering
   aria-label={L('Halaman', 'Pages')}
-  onpointerenter={measure}
-  onpointermove={(e) => { if (!centers.length) measure(); mouseX = e.clientX; }}
+  onpointerenter={(e) => { measure(); mouseX = e.clientX; }}
+  onpointermove={(e) => { mouseX = e.clientX; }}
   onpointerleave={() => (mouseX = null)}
 >
-  {#if nearest >= 0 && f(nearest) > 0.35}<span class="tip" style:left="{centers[nearest] - (nav?.getBoundingClientRect().left ?? 0)}px">{PAGES[nearest].title()}</span>{/if}
+  {#if hovering && nearest >= 0}
+    <span class="tip" style:left="{center(nearest) - origin.left}px">{PAGES[nearest].title()}</span>
+  {/if}
   {#each PAGES as p, i}
-    {@const k = f(i)}
     {@const Icon = ICONS[p.id]}
-    <button
-      class:on={i === notch.page && !notch.settings}
-      aria-label={p.title()}
-      onclick={() => notch.select(i)}
-      style:width="{6 + 16 * k}px" style:height="{6 + 16 * k}px"
-    >
-      <span class="dot" style:opacity={1 - k}></span>
-      <span class="ico" style:opacity={k}><Icon size={14 + 4 * k} strokeWidth={2.2} /></span>
-    </button>
+    {@const size = BASE + (MAX - BASE) * f(i)}
+    {#if hovering}
+      <button class="tile" class:on={i === notch.page && !notch.settings} aria-label={p.title()} onclick={() => notch.select(i)}
+        style:width="{size}px" style:height="{size}px" style:border-radius="{size * 0.28}px">
+        <Icon size={size * 0.56} strokeWidth={2.2} />
+      </button>
+    {:else}
+      <button class="pip" class:on={i === notch.page && !notch.settings} aria-label={p.title()} onclick={() => notch.select(i)}></button>
+    {/if}
   {/each}
 </nav>
 
 <style>
-  nav { position: relative; height: 26px; flex: none; display: flex; align-items: flex-end; justify-content: center; gap: 6px; padding-bottom: 3px; }
-  button { position: relative; border: 0; padding: 0; background: none; cursor: pointer; display: grid; place-items: center; color: rgba(255, 255, 255, .55); }
-  button.on { color: #fff; }
-  .dot { position: absolute; inset: 0; border-radius: 99px; background: rgba(255, 255, 255, .3); }
-  button.on .dot { background: #fff; }
-  .ico { position: absolute; inset: 0; display: grid; place-items: center; }
-  .tip { position: absolute; bottom: 30px; transform: translateX(-50%); padding: 3px 9px; border-radius: 99px; background: rgba(255, 255, 255, .16); font-size: 11px; font-weight: 600; white-space: nowrap; pointer-events: none; }
+  nav { position: relative; height: 22px; width: 170px; margin: 0 auto; flex: none; display: flex; align-items: flex-end; justify-content: center; gap: 6px; padding-bottom: 2px; }
+  nav.hovering { width: 340px; gap: 4px; z-index: 3; }
+  button { border: 0; padding: 0; cursor: pointer; flex: none; }
+  .pip { width: 6px; height: 6px; border-radius: 99px; background: rgba(255, 255, 255, .3); }
+  .pip.on { width: 16px; background: #fff; }
+  .tile { display: grid; place-items: center; background: rgba(255, 255, 255, .16); color: #fff; }
+  .tile.on { background: var(--accent); color: #fff; }
+  .tip { position: absolute; bottom: 42px; transform: translateX(-50%); padding: 3px 10px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: 11px; font-weight: 600; white-space: nowrap; pointer-events: none; }
 </style>

@@ -2,12 +2,14 @@ import { reportRect, onHover } from './bridge';
 import { PAGES } from './pages';
 import { news } from './news.svelte';
 import { load, save } from './store.svelte';
+import { device, features } from './system.svelte';
 
 // Ukuran tiap bentuk (piksel CSS). Jendela Tauri lebarnya 720 dan tingginya 300.
 export const WINDOW = { w: 720, h: 300 };
 export const SIZES = {
   idle: { w: 190, h: 36, r: 12 },
   news: { w: 400, h: 46, r: 18 },
+  media: { w: 270, h: 36, r: 14 },
   open: { w: 680, h: 256, r: 30 },
 } as const;
 
@@ -30,8 +32,13 @@ class Notch {
     });
   }
 
+  /** Musik sedang diputar: pil melebar, sampul di kiri dan equalizer di kanan. */
+  get wings() {
+    return features.media && !!device.media?.playing;
+  }
+
   get size() {
-    return this.open ? SIZES.open : news.current ? SIZES.news : SIZES.idle;
+    return this.open ? SIZES.open : news.current ? SIZES.news : this.wings ? SIZES.media : SIZES.idle;
   }
 
   enter() {

@@ -91,6 +91,12 @@
       {#key news.current.id}
         <div class="news"><b>{news.current.text}</b>{#if news.current.sub}<span>{news.current.sub}</span>{/if}</div>
       {/key}
+    {:else if notch.wings && device.media}
+      <div class="wings">
+        <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
+        <span class="song">{device.media.title}</span>
+        <Equalizer />
+      </div>
     {:else}
       <span class="eyes"><i></i><i></i></span>
     {/if}
@@ -107,6 +113,10 @@
   .eyes { display: flex; gap: 9px; }
   .eyes i { width: 7px; height: 11px; background: #fff; border-radius: 50%; animation: blink 5s infinite; }
   @keyframes blink { 0%, 92%, 100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
+  .wings { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
+  .art { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 12px; }
+  .art img { width: 100%; height: 100%; object-fit: cover; }
+  .song { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(255, 255, 255, .85); }
   .news { display: flex; gap: 10px; align-items: baseline; padding: 0 16px; max-width: 100%; white-space: nowrap; animation: pop .35s; }
   .news b { overflow: hidden; text-overflow: ellipsis; }
   .news span { color: rgba(255, 255, 255, .5); font-size: 11px; }
