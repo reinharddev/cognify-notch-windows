@@ -28,3 +28,16 @@ export async function cmd<T = void>(name: string, args?: Record<string, unknown>
 export function on<T>(event: string, handler: (payload: T) => void) {
   if (inTauri) void listen<T>(event, (e) => handler(e.payload));
 }
+
+/** Pilih file lewat jendela Windows (cadangan bila seret file tidak jalan). */
+export async function pickFiles(): Promise<string[]> {
+  if (!inTauri) return [];
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const r = await open({ multiple: true });
+    return Array.isArray(r) ? r : r ? [r] : [];
+  } catch (e) {
+    console.warn('pickFiles', e);
+    return [];
+  }
+}

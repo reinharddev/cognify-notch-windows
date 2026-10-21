@@ -266,6 +266,12 @@ fn ticks(span: TimeSpan) -> f64 {
     span.Duration as f64 / 10_000_000.0
 }
 
+/// Detik sejak 1 Januari 1601, patokan waktu yang dipakai Windows.
+fn now_seconds_1601() -> f64 {
+    let unix = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0);
+    unix + 11_644_473_600.0
+}
+
 fn thumbnail(reference: IRandomAccessStreamReference) -> Option<String> {
     use base64::Engine;
     let stream = reference.OpenReadAsync().ok()?.get().ok()?;
@@ -285,11 +291,13 @@ fn thumbnail(reference: IRandomAccessStreamReference) -> Option<String> {
 pub struct MediaPoller {
     key: String,
     thumb: Option<String>,
+    /// Berapa kali sampul lagu ini sudah dicoba diambil (Spotify kadang baru menyiapkannya setelah judul tampil).
+    tries: u8,
 }
 
 impl MediaPoller {
     pub fn new() -> Self {
-        Self { key: String::new(), thumb: None }
+        Self { key: String::new(), thumb: None, tries: 0 }
     }
 
     pub fn poll(&mut self) -> Option<Media> {
@@ -303,15 +311,29 @@ impl MediaPoller {
         let album = props.AlbumTitle().map(|s| s.to_string()).unwrap_or_default();
         let key = format!("{title}\u{1f}{artist}\u{1f}{album}");
         if key != self.key {
-            self.thumb = props.Thumbnail().ok().and_then(thumbnail);
+            self.thumb = None;
+            self.tries = 0;
             self.key = key;
+        }
+        if self.thumb.is_none() && self.tries < 8 {
+            self.tries += 1;
+            self.thumb = props.Thumbnail().ok().and_then(thumbnail);
         }
         let playing = session.GetPlaybackInfo().and_then(|i| i.PlaybackStatus()).map(|s| s == Status::Playing).unwrap_or(false);
         let (position, duration) = session
             .GetTimelineProperties()
             .map(|t| {
                 let start = t.StartTime().map(ticks).unwrap_or(0.0);
-                (t.Position().map(ticks).unwrap_or(0.0) - start, t.EndTime().map(ticks).unwrap_or(0.0) - start)
+                let end = t.EndTime().map(ticks).unwrap_or(0.0) - start;
+                let mut pos = t.Position().map(ticks).unwrap_or(0.0) - start;
+                // Posisi dari pemutar hanya diperbarui sesekali; tambahkan waktu sejak pembaruan terakhir.
+                if playing {
+                    if let Ok(updated) = t.LastUpdatedTime() {
+                        let since = now_seconds_1601() - updated.UniversalTime as f64 / 10_000_000.0;
+                        pos += since.clamp(0.0, 3600.0);
+                    }
+                }
+                (if end > 0.0 { pos.min(end) } else { pos }, end)
             })
             .unwrap_or((0.0, 0.0));
         let app = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();

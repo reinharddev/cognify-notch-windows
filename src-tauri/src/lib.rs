@@ -225,7 +225,7 @@ fn watch_media(app: AppHandle) {
         let mut poller = winsys::MediaPoller::new();
         let mut last: Option<(winsys::Media, Instant)> = None;
         loop {
-            std::thread::sleep(Duration::from_millis(1000));
+            std::thread::sleep(Duration::from_millis(500));
             let now = poller.poll();
             let changed = match (&now, &last) {
                 (None, None) => false,
@@ -316,6 +316,7 @@ fn watch_downloads(app: AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .manage(Shared::default())
         .invoke_handler(tauri::generate_handler![

@@ -51,7 +51,16 @@ class Device {
     });
     on<{ volume: number; muted: boolean }>('volume', (v) => { this.volume = v.volume; this.muted = v.muted; });
     on<number>('level', (v) => (this.level = v));
-    on<MediaInfo | null>('media', (m) => { this.media = m; this.mediaAt = Date.now(); });
+    on<MediaInfo | null>('media', (m) => {
+      // Lagu dan jalur waktu sama: pertahankan jam sendiri supaya lirik tidak melompat karena selisih kecil.
+      const old = this.media;
+      if (m && old && m.title === old.title && m.artist === old.artist && m.playing && old.playing) {
+        const predicted = old.position + (Date.now() - this.mediaAt) / 1000;
+        if (Math.abs(m.position - predicted) < 2) { this.media = { ...m, position: old.position }; return; }
+      }
+      this.media = m;
+      this.mediaAt = Date.now();
+    });
     on<boolean>('fullscreen', (h) => (this.hidden = h));
     on<boolean>('online', (o) => {
       if (features.network && o !== this.online) news.announce(o ? L('Internet tersambung lagi', 'Back online') : L('Internet terputus', 'Offline'));

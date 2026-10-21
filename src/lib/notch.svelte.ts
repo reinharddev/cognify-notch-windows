@@ -23,7 +23,9 @@ class Notch {
     $effect.root(() => {
       $effect(() => {
         const { w, h } = this.size;
-        reportRect((WINDOW.w - w) / 2, 0, w, h);
+        // Saat diam, area sambutan sedikit lebih lebar dari pil supaya mudah dikenai kursor.
+        const pad = this.open ? 0 : 28;
+        reportRect((WINDOW.w - w) / 2 - pad, 0, w + pad * 2, h + (this.open ? 0 : 10));
       });
     });
   }

@@ -1,15 +1,16 @@
 <script lang="ts">
   const ext = (n: string) => (n.includes('.') ? n.split('.').pop()!.slice(0, 4).toUpperCase() : '▭');
   import { tray } from '../shelf.svelte';
-  import { inTauri } from '../bridge';
+  import { inTauri, pickFiles } from '../bridge';
   import { L } from '../i18n';
 </script>
 
 <div class="col" style="height:100%">
   <div class="row"><span class="label grow">{L('File sementara', 'Temporary files')}</span>
+    {#if inTauri}<button class="btn on" onclick={async () => tray.add(await pickFiles())}>{L('Tambah file', 'Add files')}</button>{/if}
     {#if tray.items.length}<button class="btn" onclick={() => tray.clear()}>{L('Kosongkan', 'Clear')}</button>{/if}</div>
   {#if tray.items.length === 0}
-    <div class="empty">{inTauri ? L('Seret file dari File Explorer ke sini. Yang disimpan hanya letaknya, bukan salinan.', 'Drag files from File Explorer here. Only their location is kept, not a copy.') : L('Seret file ke sini (hanya jalan di app).', 'Drag files here (works in the app only).')}</div>
+    <div class="empty">{inTauri ? L('Klik Tambah file, atau seret file dari File Explorer. Yang disimpan hanya letaknya, bukan salinan.', 'Click Add files, or drag files from File Explorer. Only their location is kept, not a copy.') : L('Seret file ke sini (hanya jalan di app).', 'Drag files here (works in the app only).')}</div>
   {:else}
     <div class="grid">
       {#each tray.items as i (i.id)}
