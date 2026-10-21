@@ -1,4 +1,4 @@
-import { reportRect, onHover } from './bridge';
+import { reportRect, onHover, on, cmd } from './bridge';
 import { PAGES } from './pages';
 import { news } from './news.svelte';
 import { load, save } from './store.svelte';
@@ -17,10 +17,12 @@ class Notch {
   open = $state(false);
   page = $state(Math.min(load('page', 0), PAGES.length - 1));
   settings = $state(false);
+  pinned = $state(false);
   private closeTimer = 0;
 
   constructor() {
     onHover((inside) => (inside ? this.enter() : this.leave()));
+    on('hotkey', () => this.togglePinned());
     // Area sentuh mengikuti bentuk yang sedang dituju.
     $effect.root(() => {
       $effect(() => {
@@ -47,7 +49,22 @@ class Notch {
     news.dismiss();
   }
 
+  togglePinned() {
+    if (this.pinned) return this.unpin();
+    this.pinned = true;
+    this.enter();
+    void cmd('set_pinned', { on: true });
+  }
+
+  unpin() {
+    if (!this.pinned) return;
+    this.pinned = false;
+    void cmd('set_pinned', { on: false });
+    this.leave();
+  }
+
   leave() {
+    if (this.pinned) return;
     clearTimeout(this.closeTimer);
     this.closeTimer = window.setTimeout(() => {
       this.open = false;

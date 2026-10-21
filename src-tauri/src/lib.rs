@@ -19,6 +19,7 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, DragDropEvent, Emitter, Manager, PhysicalPosition, State, WebviewWindow, WindowEvent};
 use tauri_plugin_autostart::{MacosLauncher, ManagerExt};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 /// Bentuk notch yang sedang tampil, dalam piksel CSS relatif terhadap sudut kiri atas jendela.
 #[derive(Clone, Copy, Default, Deserialize, Serialize)]
@@ -34,6 +35,8 @@ struct Shared {
     rect: Mutex<HitRect>,
     clipboard_on: AtomicBool,
     hide_fullscreen: AtomicBool,
+    /// Dibuka lewat pintasan keyboard: tetap terbuka walau kursor di luar.
+    pinned: AtomicBool,
 }
 
 /// Catatan diagnosis (seret file, perintah gagal) yang bisa dibaca di Pengaturan.
@@ -66,6 +69,74 @@ fn diagnostics() -> String {
 #[tauri::command]
 fn set_hit_rect(state: State<Shared>, rect: HitRect) {
     *state.rect.lock().unwrap() = rect;
+}
+
+#[tauri::command]
+fn set_pinned(state: State<Shared>, window: WebviewWindow, on: bool) {
+    state.pinned.store(on, Ordering::Relaxed);
+    let _ = window.set_ignore_cursor_events(!on);
+    if on {
+        let _ = window.set_focus();
+    }
+}
+
+/// Pintasan keyboard global untuk membuka notch. `choice` kosong atau tidak dikenal = mati.
+#[tauri::command]
+fn set_hotkey(app: AppHandle, choice: String) {
+    let gs = app.global_shortcut();
+    let _ = gs.unregister_all();
+    let (mods, code) = match choice.as_str() {
+        "ctrl_alt_n" => (Modifiers::CONTROL | Modifiers::ALT, Code::KeyN),
+        "ctrl_alt_space" => (Modifiers::CONTROL | Modifiers::ALT, Code::Space),
+        "alt_space" => (Modifiers::ALT, Code::Space),
+        "ctrl_shift_n" => (Modifiers::CONTROL | Modifiers::SHIFT, Code::KeyN),
+        _ => return,
+    };
+    let result = gs.on_shortcut(Shortcut::new(Some(mods), code), |app, _, event| {
+        if event.state() == ShortcutState::Pressed {
+            let _ = app.emit("hotkey", ());
+        }
+    });
+    if let Err(e) = result {
+        note(format!("pintasan {choice} gagal didaftarkan: {e}"));
+    }
+}
+
+/// Isi kalender dari tautan ICS (Google Calendar, Outlook, dan lainnya). Hanya https, dan hanya
+/// tautan yang diketik pengguna; tidak ada yang dikirim selain permintaan itu sendiri.
+#[tauri::command]
+async fn fetch_text(url: String) -> Result<String, String> {
+    let url = url.trim().replacen("webcal://", "https://", 1);
+    if !url.starts_with("https://") {
+        return Err("Tautan harus diawali https://".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(20))).build().into();
+        agent
+            .get(&url)
+            .call()
+            .map_err(|e| e.to_string())?
+            .body_mut()
+            .with_config()
+            .limit(3_000_000)
+            .read_to_string()
+            .map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Membaca file kalender .ics yang dipilih pengguna.
+#[tauri::command]
+fn read_ics_file(path: String) -> Result<String, String> {
+    if !path.to_lowercase().ends_with(".ics") {
+        return Err("Pilih file berekstensi .ics".into());
+    }
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 3_000_000 {
+        return Err("File terlalu besar".into());
+    }
+    std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -170,7 +241,8 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             let rect = *app.state::<Shared>().rect.lock().unwrap();
             let x = (cursor.x - origin.x as f64) / scale;
             let y = (cursor.y - origin.y as f64) / scale;
-            let now = rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= 0.0 && y <= rect.y + rect.h;
+            let pinned = app.state::<Shared>().pinned.load(Ordering::Relaxed);
+            let now = pinned || rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= 0.0 && y <= rect.y + rect.h;
             if now != inside {
                 inside = now;
                 let _ = window.set_ignore_cursor_events(!now);
@@ -187,6 +259,7 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
         winsys::init_thread();
         let (mut level, mut volume, mut power, mut caps, mut layout, mut output) = (0.0f32, None, None, false, None, None);
         let (mut online, mut covered) = (true, false);
+        let mut brightness = (winsys::BrightnessReader::new(), None::<u8>);
         let mut tick = 0u64;
         loop {
             std::thread::sleep(Duration::from_millis(100));
@@ -216,6 +289,15 @@ fn watch_system(app: AppHandle, window: WebviewWindow) {
                         let _ = app.emit("layout", l);
                     }
                     layout = l;
+                }
+            }
+            if tick % 5 == 0 {
+                let b = brightness.0.read();
+                if b != brightness.1 {
+                    if let Some(b) = b {
+                        let _ = app.emit("brightness", b);
+                    }
+                    brightness.1 = b;
                 }
             }
             if tick % 20 == 0 {
@@ -349,10 +431,15 @@ fn watch_downloads(app: AppHandle) {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .manage(Shared::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
+            set_pinned,
+            set_hotkey,
+            fetch_text,
+            read_ics_file,
             log_note,
             diagnostics,
             open_target,

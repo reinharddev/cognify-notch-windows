@@ -21,13 +21,18 @@
   import Equalizer from './lib/Equalizer.svelte';
   import PageDock from './lib/PageDock.svelte';
   import { weather } from './lib/weather.svelte';
+  import { agenda } from './lib/agenda.svelte';
+  import { hotkey } from './lib/hotkey.svelte';
   weather.restart();
+  agenda.restart();
+  hotkey.apply();
 
   const page = $derived(PAGES[notch.page]);
   const time = $derived(new Date(ticker.now).toLocaleString([], { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }));
 
   // Geser halaman dengan panah atau roda mouse mendatar.
   const key = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') notch.unpin();
     if (!notch.open || (e.target as HTMLElement)?.matches?.('input,textarea')) return;
     if (e.key === 'ArrowRight') notch.go(1);
     if (e.key === 'ArrowLeft') notch.go(-1);
@@ -40,7 +45,7 @@
   };
 </script>
 
-<svelte:window onkeydown={key} onwheel={wheel} />
+<svelte:window onkeydown={key} onwheel={wheel} onblur={() => notch.unpin()} />
 
 <!-- Di browser biasa hover memakai pointer; di Tauri hover datang dari Rust. -->
 <main

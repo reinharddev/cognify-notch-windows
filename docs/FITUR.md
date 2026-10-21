@@ -16,27 +16,28 @@ Sinkron Pengingat Apple dan Siri Shortcuts tidak ada di Windows: Daftar tugas ha
 | Musik dan sampul | Windows media session (SMTC), lewat crate `windows` | Spotify, browser, VLC, dan lainnya terbaca | teruji di Windows 11 (Spotify) |
 | Lirik tersinkron | LRCLIB, sama dengan Mac | Hanya butuh internet | ditulis |
 | Equalizer mengikuti suara | WASAPI loopback | Tanpa izin tambahan | ditulis |
-| Agenda dan tombol Gabung | Sumber kalender perlu dipilih | Windows tidak punya Calendar API bersama; usulan: Outlook atau tautan ICS | belum |
+| Agenda dan tombol Gabung | Kalender ICS (tautan rahasia Google Calendar atau Outlook, atau file .ics); tombol Gabung 10 menit sebelum acara; pengingat 5 menit sebelumnya | Windows tidak punya Calendar API bersama. Permintaan internet hanya ke tautan yang kamu ketik, tiap 15 menit. Pengulangan sederhana saja (harian, mingguan, bulanan, tahunan) | ditulis |
 | Catatan cepat, kalkulator, konversi | Portabel (TypeScript) | Port `Calc.swift` | selesai di browser |
-| Rekam suara jadi catatan | Pengenalan ucapan Windows | Perlu uji bahasa Indonesia | belum |
+| Rekam suara jadi catatan | Tidak dikerjakan | Pengenalan ucapan bawaan Windows mengirim suara ke server Microsoft. Versi Mac sengaja hanya di perangkat; tanpa model offline yang bisa dibundel, fitur ini ditunda daripada melanggar prinsip itu | ditunda |
 | Pomodoro, Stopwatch, Timer | Portabel | Port `Timers.swift` | selesai di browser |
 | Pengingat Minum | Portabel, notifikasi Windows |  | selesai di browser |
 | Daftar tugas | Portabel | Sinkron ke Pengingat Apple tidak ada di Windows | selesai di browser |
 | Clipboard | Pendengar clipboard Windows | Lewati isi pengelola kata sandi (format clipboard yang dikecualikan) | ditulis |
 | Tray file | Tempel file dari File Explorer (Ctrl+C lalu Ctrl+V) dan pemilih file; seret file belum jalan | Windows menolak drop di jendela notch (kursor tanda larangan); sebab belum ditemukan, perlu Catatan diagnosis dari Windows | tempel dan pilih file teruji di Windows 11; seret belum jalan |
 | Cermin | `getUserMedia` di webview | Izin kamera Windows | ditulis |
+| Pintasan keyboard membuka notch | Ctrl+Alt+N bawaan (bisa diganti di Pengaturan); tekan lagi atau Esc untuk menutup, panah untuk ganti halaman | Pintasan global lewat plugin Tauri | ditulis |
 | Pintasan | Tidak ada padanan Siri Shortcuts | Usulan: pintasan yang ditentukan pengguna (buka app, tautan) | ditulis |
 | Kabar: charger dan baterai | Windows power status |  | ditulis |
 | Kabar: AirPods dan headphone | Hanya nama perangkat Bluetooth | Baterai belum tentu terbaca | ditulis (nama perangkat suara) |
 | Kabar: unduhan | Pantau folder Downloads |  | ditulis |
 | Kabar: Caps Lock, bahasa keyboard | Hook keyboard Windows |  | ditulis |
 | Kabar: internet putus | Status jaringan Windows |  | ditulis |
-| Volume dan kecerahan | Pantau volume (WASAPI), kecerahan lewat WMI | Kecerahan hanya di laptop | volume ditulis; kecerahan belum |
+| Volume dan kecerahan | Volume lewat WASAPI, kecerahan lewat WMI (laptop); perubahan tampil sebagai kabar di pil | Di PC desktop tidak ada kabar kecerahan | ditulis |
 | Sembunyi saat layar penuh | Deteksi jendela layar penuh |  | ditulis |
 | Cuaca | Open-Meteo, sama dengan Mac | Mati bawaan | selesai di browser |
 | Buka saat Windows dinyalakan | Registry Run (build GitHub) atau StartupTask (build Store) |  | ditulis |
 | Update otomatis | Pengecek versi dari Releases (build GitHub); tidak ada di build Store |  | ditulis (cek versi, buka halaman unduh) |
-| Output suara | Versi Store: tombol ke pengaturan suara Windows | API pengganti output tidak resmi (kebijakan Store 10.2.8) | belum |
+| Output suara | Tombol Output di halaman Musik membuka pengaturan suara Windows | API pengganti output tidak resmi (kebijakan Store 10.2.8) | selesai |
 
 Dua build dari kode yang sama: build GitHub (installer NSIS, ada updater, tanpa signing atau
 SignPath) dan build Store (MSIX, tanpa updater, startup lewat StartupTask).

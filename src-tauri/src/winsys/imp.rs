@@ -395,3 +395,28 @@ pub fn media_seek(seconds: f64) {
         let _ = session.TryChangePlaybackPositionAsync((seconds.max(0.0) * 10_000_000.0) as i64).and_then(|a| a.get());
     }
 }
+
+// ---------- Kecerahan layar (laptop) ----------
+/// Membaca kecerahan layar bawaan laptop lewat WMI. PC desktop tidak punya kelas ini, jadi hasilnya kosong.
+pub struct BrightnessReader {
+    conn: Option<wmi::WMIConnection>,
+}
+
+impl BrightnessReader {
+    pub fn new() -> Self {
+        Self { conn: None }
+    }
+
+    pub fn read(&mut self) -> Option<u8> {
+        #[derive(serde::Deserialize)]
+        #[allow(non_snake_case)]
+        struct Level {
+            CurrentBrightness: u8,
+        }
+        if self.conn.is_none() {
+            self.conn = wmi::WMIConnection::with_namespace_path("ROOT\\WMI").ok();
+        }
+        let rows: Vec<Level> = self.conn.as_ref()?.raw_query("SELECT CurrentBrightness FROM WmiMonitorBrightness").ok()?;
+        rows.first().map(|r| r.CurrentBrightness)
+    }
+}

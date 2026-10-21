@@ -53,6 +53,7 @@
       <div class="row dim">
         <span>{device.muted ? '🔇' : '🔈'}</span>
         <input type="range" min="0" max="100" value={Math.round(device.volume * 100)} oninput={setVolume} aria-label={L('Volume', 'Volume')} />
+        <button class="btn" title={L('Pilih perangkat keluaran suara', 'Choose the sound output device')} onclick={() => cmd('open_target', { target: 'ms-settings:sound' })}>{L('Output', 'Output')}</button>
       </div>
     </div>
     <div class="sep"></div>

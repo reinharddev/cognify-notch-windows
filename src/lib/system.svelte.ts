@@ -35,6 +35,8 @@ class Device {
   level = $state(0);        // 0..1, seberapa keras suara yang sedang keluar
   media = $state<MediaInfo | null>(null);
   mediaAt = 0;
+  volumeSeen = false;
+  brightness: number | null = null;
   hidden = $state(false);   // app layar penuh sedang tampil
   online = true;
   caps = false;
@@ -49,7 +51,18 @@ class Device {
         news.announce(p.plugged ? L('Charger tersambung', 'Charger connected') : L('Charger dicabut', 'Charger unplugged'), `${p.percent}%`);
       }
     });
-    on<{ volume: number; muted: boolean }>('volume', (v) => { this.volume = v.volume; this.muted = v.muted; });
+    on<{ volume: number; muted: boolean }>('volume', (v) => {
+      const first = this.volumeSeen;
+      const changed = Math.abs(v.volume - this.volume) > 0.005 || v.muted !== this.muted;
+      this.volume = v.volume; this.muted = v.muted; this.volumeSeen = true;
+      if (first && changed && features.devices) news.announce(v.muted ? L('Volume senyap', 'Muted') : L(`Volume ${Math.round(v.volume * 100)}%`, `Volume ${Math.round(v.volume * 100)}%`));
+    });
+    on<number>('brightness', (b) => {
+      const first = this.brightness !== null;
+      const changed = b !== this.brightness;
+      this.brightness = b;
+      if (first && changed && features.devices) news.announce(L(`Kecerahan ${b}%`, `Brightness ${b}%`));
+    });
     on<number>('level', (v) => (this.level = v));
     on<MediaInfo | null>('media', (m) => {
       // Lagu dan jalur waktu sama: pertahankan jam sendiri supaya lirik tidak melompat karena selisih kecil.
