@@ -106,6 +106,18 @@ pub fn output_name() -> Option<String> {
 /// Ada app layar penuh atau presentasi di depan (game, video, PowerPoint).
 pub fn fullscreen_busy() -> bool {
     unsafe {
+        // Jendela kita sendiri (gaya pill menutupi layar) tidak boleh dianggap app layar penuh, kalau tidak
+        // jendela menyembunyikan dirinya, lalu muncul lagi, berulang-ulang.
+        use windows::Win32::System::Threading::GetCurrentProcessId;
+        use windows::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowThreadProcessId};
+        let fg = GetForegroundWindow();
+        if !fg.0.is_null() {
+            let mut pid = 0u32;
+            GetWindowThreadProcessId(fg, Some(&mut pid));
+            if pid == GetCurrentProcessId() {
+                return false;
+            }
+        }
         matches!(SHQueryUserNotificationState(), Ok(s) if s == QUNS_BUSY || s == QUNS_RUNNING_D3D_FULL_SCREEN || s == QUNS_PRESENTATION_MODE)
     }
 }

@@ -308,7 +308,10 @@ fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, Physica
     let monitor = target_monitor(window)?;
     if window.app_handle().state::<Shared>().pill.load(Ordering::Relaxed) {
         // Gaya pill: seluruh layar. Bagian di luar bentuk pill tetap tembus klik (lihat `watch_cursor`).
-        return Some((*monitor.position(), *monitor.size()));
+        // Dua piksel lebih kecil dari layar: jendela yang persis menutupi layar dianggap app layar penuh oleh Windows
+        // (fitur "Sembunyi saat layar penuh" dan mode fokus), dan jendela pun berkedip hilang-muncul.
+        let size = monitor.size();
+        return Some((*monitor.position(), PhysicalSize::new(size.width.saturating_sub(2), size.height.saturating_sub(2))));
     }
     let scale = monitor.scale_factor();
     let size = PhysicalSize::new((WIN_W * scale).round() as u32, (WIN_H * scale).round() as u32);
