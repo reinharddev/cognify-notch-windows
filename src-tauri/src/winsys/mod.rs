@@ -36,6 +36,10 @@ pub struct Media {
     pub duration: f64,
     /// Sampul sebagai data URL (PNG atau JPEG), bila ada.
     pub thumb: Option<String>,
+    /// Acak nyala/mati; None = pemutar tidak melaporkan.
+    pub shuffle: Option<bool>,
+    /// Ulangi: 0 mati, 1 semua, 2 satu lagu; None = pemutar tidak melaporkan.
+    pub repeat: Option<u8>,
 }
 
 #[derive(Clone, Serialize)]

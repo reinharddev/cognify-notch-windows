@@ -16,7 +16,7 @@ export function openSettings() {
 }
 
 /** Bagian pengaturan yang berubah; jendela notch memuat ulang bagian itu dari penyimpanan bersama. */
-export type PrefScope = 'features' | 'weather' | 'agenda' | 'hotkey' | 'ui';
+export type PrefScope = 'features' | 'weather' | 'agenda' | 'hotkey' | 'ui' | 'reload';
 export async function emitPrefs(scope: PrefScope) {
   if (!inTauri) return;
   void emit('prefs-changed', scope);

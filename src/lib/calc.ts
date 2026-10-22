@@ -125,3 +125,42 @@ export function evaluate(raw: string): string | null {
   const v = parse(normalize(expr));
   return v !== null && Number.isFinite(v) ? format(v) : null;
 }
+
+/** Hitungan di tengah kalimat ("beli susu 5 * 12000"): bagian hitungan terakhir di satu baris, nilai, dan hasil siap tampil.
+ *  Tanggal ("22-10-2026"), jam ("16:06"), dan angka yang cuma dipisah tanda minus tanpa spasi tidak dianggap hitungan. */
+export function inline(line: string): { expression: string; value: number; result: string } | null {
+  const re = /\(*\d[\d.,]*\)*(?:\s*(?:[*/×÷^+x]|\s-\s)\s*\(*\d[\d.,]*\)*)+/g;
+  for (const m of [...line.matchAll(re)].reverse()) {
+    const expression = m[0].trim();
+    const flat = expression.replace(/×/g, '*').replace(/x/g, '*').replace(/÷/g, '/');
+    const value = parse(normalize(flat));
+    if (value !== null && Number.isFinite(value)) return { expression, value, result: format(value) };
+  }
+  return null;
+}
+
+/** Teks catatan dengan hasil hitungan di ujung tiap baris ("beli susu 5 * 12000 = 60.000"). Baris yang sudah
+ *  memuat "=" dibiarkan. Bila dua baris atau lebih punya hasil, ditambah baris "Total". */
+export function annotated(text: string): string {
+  const values: number[] = [];
+  const lines = text.split('\n').map((line) => {
+    if (line.includes('=')) return line;
+    const hit = inline(line);
+    if (!hit) return line;
+    values.push(hit.value);
+    return `${line.trim()} = ${hit.result}`;
+  });
+  if (values.length < 2) return lines.join('\n');
+  return [...lines, `Total = ${format(values.reduce((a, b) => a + b, 0))}`].join('\n');
+}
+
+/** Hasil untuk pratinjau di bawah kolom catatan: hitungan murni lebih dulu, lalu hitungan di tengah kalimat. */
+export function preview(text: string): string | null {
+  const plain = evaluate(text);
+  if (plain) return plain;
+  const lines = annotated(text).split('\n');
+  const original = text.split('\n');
+  const last = lines[lines.length - 1];
+  if (lines.length > original.length) return last.split(' = ').pop() ?? null;
+  return lines.join('\n') === original.join('\n') ? null : (last.split(' = ').pop() ?? null);
+}

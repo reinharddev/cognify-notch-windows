@@ -6,6 +6,7 @@
 //! Semua yang bicara langsung dengan Windows ada di `winsys`; file ini hanya menyambungkannya
 //! ke antarmuka lewat perintah dan peristiwa.
 
+mod link;
 mod updater;
 mod winsys;
 
@@ -46,6 +47,42 @@ struct Shared {
     playing: AtomicBool,
     /// Mata mengikuti kursor (pengaturan). Mati = tidak ada perhitungan arah pandang sama sekali.
     eyes_follow: AtomicBool,
+    /// Layar tempat notch tampil: 0 = layar utama, 1 = layar yang sedang dipakai (tempat kursor).
+    display: std::sync::atomic::AtomicU8,
+    /// Kursor sedang di atas notch (atau notch disematkan).
+    inside: AtomicBool,
+    /// Gaya pill: jendela menutupi seluruh layar (tembus klik di luar bentuk), supaya pill bisa di mana saja.
+    pill: AtomicBool,
+}
+
+/// Gaya tampilan: "notch" (jendela kecil di tengah atas) atau "pill" (jendela seluas layar, bentuk bebas di dalamnya).
+#[tauri::command]
+fn set_layout(state: State<Shared>, window: WebviewWindow, mode: String) {
+    state.pill.store(mode == "pill", Ordering::Relaxed);
+    let _ = window.set_ignore_cursor_events(true);
+    let _ = dock(&window);
+}
+
+/// Pengaturan "Tampil di": "main" atau "active".
+#[tauri::command]
+fn set_display(state: State<Shared>, window: WebviewWindow, mode: String) {
+    state.display.store(if mode == "active" { 1 } else { 0 }, Ordering::Relaxed);
+    let _ = dock(&window);
+}
+
+/// Cadangan data: tulis dan baca satu berkas teks yang dipilih pengguna lewat dialog.
+#[tauri::command]
+fn write_text_file(path: String, text: String) -> Result<(), String> {
+    std::fs::write(path, text).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn read_text_file(path: String) -> Result<String, String> {
+    let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
+    if meta.len() > 20 * 1024 * 1024 {
+        return Err("too large".into());
+    }
+    std::fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
 /// Pengaturan "ikuti kursor" untuk mata.
@@ -157,6 +194,11 @@ fn read_ics_file(path: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+fn play_chime(soft: bool) {
+    std::thread::spawn(move || winsys::play_chime(soft));
+}
+
+#[tauri::command]
 fn open_target(target: String) {
     winsys::open_target(&target);
 }
@@ -256,14 +298,18 @@ fn autostart_set(app: AppHandle, on: bool) {
 }
 
 /// Ukuran jendela notch dalam piksel CSS (sama dengan tauri.conf.json dan WINDOW di notch.svelte.ts).
-const WIN_W: f64 = 720.0;
-const WIN_H: f64 = 300.0;
+const WIN_W: f64 = 800.0;
+const WIN_H: f64 = 330.0;
 
 /// Ukuran dan tempat jendela seharusnya: 720 x 300 piksel CSS dikalikan skala layar utama (di 150% itu 1080 x 450
 /// piksel fisik), menempel di tengah atas. Menghitung dengan angka 720 mentah membuat jendela bergeser ke kanan
 /// di skala di atas 100%, dan di layar sempit bagian kanannya keluar dari tepi layar.
 fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, PhysicalSize<u32>)> {
-    let monitor = window.primary_monitor().ok()??;
+    let monitor = target_monitor(window)?;
+    if window.app_handle().state::<Shared>().pill.load(Ordering::Relaxed) {
+        // Gaya pill: seluruh layar. Bagian di luar bentuk pill tetap tembus klik (lihat `watch_cursor`).
+        return Some((*monitor.position(), *monitor.size()));
+    }
     let scale = monitor.scale_factor();
     let size = PhysicalSize::new((WIN_W * scale).round() as u32, (WIN_H * scale).round() as u32);
     let origin = monitor.position();
@@ -271,9 +317,27 @@ fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, Physica
     Some((PhysicalPosition::new(x, origin.y), size))
 }
 
-/// Letakkan jendela di tengah atas layar utama.
+/// Layar tujuan menurut pilihan "Tampil di": layar utama, atau layar tempat kursor berada.
+fn target_monitor(window: &WebviewWindow) -> Option<tauri::Monitor> {
+    let primary = window.primary_monitor().ok()?;
+    let active = window.app_handle().state::<Shared>().display.load(Ordering::Relaxed) == 1;
+    if active {
+        if let (Ok(cursor), Ok(all)) = (window.cursor_position(), window.available_monitors()) {
+            let hit = all.into_iter().find(|m| {
+                let (p, s) = (m.position(), m.size());
+                cursor.x >= p.x as f64 && cursor.x < (p.x + s.width as i32) as f64 && cursor.y >= p.y as f64 && cursor.y < (p.y + s.height as i32) as f64
+            });
+            if hit.is_some() {
+                return hit;
+            }
+        }
+    }
+    primary
+}
+
+/// Letakkan jendela di tengah atas layar tujuan.
 fn dock(window: &WebviewWindow) -> tauri::Result<()> {
-    let Some(monitor) = window.primary_monitor()? else { return Ok(()) };
+    let Some(monitor) = target_monitor(window) else { return Ok(()) };
     let origin = *monitor.position();
     // Pindah dulu ke layar utama supaya skala jendela mengikuti layar itu, baru ukuran dan posisi akhirnya.
     window.set_position(origin)?;
@@ -287,6 +351,11 @@ fn dock(window: &WebviewWindow) -> tauri::Result<()> {
 /// Dipanggil berkala: bila ukuran atau posisi jendela tidak sama dengan yang seharusnya (skala tampilan diganti,
 /// resolusi berubah, monitor dicolok atau dicabut, laptop di-dock), jendela dipasang ulang.
 fn ensure_docked(window: &WebviewWindow) {
+    // Pada "layar yang sedang dipakai", notch hanya pindah saat sedang tertutup dan tidak disentuh.
+    let shared = window.app_handle().state::<Shared>();
+    if shared.display.load(Ordering::Relaxed) == 1 && (shared.inside.load(Ordering::Relaxed) || shared.pinned.load(Ordering::Relaxed)) {
+        return;
+    }
     let Some((pos, size)) = dock_target(window) else { return };
     let (Ok(cur_pos), Ok(cur_size)) = (window.outer_position(), window.outer_size()) else { return };
     // Toleransi 2 piksel: Windows kadang membulatkan ukuran, dan tanpa toleransi jendela dipasang ulang terus-menerus.
@@ -340,7 +409,7 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             }
             let want = if shared.eyes_follow.load(Ordering::Relaxed) && rect.w > 0.0 {
                 let cx = x - (rect.x + rect.w / 2.0);
-                let cy = y - 18.0;
+                let cy = y - (rect.y + 18.0);
                 ((cx / 140.0).round().clamp(-2.0, 2.0) as i8, (cy / 120.0).round().clamp(-1.0, 2.0) as i8)
             } else {
                 (0, 0)
@@ -350,9 +419,10 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
                 let _ = app.emit("eye-look", [look.0, look.1]);
             }
             let pinned = shared.pinned.load(Ordering::Relaxed);
-            let now = pinned || rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= 0.0 && y <= rect.y + rect.h;
-            let near = now || (rect.w > 0.0 && x >= rect.x - 120.0 && x <= rect.x + rect.w + 120.0 && y <= rect.y + rect.h + 100.0);
+            let now = pinned || rect.w > 0.0 && x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+            let near = now || (rect.w > 0.0 && x >= rect.x - 120.0 && x <= rect.x + rect.w + 120.0 && y >= rect.y - 120.0 && y <= rect.y + rect.h + 120.0);
             wait = if near { 8 } else { 50 };
+            shared.inside.store(now, Ordering::Relaxed);
             if now != inside {
                 inside = now;
                 let _ = window.set_ignore_cursor_events(!now);
@@ -553,14 +623,57 @@ fn watch_downloads(app: AppHandle) {
         // jadi isi folder hanya dibaca bila waktu itu berubah atau masih ada unduhan yang ditunggu.
         let stamp = |dir: &Path| std::fs::metadata(dir).and_then(|m| m.modified()).ok();
         let mut last_stamp = stamp(&dir);
+        // Unduhan yang sedang berjalan (file sementara browser): ukuran terakhir, kapan terakhir bertambah, dan
+        // apakah sudah dilaporkan gagal. Dipakai untuk progres di sayap dan untuk membedakan selesai, gagal, dibatalkan.
+        let mut running: HashMap<String, (u64, Instant, bool)> = HashMap::new();
+        let clean = |name: &str| -> String {
+            let l = name.to_lowercase();
+            for x in [".crdownload", ".part", ".opdownload", ".download"] {
+                if l.ends_with(x) {
+                    return name[..name.len() - x.len()].to_string();
+                }
+            }
+            name.to_string()
+        };
         loop {
-            std::thread::sleep(Duration::from_secs(2));
+            std::thread::sleep(Duration::from_secs(if running.is_empty() { 2 } else { 1 }));
             let current = stamp(&dir);
-            if pending.is_empty() && current.is_some() && current == last_stamp {
+            if pending.is_empty() && running.is_empty() && current.is_some() && current == last_stamp {
                 continue;
             }
             last_stamp = current;
             let now = snapshot(&dir);
+            // Progres: file sementara yang ukurannya bertambah.
+            let mut latest: Option<(String, u64, Instant)> = None;
+            for (name, size) in &now {
+                let l = name.to_lowercase();
+                if ![".crdownload", ".part", ".opdownload"].iter().any(|x| l.ends_with(x)) {
+                    continue;
+                }
+                let entry = running.entry(name.clone()).or_insert((0, Instant::now(), false));
+                if *size > entry.0 {
+                    *entry = (*size, Instant::now(), false);
+                }
+                if latest.as_ref().map_or(true, |(_, _, t)| entry.1 >= *t) {
+                    latest = Some((name.clone(), *size, entry.1));
+                }
+                if !entry.2 && entry.1.elapsed() > Duration::from_secs(10) {
+                    entry.2 = true; // berhenti bertambah dan file sementara masih ada: gagal (mis. internet putus)
+                    let _ = app.emit("download-result", serde_json::json!({ "kind": "failed", "name": clean(name) }));
+                }
+            }
+            let gone: Vec<String> = running.keys().filter(|n| !now.contains_key(*n)).cloned().collect();
+            for name in gone {
+                let (_, _, failed) = running.remove(&name).unwrap();
+                // Selesai bila file akhir ada (peristiwa "download" dikirim di bawah); selain itu dibatalkan.
+                if !failed && !now.contains_key(&clean(&name)) {
+                    let _ = app.emit("download-result", serde_json::json!({ "kind": "canceled", "name": clean(&name) }));
+                }
+            }
+            let _ = app.emit(
+                "download-progress",
+                latest.map(|(n, bytes, _)| serde_json::json!({ "name": clean(&n), "bytes": bytes })),
+            );
             for (name, size) in &now {
                 if known.contains_key(name) || temp(name) {
                     continue;
@@ -591,8 +704,17 @@ pub fn run() {
             open_settings,
             set_eyes_follow,
             set_pinned,
+            set_display,
+            set_layout,
+            write_text_file,
+            read_text_file,
+            play_chime,
             set_hotkey,
             fetch_text,
+            link::link_consent,
+            link::link_write,
+            link::link_clear,
+            link::link_read_agenda,
             read_ics_file,
             open_target,
             reveal,

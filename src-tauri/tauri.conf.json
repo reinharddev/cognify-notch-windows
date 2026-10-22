@@ -15,8 +15,8 @@
       {
         "label": "notch",
         "title": "Cognify Notch",
-        "width": 720,
-        "height": 300,
+        "width": 800,
+        "height": 330,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,

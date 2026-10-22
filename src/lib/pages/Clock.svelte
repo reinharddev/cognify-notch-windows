@@ -2,6 +2,7 @@
   import { clockTools as c } from '../state.svelte';
   import { clock, ticker } from '../store.svelte';
   import { L } from '../i18n';
+  import { Pause, Play } from '@lucide/svelte';
   const presets = [1, 3, 5, 10, 15, 30];
   let custom = $state(20);
 </script>
@@ -11,7 +12,7 @@
     <span class="label">Stopwatch</span>
     <span class="mid">{clock(c.elapsed, true)}</span>
     <div class="row">
-      <button class="btn on" onclick={() => c.toggle()}>{c.running ? L('Jeda', 'Pause') : c.elapsed > 0 ? L('Lanjut', 'Resume') : L('Mulai', 'Start')}</button>
+      <button class="btn on" onclick={() => c.toggle()}>{#if c.running}<Pause size={11} fill="currentColor" />{:else}<Play size={11} fill="currentColor" />{/if} {c.running ? L('Jeda', 'Pause') : c.elapsed > 0 ? L('Lanjut', 'Resume') : L('Mulai', 'Start')}</button>
       <button class="btn" onclick={() => c.lap()} disabled={!c.running}>Lap</button>
       <button class="btn" onclick={() => c.reset()} disabled={c.running || c.elapsed === 0}>{L('Ulang', 'Reset')}</button>
     </div>
@@ -29,7 +30,7 @@
       <button class="btn" onclick={() => (custom = Math.max(1, custom - 5))}>-</button>
       <span style="min-width:62px;text-align:center;font-weight:600">{custom} {L('menit', 'min')}</span>
       <button class="btn" onclick={() => (custom = Math.min(240, custom + 5))}>+</button>
-      <button class="btn on" onclick={() => c.start(custom)}>{L('Mulai', 'Start')}</button>
+      <button class="btn on" onclick={() => c.start(custom)}><Play size={11} fill="currentColor" /> {L('Mulai', 'Start')}</button>
     </div>
     <div class="list">
       {#if c.countdowns.length === 0}

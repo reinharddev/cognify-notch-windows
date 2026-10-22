@@ -363,7 +363,14 @@ impl MediaPoller {
             })
             .unwrap_or((0.0, 0.0));
         let app = session.SourceAppUserModelId().map(|s| s.to_string()).unwrap_or_default();
-        Some(Media { title, artist, album, app, playing, position, duration: duration.max(0.0), thumb: self.thumb.clone() })
+        let info = session.GetPlaybackInfo().ok();
+        let shuffle = info.as_ref().and_then(|i| i.IsShuffleActive().ok()).and_then(|v| v.Value().ok());
+        let repeat = info.as_ref().and_then(|i| i.AutoRepeatMode().ok()).and_then(|v| v.Value().ok()).map(|m| match m {
+            windows::Media::MediaPlaybackAutoRepeatMode::List => 1u8,
+            windows::Media::MediaPlaybackAutoRepeatMode::Track => 2u8,
+            _ => 0u8,
+        });
+        Some(Media { title, artist, album, app, playing, position, duration: duration.max(0.0), thumb: self.thumb.clone(), shuffle, repeat })
     }
 }
 
@@ -373,6 +380,17 @@ pub fn media_command(action: &str) {
         "toggle" => session.TryTogglePlayPauseAsync().and_then(|a| a.get()),
         "next" => session.TrySkipNextAsync().and_then(|a| a.get()),
         "prev" => session.TrySkipPreviousAsync().and_then(|a| a.get()),
+        // Acak: balik keadaan sekarang. Ulangi: mati, semua, satu lagu, lalu kembali mati (seperti di Mac).
+        "shuffle" => {
+            let now = session.GetPlaybackInfo().ok().and_then(|i| i.IsShuffleActive().ok()).and_then(|v| v.Value().ok()).unwrap_or(false);
+            session.TryChangeShuffleActiveAsync(!now).and_then(|a| a.get())
+        }
+        "repeat" => {
+            use windows::Media::MediaPlaybackAutoRepeatMode as R;
+            let now = session.GetPlaybackInfo().ok().and_then(|i| i.AutoRepeatMode().ok()).and_then(|v| v.Value().ok()).unwrap_or(R::None);
+            let next = match now { R::None => R::List, R::List => R::Track, _ => R::None };
+            session.TryChangeAutoRepeatModeAsync(next).and_then(|a| a.get())
+        }
         _ => return,
     };
 }
@@ -405,5 +423,17 @@ impl BrightnessReader {
         }
         let rows: Vec<Level> = self.conn.as_ref()?.raw_query("SELECT CurrentBrightness FROM WmiMonitorBrightness").ok()?;
         rows.first().map(|r| r.CurrentBrightness)
+    }
+}
+
+/// Bunyi pengingat (timer selesai, tugas jatuh tempo, waktunya minum). Memakai bunyi notifikasi
+/// Windows yang dipilih pengguna; bila tidak ada, bunyi sistem bawaan.
+pub fn play_chime(soft: bool) {
+    use windows::Win32::Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC, SND_NODEFAULT};
+    use windows::Win32::UI::WindowsAndMessaging::{MessageBeep, MB_ICONASTERISK, MB_OK};
+    let alias = if soft { w!("Notification.Default") } else { w!("Notification.Reminder") };
+    let played = unsafe { PlaySoundW(alias, None, SND_ALIAS | SND_ASYNC | SND_NODEFAULT).as_bool() };
+    if !played {
+        let _ = unsafe { MessageBeep(if soft { MB_OK } else { MB_ICONASTERISK }) };
     }
 }

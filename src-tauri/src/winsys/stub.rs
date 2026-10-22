@@ -2,6 +2,7 @@
 use super::{ClipEvent, Media, Power, Volume};
 
 pub fn init_thread() {}
+pub fn play_chime(_soft: bool) {}
 pub fn power() -> Option<Power> { None }
 pub fn volume() -> Option<Volume> { None }
 pub fn set_volume(_value: f32) {}

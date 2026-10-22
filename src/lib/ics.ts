@@ -9,6 +9,8 @@ export interface AgendaEvent {
   end: number | null;
   allDay: boolean;
   meeting: string | null;
+  /** Nama kalender sumbernya (tampil di bawah judul, seperti di Mac). */
+  calendar?: string;
 }
 
 const MEETING = /https:\/\/[^\s<>"']*(zoom\.us\/(j|my|w|s)\/|meet\.google\.com\/[a-z]|teams\.microsoft\.com\/l\/meetup-join|teams\.live\.com\/meet|webex\.com\/(meet|join|[a-z0-9.-]+\/j\.php))[^\s<>"']*/i;

@@ -1,10 +1,10 @@
 <script lang="ts">
-  import { device } from './system.svelte';
+  import { device, features } from './system.svelte';
   // Lima batang. Naik-turunnya animasi CSS pada transform (dikerjakan GPU, tanpa kerja JavaScript per frame).
   // Keras suara hanya mengatur tinggi puncaknya lewat satu nilai CSS yang dibulatkan ke 1/8, jadi berubah
   // paling banyak sekitar 8 kali per detik. Tinggi = 3 + A·m px dengan m bergerak antara 0,4 dan 1.
   const periods = [1.047, 0.806, 0.654, 0.551, 0.476]; // satu putaran |sin(ωt)|, sama dengan versi sebelumnya
-  const A = $derived((0.25 + 0.75 * (Math.round(device.level * 8) / 8)) * 11);
+  const A = $derived((0.25 + 0.75 * (Math.round((features.spectrum ? device.level : 0.5) * 8) / 8)) * 11);
 </script>
 
 <span class="eq" aria-hidden="true" style:--A={A}>{#each periods as p, i}<i style:--d="{p}s" style:--o="{-0.21 * i}s"></i>{/each}</span>

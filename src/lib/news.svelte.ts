@@ -1,18 +1,24 @@
 import { L } from './i18n';
 import type { IconName } from './icons';
 import { TINT } from './icons';
+import { cmd } from './bridge';
 
 // Kabar singkat di notch, sama dengan versi Mac: kartu (ikon, judul, keterangan, nilai) untuk charger, perangkat,
 // unduhan, Caps Lock, bahasa keyboard, internet, dan pengingat; serta HUD volume dan kecerahan (ikon di kiri,
 // garis level di kanan). Saat HUD tampil, kartu menunggu.
 export interface News { id: number; icon: IconName; tint: string; title: string; sub?: string; value?: string }
 export interface Level { kind: 'volume' | 'brightness'; value: number; muted?: boolean }
+/** Pengingat besar: notch membuka sendiri, berbunyi, dan menawarkan satu tombol aksi (seperti `.alert` di Mac). */
+export interface Alert { id: number; title: string; detail: string; icon: IconName; action?: { label: string; run: () => void }; page?: string }
+
 export interface Opts { icon?: IconName; tint?: string; value?: string; seconds?: number; toast?: boolean }
 
 class Newsroom {
   current = $state<News | null>(null);
   level = $state<Level | null>(null);
+  alert = $state<Alert | null>(null);
   private n = 0;
+  private alertTimer = 0;
   private timer = 0;
   private levelTimer = 0;
 
@@ -26,6 +32,20 @@ class Newsroom {
       if (typeof Notification !== 'undefined' && Notification.permission === 'granted') new Notification(title, { body: sub, silent: true });
       else if (typeof Notification !== 'undefined' && Notification.permission === 'default') void Notification.requestPermission();
     } catch {}
+  }
+
+  /** Pengingat yang harus terlihat dan terdengar: timer selesai, tugas jatuh tempo, rapat, waktunya minum. */
+  ring(title: string, detail: string, o: { soft?: boolean; icon?: IconName; action?: Alert['action']; page?: string } = {}) {
+    this.alert = { id: ++this.n, title, detail, icon: o.icon ?? 'bell', action: o.action, page: o.page };
+    this.current = null;
+    void cmd('play_chime', { soft: !!o.soft });
+    clearTimeout(this.alertTimer);
+    this.alertTimer = window.setTimeout(() => this.clearAlert(), 7000);
+  }
+
+  clearAlert() {
+    clearTimeout(this.alertTimer);
+    this.alert = null;
   }
 
   /** Kabar dari perangkat: tanpa notifikasi Windows, durasi 3 detik kecuali disebut lain (seperti di Mac). */

@@ -8,6 +8,7 @@
     "core:window:allow-set-ignore-cursor-events",
     "core:window:allow-set-position",
     "core:window:allow-show",
-    "dialog:allow-open"
+    "dialog:allow-open",
+    "dialog:allow-save"
   ]
 }

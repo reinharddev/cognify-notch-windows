@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Repeat, Repeat1, Shuffle } from '@lucide/svelte';
   import { device, features } from '../system.svelte';
   import { lyrics } from '../lyrics.svelte';
   import { cmd } from '../bridge';
@@ -46,9 +47,11 @@
         <div class="row dim" style="justify-content:space-between;font-size:10px"><span>{clock(pos)}</span><span>{m.duration ? clock(m.duration) : ''}</span></div>
       </div>
       <div class="row" style="justify-content:center;gap:10px">
+        <button class="btn" class:on={m.shuffle === true} aria-label={L('Acak', 'Shuffle')} title={L('Acak', 'Shuffle')} disabled={m.shuffle == null} onclick={() => cmd('media_cmd', { action: 'shuffle' })}><Shuffle size={13} /></button>
         <button class="btn" aria-label={L('Sebelumnya', 'Previous')} onclick={() => cmd('media_cmd', { action: 'prev' })}>⏮</button>
         <button class="btn on" style="padding:6px 16px" aria-label={m.playing ? L('Jeda', 'Pause') : L('Putar', 'Play')} onclick={() => cmd('media_cmd', { action: 'toggle' })}>{m.playing ? '⏸' : '▶'}</button>
         <button class="btn" aria-label={L('Berikutnya', 'Next')} onclick={() => cmd('media_cmd', { action: 'next' })}>⏭</button>
+        <button class="btn" class:on={(m.repeat ?? 0) > 0} aria-label={L('Ulangi', 'Repeat')} title={L('Ulangi', 'Repeat')} disabled={m.repeat == null} onclick={() => cmd('media_cmd', { action: 'repeat' })}>{#if m.repeat === 2}<Repeat1 size={13} />{:else}<Repeat size={13} />{/if}</button>
       </div>
       <div class="row dim">
         <span>{device.muted ? '🔇' : '🔈'}</span>

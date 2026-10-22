@@ -10,13 +10,16 @@ export interface Power { percent: number; charging: boolean; plugged: boolean }
 export interface MediaInfo {
   title: string; artist: string; album: string; app: string; playing: boolean;
   position: number; duration: number; thumb: string | null;
+  shuffle?: boolean | null; repeat?: number | null; // repeat: 0 mati, 1 semua, 2 satu lagu
 }
 export interface ClipItem { id: string; kind: 'text' | 'link' | 'image'; text: string; image?: string; app: string | null; t: number; pinned: boolean }
 
 class Features {
-  media = $state(true); lyrics = $state(true); clipboard = $state(false); weather = $state(false);
+  media = $state(true); lyrics = $state(true); clipboard = $state(true); weather = $state(false);
   charger = $state(true); devices = $state(true); downloads = $state(true); keys = $state(true); network = $state(true);
   hideFullscreen = $state(true);
+  spectrum = $state(true); camera = $state(true); shortcuts = $state(true); hud = $state(true); hotkey = $state(true);
+  water = $state(true); todo = $state(true); clockTools = $state(true); calculator = $state(true); lyricsWing = $state(true);
   companion = $state(true); // mata saat notch diam
   updates = $state(true);
   autoInstall = $state(true);
@@ -26,7 +29,8 @@ class Features {
   reload() { Object.assign(this, load('features', {})); }
   persist() {
     save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, weather: this.weather, charger: this.charger,
-      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, companion: this.companion, updates: this.updates, autoInstall: this.autoInstall });
+      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, spectrum: this.spectrum, camera: this.camera, shortcuts: this.shortcuts, hud: this.hud, hotkey: this.hotkey,
+      water: this.water, todo: this.todo, clockTools: this.clockTools, calculator: this.calculator, lyricsWing: this.lyricsWing, companion: this.companion, updates: this.updates, autoInstall: this.autoInstall });
     void cmd('set_clipboard_watch', { on: this.clipboard });
     void cmd('set_hide_fullscreen', { on: this.hideFullscreen });
   }
@@ -53,6 +57,8 @@ class Device {
   volumeSeen = false;
   brightness: number | null = null;
   hidden = $state(false);   // app layar penuh sedang tampil
+  /** Unduhan yang sedang berjalan (file sementara browser); `bytes` = yang sudah terunduh. */
+  download = $state<{ name: string; bytes: number } | null>(null);
   online = true;
   caps = false;
   layout = '';
@@ -89,13 +95,13 @@ class Device {
       const first = this.volumeSeen;
       const changed = Math.abs(v.volume - this.volume) > 0.005 || v.muted !== this.muted;
       this.volume = v.volume; this.muted = v.muted; this.volumeSeen = true;
-      if (first && changed && features.devices) news.showLevel({ kind: 'volume', value: v.volume, muted: v.muted });
+      if (first && changed && features.hud) news.showLevel({ kind: 'volume', value: v.volume, muted: v.muted });
     });
     on<number>('brightness', (b) => {
       const first = this.brightness !== null;
       const changed = b !== this.brightness;
       this.brightness = b;
-      if (first && changed && features.devices) news.showLevel({ kind: 'brightness', value: b / 100 });
+      if (first && changed && features.hud) news.showLevel({ kind: 'brightness', value: b / 100 });
     });
     on<number>('level', (v) => (this.level = v));
     on<MediaInfo | null>('media', (m) => {
@@ -129,6 +135,11 @@ class Device {
         news.device(shortName(name), L('Tersambung', 'Connected'), 'headphones', TINT.white, { seconds: 4 });
       }
       this.outName = name;
+    });
+    on<{ name: string; bytes: number } | null>('download-progress', (p) => { this.download = features.downloads ? p : null; });
+    on<{ kind: 'failed' | 'canceled'; name: string }>('download-result', (r) => {
+      if (!features.downloads) return;
+      news.device(r.kind === 'failed' ? L('Unduhan gagal', 'Download failed') : L('Unduhan dibatalkan', 'Download canceled'), r.name, 'triangle-alert', TINT.orange);
     });
     on<string>('download', (name) => { if (features.downloads) news.device(L('Unduhan selesai', 'Download complete'), name, 'circle-check', TINT.green); });
     void cmd('set_clipboard_watch', { on: features.clipboard });

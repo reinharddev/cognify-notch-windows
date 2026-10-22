@@ -4,6 +4,8 @@
   import { L } from '../i18n';
   import { ticker } from '../store.svelte';
   let copied = $state('');
+  let query = $state('');
+  const shown = $derived(clipboard.items.filter((i) => !query.trim() || (i.text ?? '').toLowerCase().includes(query.trim().toLowerCase())));
   const ago = (t: number) => {
     const m = Math.floor((ticker.now - t) / 60000);
     return m < 1 ? L('baru saja', 'just now') : m < 60 ? L(`${m} mnt`, `${m} min`) : L(`${Math.floor(m / 60)} jam`, `${Math.floor(m / 60)} h`);
@@ -20,9 +22,9 @@
   <div class="empty">{L('Salin sesuatu, nanti muncul di sini.', 'Copy something and it shows up here.')}</div>
 {:else}
   <div class="col" style="height:100%">
-    <div class="row"><span class="label grow">{L('Riwayat', 'History')}</span><button class="btn" onclick={() => clipboard.clear()}>{L('Bersihkan', 'Clear')}</button></div>
+    <div class="row"><span class="label">{L('Riwayat', 'History')}</span><input class="find grow" bind:value={query} placeholder={L('Cari…', 'Search…')} aria-label={L('Cari di clipboard', 'Search clipboard')} spellcheck="false" /><button class="btn" onclick={() => clipboard.clear()}>{L('Bersihkan', 'Clear')}</button></div>
     <div class="grid">
-      {#each clipboard.items as i (i.id)}
+      {#each shown as i (i.id)}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
         <div class="tile" class:pin={i.pinned} onclick={() => pick(i)}>
           {#if i.kind === 'image' && i.image}<img src={i.image} alt="" />{:else}<span class="t" class:link={i.kind === 'link'}>{i.text}</span>{/if}
@@ -38,6 +40,8 @@
 {/if}
 
 <style>
+  .find { min-width: 0; padding: 3px 9px; border: 0; border-radius: 99px; background: rgba(255, 255, 255, .08); color: #fff; font-size: 11px; outline: none; }
+  .find:focus { background: rgba(255, 255, 255, .14); }
   .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; overflow-y: auto; align-content: start; min-height: 0; }
   .grid::-webkit-scrollbar { width: 0; }
   .tile { height: 78px; border-radius: 10px; background: rgba(255, 255, 255, .07); padding: 7px 8px 4px; display: flex; flex-direction: column; justify-content: space-between; cursor: pointer; overflow: hidden; }

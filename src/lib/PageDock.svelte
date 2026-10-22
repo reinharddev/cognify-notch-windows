@@ -1,6 +1,6 @@
 <script lang="ts">
   import { House, Music, Timer, AlarmClock, Droplet, ListChecks, NotebookPen, ClipboardList, Inbox, ScanFace, Zap } from '@lucide/svelte';
-  import { PAGES } from './pages';
+  import { ui } from './ui.svelte';
   import { notch } from './notch.svelte';
   import { L } from './i18n';
 
@@ -12,7 +12,9 @@
     home: House, music: Music, timer: Timer, clock: AlarmClock, water: Droplet, todo: ListChecks,
     notes: NotebookPen, clipboard: ClipboardList, tray: Inbox, mirror: ScanFace, shortcuts: Zap,
   };
-  const BASE = 20, PEAK = 34, REACH = 64, GAP = 4, N = PAGES.length;
+  const BASE = 20, PEAK = 34, REACH = 64, GAP = 4;
+  const PAGES = $derived(ui.pages);
+  const N = $derived(PAGES.length);
   const ENTER = { response: 0.28, damping: 0.8 }, LEAVE = { response: 0.3, damping: 0.85 };
 
   let nav: HTMLElement | undefined = $state();

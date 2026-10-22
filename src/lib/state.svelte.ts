@@ -1,6 +1,7 @@
 import { load, save, ticker } from './store.svelte';
-import { news, doneText } from './news.svelte';
+import { news } from './news.svelte';
 import { parseDue } from './due';
+import { features } from './system.svelte';
 import { L } from './i18n';
 
 const day = () => new Date().toISOString().slice(0, 10);
@@ -65,7 +66,17 @@ class Pomodoro {
     if (finished === 'focus') { this.sessions++; this.persist(); }
     this.mode = finished === 'focus' ? 'rest' : 'focus';
     this.remainingAtPause = this.total;
-    news.announce(finished === 'focus' ? L('Fokus selesai, waktunya istirahat', 'Focus done, time for a break') : L('Istirahat selesai', 'Break over'), 'Pomodoro');
+    news.ring(
+      finished === 'focus' ? L('Waktu fokus selesai', 'Focus time is up') : L('Istirahat selesai', 'Break is over'),
+      finished === 'focus'
+        ? L(`Istirahat ${this.restMin} menit dulu, lalu lanjut lagi.`, `Take a ${this.restMin} minute break, then keep going.`)
+        : L('Siap fokus lagi?', 'Ready to focus again?'),
+      {
+        page: 'timer',
+        icon: 'timer',
+        action: { label: finished === 'focus' ? L('Mulai istirahat', 'Start break') : L('Mulai fokus', 'Start focus'), run: () => { if (!this.running) this.toggle(); } },
+      },
+    );
   }
 }
 export const pomodoro = new Pomodoro();
@@ -114,7 +125,7 @@ class ClockTools {
     if (!done.length) { this.arm(); return; }
     this.countdowns = this.countdowns.filter((c) => !done.includes(c));
     this.persist();
-    for (const c of done) news.announce(doneText(c.label), L('Hitung mundur', 'Countdown'));
+    for (const c of done) news.ring(L(`Timer ${c.label} selesai`, `${c.label} timer done`), L('Waktunya!', "Time's up!"), { icon: 'timer' });
     this.arm();
   }
 }
@@ -155,23 +166,24 @@ class Water {
 
   // Jam aktif, target belum tercapai, dan sudah lewat `interval` menit sejak minum atau pengingat terakhir.
   private check() {
-    if (!this.reminders || this.total >= this.goal) return;
+    if (!features.water || !this.reminders || this.total >= this.goal) return;
     const now = new Date(), hour = now.getHours();
     if (hour < this.startHour || hour >= this.endHour) return;
     const start = new Date(now); start.setHours(this.startHour, 0, 0, 0);
     const since = Math.max(this.today.at(-1)?.t ?? 0, start.getTime(), this.lastReminder);
     if (now.getTime() - since < this.interval * 60_000) return;
     this.lastReminder = now.getTime();
-    news.announce(L('Waktunya minum', 'Time to drink'), `${this.total} / ${this.goal} ml`);
+    news.ring(L('Waktunya minum', 'Time for some water'), L(`Hari ini ${this.total} dari ${this.goal} ml`, `Today ${this.total} of ${this.goal} ml`), { soft: true, icon: 'droplet', action: { label: L(`Minum ${this.glass} ml`, `Drink ${this.glass} ml`), run: () => this.drink() } });
   }
 }
 export const water = new Water();
 
 // ---------- Daftar tugas ----------
-export interface Task { id: string; text: string; done: boolean; due: number | null; notified: boolean }
+export interface Task { id: string; text: string; done: boolean; doneAt?: number; due: number | null; notified: boolean }
 
 class Todo {
-  items = $state<Task[]>(load<Task[]>('todo', []));
+  // Tugas selesai disimpan sampai awal hari kemarin, seperti di Mac.
+  items = $state<Task[]>(load<Task[]>('todo', []).filter((t) => !t.done || (t.doneAt ?? 0) > new Date().setHours(0, 0, 0, 0) - 864e5));
   constructor() { setInterval(() => this.checkDue(), 20_000); }
 
   private persist() { save('todo', this.items); }
@@ -179,6 +191,8 @@ class Todo {
     return [...this.items].sort((a, b) => Number(a.done) - Number(b.done) || (a.due ?? Infinity) - (b.due ?? Infinity));
   }
   get open() { return this.items.filter((t) => !t.done).length; }
+  get doneToday() { const d0 = new Date().setHours(0, 0, 0, 0); return this.items.filter((t) => t.done && (t.doneAt ?? 0) >= d0).length; }
+  get totalToday() { return this.doneToday + this.open; }
 
   add(text: string, due: Date | null = parseDue(text)) {
     const clean = text.trim();
@@ -186,16 +200,17 @@ class Todo {
     this.items = [...this.items, { id: uid(), text: clean, done: false, due: due ? due.getTime() : null, notified: false }];
     this.persist();
   }
-  toggle(id: string) { this.items = this.items.map((t) => (t.id === id ? { ...t, done: !t.done } : t)); this.persist(); }
+  toggle(id: string) { this.items = this.items.map((t) => (t.id === id ? { ...t, done: !t.done, doneAt: t.done ? undefined : Date.now() } : t)); this.persist(); }
   remove(id: string) { this.items = this.items.filter((t) => t.id !== id); this.persist(); }
 
   private checkDue() {
+    if (!features.todo) return;
     const now = Date.now();
     let changed = false;
     this.items = this.items.map((t) => {
       if (!t.done && !t.notified && t.due && t.due <= now && now - t.due < 6 * 3600_000) {
         changed = true;
-        news.announce(t.text, L('Tugas', 'Task'));
+        news.ring(t.text, L('Pengingat tugas', 'Task reminder'), { icon: 'list-checks', action: { label: L('Selesai', 'Done'), run: () => this.toggle(t.id) } });
         return { ...t, notified: true };
       }
       return t;

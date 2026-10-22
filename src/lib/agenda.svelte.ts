@@ -6,29 +6,38 @@ import { news } from './news.svelte';
 import { L } from './i18n';
 import { load, save } from './store.svelte';
 import { parseIcs, type AgendaEvent } from './ics';
+import { parseCognifyAgenda } from './cognifyAgenda';
 
 class Agenda {
   url = $state(load('ics.url', ''));
   file = $state(load('ics.file', ''));
+  /** Pakai kalender Cognify (butuh Cognify terhubung ke Notch). */
+  cognify = $state(load('ics.cognify', false));
   events = $state<AgendaEvent[]>([]);
   problem = $state('');
   private timer = 0;
   private remindTimer = 0;
   private warned = new Set<string>();
 
-  get enabled() { return !!(this.url || this.file); }
+  get enabled() { return !!(this.url || this.file || this.cognify); }
 
   /** Dipanggil jendela notch saat Pengaturan (jendela lain) mengubah sumber kalender. */
   reload() {
-    const url = load('ics.url', ''), file = load('ics.file', '');
-    if (url === this.url && file === this.file) return;
-    this.url = url; this.file = file;
+    const url = load('ics.url', ''), file = load('ics.file', ''), cognify = load('ics.cognify', false);
+    if (url === this.url && file === this.file && cognify === this.cognify) return;
+    this.url = url; this.file = file; this.cognify = cognify;
     this.restart();
   }
 
   setSource(url: string, file = '') {
     this.url = url.trim(); this.file = file;
     save('ics.url', this.url); save('ics.file', this.file);
+    this.restart();
+  }
+
+  setCognify(on: boolean) {
+    this.cognify = on;
+    save('ics.cognify', on);
     this.restart();
   }
 
@@ -44,12 +53,28 @@ class Agenda {
   }
 
   async refresh() {
-    const text = this.file ? await cmd<string>('read_ics_file', { path: this.file }) : await cmd<string>('fetch_text', { url: this.url });
-    if (typeof text !== 'string') { this.problem = L('Kalender tidak bisa dimuat. Periksa tautan atau file.', 'Couldn\'t load the calendar. Check the link or file.'); return; }
     const now = Date.now();
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
-    this.events = parseIcs(text, midnight.getTime(), midnight.getTime() + 2 * 864e5).filter((e) => (e.end ?? e.start) > now);
-    this.problem = this.events.length || text.includes('BEGIN:VCALENDAR') ? '' : L('Isinya bukan kalender ICS.', 'That isn\'t an ICS calendar.');
+    const from = midnight.getTime(), to = from + 2 * 864e5;
+    let events: AgendaEvent[] = [];
+    let problem = '';
+
+    if (this.url || this.file) {
+      const text = this.file ? await cmd<string>('read_ics_file', { path: this.file }) : await cmd<string>('fetch_text', { url: this.url });
+      if (typeof text !== 'string') problem = L('Kalender tidak bisa dimuat. Periksa tautan atau file.', 'Couldn\'t load the calendar. Check the link or file.');
+      else {
+        const name = /^X-WR-CALNAME[^:]*:(.+)$/m.exec(text)?.[1]?.trim() ?? L('Kalender', 'Calendar');
+        events = parseIcs(text, from, to).map((e) => ({ ...e, calendar: name }));
+        if (!events.length && !text.includes('BEGIN:VCALENDAR')) problem = L('Isinya bukan kalender ICS.', 'That isn\'t an ICS calendar.');
+      }
+    }
+    if (this.cognify) {
+      const json = await cmd<string | null>('link_read_agenda');
+      if (typeof json !== 'string') problem ||= L('Kalender Cognify belum tersedia. Hubungkan Cognify ke Notch di app Cognify.', 'The Cognify calendar isn\'t available yet. Connect Cognify to Notch in the Cognify app.');
+      else events = [...events, ...parseCognifyAgenda(json, from, to).map((e) => ({ ...e, calendar: e.calendar ?? 'Cognify' }))];
+    }
+    this.events = events.filter((e) => (e.end ?? e.start) > now).sort((a, b) => a.start - b.start);
+    this.problem = problem;
   }
 
   /** Tombol Gabung tampil dari 10 menit sebelum mulai sampai acara selesai. */
@@ -62,7 +87,7 @@ class Agenda {
     for (const e of this.events) {
       if (e.allDay || this.warned.has(e.id)) continue;
       const left = e.start - now;
-      if (left > 0 && left <= 5 * 60_000) { this.warned.add(e.id); news.announce(e.title, L(`mulai ${Math.ceil(left / 60000)} menit lagi`, `starts in ${Math.ceil(left / 60000)} min`)); }
+      if (left > 0 && left <= 5 * 60_000) { this.warned.add(e.id); news.ring(e.title, L(`Mulai ${Math.ceil(left / 60000)} menit lagi`, `Starts in ${Math.ceil(left / 60000)} min`), e.meeting ? { icon: 'video' as const, action: { label: L('Gabung', 'Join'), run: () => void cmd('open_target', { target: e.meeting! }) } } : {}); }
     }
   }
 }

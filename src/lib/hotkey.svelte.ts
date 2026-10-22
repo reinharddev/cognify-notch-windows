@@ -1,5 +1,6 @@
 import { cmd } from './bridge';
 import { load, save } from './store.svelte';
+import { features } from './system.svelte';
 
 export const HOTKEYS = [
   ['ctrl_alt_n', 'Ctrl+Alt+N'], ['ctrl_alt_space', 'Ctrl+Alt+Space'], ['alt_space', 'Alt+Space'], ['ctrl_shift_n', 'Ctrl+Shift+N'], ['off', '-'],
@@ -9,6 +10,6 @@ export const HOTKEYS = [
 class Hotkey {
   choice = $state(load('hotkey', 'ctrl_alt_n'));
   reload() { this.choice = load('hotkey', 'ctrl_alt_n'); }
-  apply() { save('hotkey', this.choice); void cmd('set_hotkey', { choice: this.choice }); }
+  apply() { save('hotkey', this.choice); void cmd('set_hotkey', { choice: features.hotkey ? this.choice : 'off' }); }
 }
 export const hotkey = new Hotkey();
