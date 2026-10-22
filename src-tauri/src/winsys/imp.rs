@@ -430,7 +430,8 @@ impl BrightnessReader {
 /// Windows yang dipilih pengguna; bila tidak ada, bunyi sistem bawaan.
 pub fn play_chime(soft: bool) {
     use windows::Win32::Media::Audio::{PlaySoundW, SND_ALIAS, SND_ASYNC, SND_NODEFAULT};
-    use windows::Win32::UI::WindowsAndMessaging::{MessageBeep, MB_ICONASTERISK, MB_OK};
+    use windows::Win32::System::Diagnostics::Debug::MessageBeep;
+    use windows::Win32::UI::WindowsAndMessaging::{MB_ICONASTERISK, MB_OK};
     let alias = if soft { w!("Notification.Default") } else { w!("Notification.Reminder") };
     let played = unsafe { PlaySoundW(alias, None, SND_ALIAS | SND_ASYNC | SND_NODEFAULT).as_bool() };
     if !played {
