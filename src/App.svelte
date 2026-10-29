@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { notch, SIZES } from './lib/notch.svelte';
+  import { notch, SIZES, HEAD } from './lib/notch.svelte';
   import { Spring, springEase } from './lib/spring';
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
@@ -217,8 +217,8 @@
         </div>
       </div>
     {:else}
-      <div class="layer center" style:--lw="{notch.closed.idle.w}px" style:--lh="{notch.closed.idle.h}px" in:enter out:leave>
-        {#if features.companion}<Eyes />{/if}
+      <div class="layer center" style:--lw="{notch.headMode ? HEAD : notch.closed.idle.w}px" style:--lh="{notch.headMode ? HEAD : notch.closed.idle.h}px" in:enter out:leave>
+        {#if features.companion}<Eyes head={notch.headMode} />{/if}
       </div>
     {/if}
   </div>

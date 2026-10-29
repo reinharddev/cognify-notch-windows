@@ -85,6 +85,25 @@ fn read_text_file(path: String) -> Result<String, String> {
     std::fs::read_to_string(path).map_err(|e| e.to_string())
 }
 
+/// Lama Windows menyala sejak dihidupkan, dalam hari (suasana hati teman kecil: lama tak dimatikan = lelah).
+#[tauri::command]
+fn uptime_days() -> f64 {
+    #[cfg(windows)]
+    {
+        #[link(name = "kernel32")]
+        extern "system" {
+            fn GetTickCount64() -> u64;
+        }
+        // SAFETY: GetTickCount64 tidak punya argumen dan selalu aman dipanggil.
+        let ms = unsafe { GetTickCount64() };
+        ms as f64 / 86_400_000.0
+    }
+    #[cfg(not(windows))]
+    {
+        0.0
+    }
+}
+
 /// Pengaturan "ikuti kursor" untuk mata.
 #[tauri::command]
 fn set_eyes_follow(state: State<Shared>, on: bool) {
@@ -706,6 +725,7 @@ pub fn run() {
             set_hit_rect,
             open_settings,
             set_eyes_follow,
+            uptime_days,
             set_pinned,
             set_display,
             set_layout,

@@ -21,6 +21,8 @@ export const SIZES = {
   open: { w: 680, h: 236, r: 30 },
 } as const;
 
+export const HEAD = 42;
+
 class Notch {
   open = $state(false);
   page = $state(Math.max(0, Math.min(load('page', 0), ui.pages.length - 1)));
@@ -157,7 +159,13 @@ class Notch {
     return { ...g, x: g.x + o.dx, y: g.y + o.dy };
   }
 
+  /** Mode pill yang sedang diam: tampil sebagai kepala bulat (mata + mulut), bukan pil kosong. */
+  get headMode() {
+    return this.pill && features.companion && !this.open && !news.level && !news.current && !this.live && !this.wings;
+  }
+
   get size() {
+    if (this.headMode) return { w: HEAD, h: HEAD, r: HEAD / 2 };
     return this.open ? { w: SIZES.open.w * ui.scale, h: SIZES.open.h * ui.scale, r: SIZES.open.r * ui.scale } : news.level ? this.closed.hud : news.current ? this.closed.card : this.live || this.wings ? this.closed.media : this.closed.idle;
   }
 
