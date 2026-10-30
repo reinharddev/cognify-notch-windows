@@ -44,19 +44,21 @@
   {@const tilt = (right ? -1 : 1) * p.tilt}
   {@const size = p.skew === 0 ? 1 : right ? 1 + p.skew : 1 - p.skew * 0.5}
   {@const hidden = p.deco === 'heart' || p.deco === 'spiral'}
+  {@const closed = clamp((top - 0.78) / 0.22)}
+  {@const lt = face.blinkPhase === 'close' ? 'transform .11s ease-in, opacity .11s ease-in' : face.blinkPhase === 'open' ? 'transform .26s ease-out, opacity .26s ease-out' : undefined}
   {@const gx = p.gx * 0.5 + face.glance.x + (follow ? face.look.x * 1.2 : 0)}
   {@const gy = p.gy * 0.5 + face.glance.y + (follow ? face.look.y : 0)}
   <g class="eye" style:transform="translate({gx}px, {gy}px) scale({scale})">
-    <g class="shape" style:transform="scale({p.sx}, {p.sy * size})" style:opacity={hidden ? 0 : top > 0.88 ? 0 : 1}>
+    <g class="shape" style:transform="scale({p.sx}, {p.sy * size})" style:opacity={hidden ? 0 : 1 - closed} style:transition={lt}>
       <clipPath id="c{uid}{right ? 'r' : 'l'}"><rect x="-4.2" y="-6.2" width="8.4" height="12.4" rx="3.7" /></clipPath>
       <g clip-path="url(#c{uid}{right ? 'r' : 'l'})">
         <rect class="body" x="-4" y="-6" width="8" height="12" rx="3.5" />
-        <rect class="lid" x="-14" y="-32" width="28" height="32" style:transform="rotate({tilt}deg) translate(0px, {-6 + 13 * top}px)" />
-        <circle class="lid" r="8.4" style:transform="rotate({tilt}deg) translate(0px, {14.4 - 12 * p.bot}px)" />
+        <rect class="lid" x="-14" y="-32" width="28" height="32" style:transform="rotate({tilt}deg) translate(0px, {-6 + 13 * top}px)" style:transition={lt} />
+        <circle class="lid" r="8.4" style:transform="rotate({tilt}deg) translate(0px, {14.4 - 12 * p.bot}px)" style:transition={lt} />
       </g>
     </g>
     <!-- Mata tertutup: garis tipis. -->
-    <rect class="shut" x="-4.5" y="1" width="9" height="2" rx="1" style:opacity={top > 0.88 && !hidden ? 0.75 : 0} />
+    <rect class="shut" x="-4.5" y="1" width="9" height="2" rx="1" style:opacity={hidden ? 0 : 0.75 * closed} style:transition={lt} />
     <path class="heart" d="M0 4.5C-8 -1 -6 -7 0 -3.5C6 -7 8 -1 0 4.5Z" style:opacity={p.deco === 'heart' ? 1 : 0} />
     <text class="spiral" y="4" text-anchor="middle" style:opacity={p.deco === 'spiral' ? 1 : 0}>@</text>
     {#if right}
@@ -86,7 +88,7 @@
 
 <style>
   .eyes { display: flex; align-items: center; justify-content: center; }
-  .notchEye, .head { overflow: visible; filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 90%, transparent)); }
+  .notchEye, .head { overflow: visible; }
   .notchEye { margin: 0 4px; }
   .head { width: 100%; height: 100%; }
   .eye, .shape, .lid, .shut, .heart, .spiral, .z, .sym, .drop, .mouth { transition: transform .35s cubic-bezier(.34, 1.4, .5, 1), opacity .25s ease, d .35s ease, fill-opacity .25s ease; }

@@ -166,7 +166,7 @@ class Notch {
 
   get size() {
     if (this.headMode) return { w: HEAD, h: HEAD, r: HEAD / 2 };
-    return this.open ? { w: SIZES.open.w * ui.scale, h: SIZES.open.h * ui.scale, r: SIZES.open.r * ui.scale } : news.level ? this.closed.hud : news.current ? this.closed.card : this.live || this.wings ? this.closed.media : this.closed.idle;
+    return this.open ? { w: SIZES.open.w * ui.scale, h: SIZES.open.h * ui.scale, r: ui.roundness * ui.scale } : news.level ? this.closed.hud : news.current ? this.closed.card : this.live || this.wings ? this.closed.media : this.closed.idle;
   }
 
   /** Kursor masuk: terbuka setelah jeda (lewat sekilas tidak membuka notch); dengan "buka dengan klik", hanya klik yang membuka. */
@@ -200,6 +200,13 @@ class Notch {
     this.autoHidden = false;
     this.open = true;
     news.dismiss();
+  }
+
+  /** Buka sebentar agar perubahan bentuk (mis. lengkung sudut) terlihat; menutup lagi bila kursor tidak di atasnya. */
+  previewShape() {
+    this.show();
+    clearTimeout(this.closeTimer);
+    this.closeTimer = window.setTimeout(() => { if (!this.hovering && !this.pinned) this.open = false; }, 1800);
   }
 
   togglePinned() {

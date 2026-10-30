@@ -17,6 +17,8 @@
   import Music from './lib/pages/Music.svelte';
   import Pomodoro from './lib/pages/Pomodoro.svelte';
   import Clock from './lib/pages/Clock.svelte';
+  import Sky from './lib/pages/Sky.svelte';
+  import SkyBackground from './lib/SkyBackground.svelte';
   import Water from './lib/pages/Water.svelte';
   import Todo from './lib/pages/Todo.svelte';
   import Notes from './lib/pages/Notes.svelte';
@@ -30,6 +32,8 @@
   import Eyes from './lib/Eyes.svelte';
   import PageDock from './lib/PageDock.svelte';
   import { weather } from './lib/weather.svelte';
+  import { skyInk } from './lib/sky';
+  import { artColors } from './lib/artColor.svelte';
   import { ICONS } from './lib/icons';
   import { headerStamp } from './lib/relative';
   import { lyrics } from './lib/lyrics.svelte';
@@ -50,7 +54,7 @@
     else if (scope === 'weather') weather.reload();
     else if (scope === 'agenda') agenda.reload();
     else if (scope === 'hotkey') hotkey.reload();
-    else if (scope === 'ui') { ui.reload(); syncEyes(); }
+    else if (scope === 'ui') { const r = ui.roundness; ui.reload(); syncEyes(); if (ui.roundness !== r) notch.previewShape(); }
     else if (scope === 'reload') location.reload();
   });
 
@@ -66,6 +70,9 @@
     const pages = $derived(ui.pages);
   const page = $derived(pages[Math.min(notch.page, pages.length - 1)]);
   const time = $derived(headerStamp(ticker.now));
+  $effect(() => { artColors.update(((ui.lyricAuto || ui.equalizerAuto) ? device.media?.thumb : undefined) ?? undefined); });
+  // Halaman Langit: warna tulisan menyesuaikan terang gelapnya langit.
+  const ink = $derived(page.id === 'sky' ? skyInk(weather.clockOverride ?? ticker.now, weather.now?.sun ?? null, weather.now?.code ?? null, weather.kindShift) : undefined);
 
   // Geser halaman dengan panah atau roda mouse mendatar.
   const key = (e: KeyboardEvent) => {
@@ -81,6 +88,7 @@
   let shellEl: HTMLElement;
   let spring: Spring;
   onMount(() => {
+    ui.applyAccent();
     void notchLink.start();
     const p0 = notch.pos;
     spring = new Spring({ x: p0.x, y: p0.y, w: p0.w, h: p0.h, r: p0.r }, (v) => {
@@ -138,8 +146,9 @@
   onpointerleave={() => { if (!inTauri) notch.leave(); }}
 >
   <div class="shell" class:open={notch.open} class:pillmode={notch.pill} class:ax-left={notch.geo.ax === 'left'} class:ax-right={notch.geo.ax === 'right'} bind:this={shellEl}>
+    {#if notch.open && page.id === 'sky'}<SkyBackground />{/if}
     {#if notch.open}
-      <div class="layer openl" style:--lw="{SIZES.open.w}px" style:--lh="{SIZES.open.h}px" style:--sc={ui.scale} in:enter out:leave>
+      <div class="layer openl" style:--lw="{SIZES.open.w}px" style:--lh="{SIZES.open.h}px" style:--sc={ui.scale} style:--ink={ink} style:color={ink} in:enter out:leave>
         <header>
           <span class="title"><b>{page.title()}</b></span>
           <span class="right">
@@ -173,6 +182,7 @@
               {:else if page.id === 'music'}<Music />
               {:else if page.id === 'timer'}<Pomodoro />
               {:else if page.id === 'clock'}<Clock />
+              {:else if page.id === 'sky'}<Sky />
               {:else if page.id === 'water'}<Water />
               {:else if page.id === 'todo'}<Todo />
               {:else if page.id === 'notes'}<Notes />
@@ -212,7 +222,7 @@
       <div class="layer center" style:--lw="{notch.closed.media.w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
-          <span class="song">{wingLine || device.media.title}</span>
+          <span class="song" style:color={wingLine ? (ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined : undefined}>{wingLine || device.media.title}</span>
           <Equalizer />
         </div>
       </div>
@@ -248,7 +258,7 @@
   header { white-space: nowrap; height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
   .title { border: 0; background: none; padding: 0; cursor: default; font-size: 13px; }
   .right { display: flex; align-items: center; gap: 10px; }
-  .clock { font-weight: 600; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .8); font-size: 11.5px; }
+  .clock { font-weight: 600; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--ink, #fff) 80%, transparent); font-size: 11.5px; }
   .wx { font-size: 11.5px; font-weight: 600; }
   .batt { font-size: 11px; font-weight: 600; }
   .batt.chg { color: #5fd38d; }

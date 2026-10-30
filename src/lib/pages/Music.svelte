@@ -2,6 +2,8 @@
   import { Repeat, Repeat1, Shuffle } from '@lucide/svelte';
   import { device, features } from '../system.svelte';
   import { lyrics } from '../lyrics.svelte';
+  import { ui } from '../ui.svelte';
+  import { artColors } from '../artColor.svelte';
   import { cmd } from '../bridge';
   import { clock, ticker } from '../store.svelte';
   import { L } from '../i18n';
@@ -31,10 +33,11 @@
 {#if !m}
   <div class="empty">{L('Putar musik di Spotify, browser, atau pemutar lain. Judulnya muncul di sini.', 'Play music in Spotify, a browser, or another player. It shows up here.')}</div>
 {:else}
+  {#if m.thumb}<img class="wash" src={m.thumb} alt="" aria-hidden="true" />{/if}
   <div class="cols">
     <div class="col" style="width:264px">
       <div class="row" style="gap:12px">
-        <div class="art">{#if m.thumb}<img src={m.thumb} alt="" />{:else}<span>♪</span>{/if}</div>
+        <div class="artw">{#if m.thumb}<img class="glow" src={m.thumb} alt="" aria-hidden="true" />{/if}<div class="art">{#if m.thumb}<img src={m.thumb} alt="" />{:else}<span>♪</span>{/if}</div></div>
         <div class="col" style="gap:2px;min-width:0">
           <b class="one">{m.title}</b>
           <span class="dim one">{m.artist || m.app}</span>
@@ -60,7 +63,7 @@
       </div>
     </div>
     <div class="sep"></div>
-    <div class="lyr grow" bind:this={box}>
+    <div class="lyr grow" bind:this={box} style:--on={(ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined} style:--off={(ui.lyricAuto ? artColors.off : null) || ui.lyricIdle || undefined}>
       {#if !features.lyrics}
         <span class="dim">{L('Lirik dimatikan di pengaturan.', 'Lyrics are off in settings.')}</span>
       {:else if ls.kind === 'loading'}<span class="dim">{L('Mencari lirik…', 'Looking for lyrics…')}</span>
@@ -77,14 +80,19 @@
 {/if}
 
 <style>
-  .art { width: 84px; height: 84px; border-radius: 12px; background: rgba(255, 255, 255, .08); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 28px; }
+  /* Pendar: salinan sampul yang diburamkan di belakangnya, warnanya sama dengan foto lagu. */
+  .artw { position: relative; flex: none; width: 84px; height: 84px; }
+  .glow { position: absolute; left: -6px; top: -36px; width: 290px; height: 156px; object-fit: cover; border-radius: 50%; filter: blur(38px); opacity: .5; pointer-events: none; }
+  /* Gradasi di sisi kanan (di belakang lirik). position: fixed di dalam lapisan panel yang ber-transform = relatif ke panel, jadi tidak terpotong halaman. */
+  .wash { position: fixed; z-index: -1; right: -90px; top: -64px; width: 380px; height: 300px; object-fit: cover; border-radius: 50%; filter: blur(60px); opacity: .38; pointer-events: none; }
+  .art { position: relative; width: 84px; height: 84px; border-radius: 12px; background: rgba(255, 255, 255, .08); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 28px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
   .one { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .seek { cursor: pointer; height: 6px; }
   .lyr { overflow-y: auto; position: relative; padding: 70px 0; mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); }
   .lyr::-webkit-scrollbar { width: 0; }
-  .lyr .ln { display: block; border: 0; background: none; padding: 0; text-align: left; margin: 0 0 6px; font-family: inherit; font-size: 15px; font-weight: 700; color: rgba(255, 255, 255, .32); cursor: pointer; transition: color .25s, transform .25s; transform-origin: left; }
-  .lyr .ln.now { color: #fff; transform: scale(1.06); }
+  .lyr .ln { display: block; border: 0; background: none; padding: 0; text-align: left; margin: 0 0 6px; font-family: inherit; font-size: 15px; font-weight: 700; color: var(--off, rgba(255, 255, 255, .32)); cursor: pointer; transition: color .25s, transform .25s; transform-origin: left; }
+  .lyr .ln.now { color: var(--on, #fff); transform: scale(1.06); }
   pre { margin: 0; font: inherit; white-space: pre-wrap; color: rgba(255, 255, 255, .7); }
   input[type=range] { flex: 1; accent-color: var(--accent); }
 </style>

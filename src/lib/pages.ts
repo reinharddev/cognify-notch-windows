@@ -1,11 +1,12 @@
 import { L } from './i18n';
 
-// Sebelas halaman, urutan dan nama sama dengan versi Mac. Ikon memakai nama Lucide.
+// Dua belas halaman, urutan dan nama sama dengan versi Mac. Ikon memakai nama Lucide.
 export const PAGES = [
   { id: 'home', icon: 'house', title: () => L('Beranda', 'Home') },
   { id: 'music', icon: 'music', title: () => L('Musik', 'Music') },
   { id: 'timer', icon: 'timer', title: () => 'Pomodoro' },
   { id: 'clock', icon: 'alarm-clock', title: () => 'Stopwatch & Timer' },
+  { id: 'sky', icon: 'cloud-sun', title: () => L('Langit', 'Sky') },
   { id: 'water', icon: 'droplet', title: () => L('Pengingat Minum', 'Water Reminder') },
   { id: 'todo', icon: 'list-checks', title: () => L('Daftar Tugas', 'To-do') },
   { id: 'notes', icon: 'notebook-pen', title: () => L('Catatan', 'Notes') },

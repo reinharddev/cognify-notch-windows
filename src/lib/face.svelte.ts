@@ -3,19 +3,17 @@ import { cmd, on, windowKind } from './bridge';
 import { device, features } from './system.svelte';
 import { pomodoro } from './state.svelte';
 import { news } from './news.svelte';
+import { ui } from './ui.svelte';
+import { motionOf, pickEmotion, type CompanionConfig, type Emotion, type SituationId } from './companion';
 
 // Teman kecil di notch, sama dengan versi Mac (Companion.swift): wajah yang ekspresinya menyesuaikan keadaan.
 // Saat notch menempel di tepi layar hanya dua mata yang tampil; saat mode pill (mengambang) matanya menjadi kepala
-// bulat lengkap dengan mulut. Tidur dan bangun diketahui dari Rust (yang membaca posisi kursor); arah pandang
-// "ikuti kursor" juga datang dari Rust.
+// bulat lengkap dengan mulut. Tiga cara kerja (Pengaturan): dinamis (acak, mengikuti keadaan), per kejadian (ekspresi
+// dipilih sendiri, tanpa acak), dan statis (satu ekspresi). Tidur dan bangun diketahui dari Rust (yang membaca posisi
+// kursor); arah pandang "ikuti kursor" juga datang dari Rust.
 
+export type { Emotion };
 export type Deco = 'none' | 'z' | 'question' | 'bang' | 'sweat' | 'heart' | 'spiral';
-export type Emotion =
-  | 'idle' | 'content' | 'happy' | 'joy' | 'excited' | 'love' | 'hello'
-  | 'surprised' | 'scared' | 'curious' | 'confused' | 'dizzy'
-  | 'suspicious' | 'smug' | 'bored' | 'tired' | 'exhausted' | 'yawn'
-  | 'worried' | 'sad' | 'annoyed' | 'angry' | 'determined'
-  | 'sleepy' | 'sleep';
 export type Reaction = 'none' | 'shake' | 'bounce' | 'pop';
 
 /** top/bot: kelopak atas/bawah menutup 0..1, tilt: kemiringan kelopak (derajat, + = ujung dalam turun), sx/sy: ukuran mata,
@@ -60,6 +58,8 @@ class Face {
   emotion = $state<Emotion>('idle');
   blink = $state(0);
   wink = $state(0);
+  /** Sedang berkedip: kelopak menutup cepat lalu membuka pelan, tanpa pantulan. */
+  blinkPhase = $state<'none' | 'close' | 'open'>('none');
   glance = $state({ x: 0, y: 0 });
   /** Arah pandang dari Rust, hanya bila "ikuti kursor" menyala. */
   look = $state({ x: 0, y: 0 });
@@ -68,6 +68,7 @@ class Face {
   rxKey = $state(0);
 
   private base: Emotion = 'idle';
+  private sleeping = false;
   private holding = false;
   private seq = 0;
   private timer = 0;
@@ -76,6 +77,10 @@ class Face {
   private uptime = 0;
   /** Reaksi pada kabar menunggu kartunya hilang: di Windows kartu menggantikan seluruh pill. */
   private pending: Step[] | null = null;
+
+  private get cfg(): CompanionConfig {
+    return { mode: ui.companionMode, fixed: ui.companionFixed, blink: ui.companionBlink, map: ui.companionMap };
+  }
 
   constructor() {
     if (windowKind !== 'notch') return;
@@ -86,37 +91,54 @@ class Face {
     $effect.root(() => {
       $effect(() => {
         const n = news.current;
-        untrack(() => { if (n && features.companion) this.reactToNews(n.icon, n.title, n.tint); });
+        untrack(() => { if (n && features.companion) this.reactToNews(n.icon, n.title); });
       });
       $effect(() => {
         const a = news.alert;
-        untrack(() => { if (a && features.companion) this.queue(Math.random() < 0.5 ? [['surprised', 0.9, 'shake'], ['excited', 1.6, 'bounce']] : [['excited', 2, 'bounce']]); });
+        untrack(() => { if (a && features.companion) this.reactToSituation('alert'); });
       });
       // Kartu selesai: tampilkan reaksi yang tertunda.
       $effect(() => {
         const showing = !!news.current || !!news.alert || !!news.level;
         untrack(() => {
-          if (!showing && this.pending) { const steps = this.pending; this.pending = null; this.play(steps); }
+          if (!showing && this.pending) { const steps = this.pending; this.pending = null; void this.play(steps); }
         });
+      });
+      // Pilihan wajah berubah di Pengaturan: terapkan segera.
+      $effect(() => {
+        void [ui.companionMode, ui.companionFixed, ui.companionBlink, JSON.stringify(ui.companionMap)];
+        untrack(() => this.configChanged());
       });
     });
   }
 
   // MARK: Perintah
 
-  sleep() {
-    if (this.base === 'sleep') return;
+  private configChanged() {
     this.seq++;
     this.holding = false;
-    this.base = 'sleep';
-    this.emotion = 'sleep';
+    this.sleeping = false;
+    this.pending = null;
+    this.tick(false);
+  }
+
+  sleep() {
+    if (this.sleeping || this.cfg.mode === 'fixed') return;
+    this.seq++;
+    this.holding = false;
+    this.sleeping = true;
+    this.base = pickEmotion(this.cfg, 'sleeping') ?? 'sleep';
+    this.emotion = this.base;
   }
 
   /** Mouse bergerak lagi: kalau tertidur, bangun dan menyapa. */
   wake() {
-    if (this.base !== 'sleep' && this.emotion !== 'sleep') return;
+    if (!this.sleeping) return;
+    this.sleeping = false;
     this.base = 'idle';
-    void this.play([['hello', 1.6, 'pop']]);
+    const hello = pickEmotion(this.cfg, 'waking');
+    if (hello) void this.play([[hello, 1.6, motionOf(hello)]]);
+    else this.emotion = this.base;
   }
 
   react(kind: Reaction) {
@@ -144,22 +166,31 @@ class Face {
     else void this.play(steps);
   }
 
+  /** Kedip halus: menutup 110 ms, tertahan sebentar, membuka 260 ms (lihat Eyes.svelte). */
   async blinkOnce() {
-    if (this.holding || this.emotion === 'sleep') return;
+    if (this.holding || this.sleeping || !this.cfg.blink || this.emotion === 'sleep') return;
+    this.blinkPhase = 'close';
     this.blink = 1;
-    await wait(0.14);
+    await wait(0.17);
+    this.blinkPhase = 'open';
     this.blink = 0;
+    await wait(0.3);
+    this.blinkPhase = 'none';
   }
 
   async winkOnce() {
-    if (this.holding || this.emotion === 'sleep') return;
+    if (this.holding || this.sleeping || this.emotion === 'sleep') return;
+    this.blinkPhase = 'close';
     this.wink = 1;
-    await wait(0.38);
+    await wait(0.42);
+    this.blinkPhase = 'open';
     this.wink = 0;
+    await wait(0.3);
+    this.blinkPhase = 'none';
   }
 
   async lookAround() {
-    if (this.holding || this.emotion === 'sleep') return;
+    if (this.holding || this.sleeping || this.emotion === 'sleep') return;
     this.glance = { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 3 };
     await wait(1.2 + Math.random() * 1.2);
     this.glance = { x: 0, y: 0 };
@@ -167,35 +198,48 @@ class Face {
 
   // MARK: Suasana hati
 
-  /** Suasana dasar dari keadaan sekarang. Urutannya dari yang paling mendesak. */
-  private mood(): Emotion {
+  /** Keadaan yang paling mendesak sekarang. */
+  private state(): SituationId {
     const hour = new Date().getHours();
     const p = device.power;
     if (p && !p.plugged) {
-      if (p.percent <= 10) return 'worried';
-      if (p.percent <= 20) return 'tired';
+      if (p.percent <= 10) return 'batteryCritical';
+      if (p.percent <= 20) return 'batteryLow';
     }
-    if (pomodoro.running && pomodoro.mode === 'focus') return 'determined';
-    if (pomodoro.running) return 'content';
-    if (!device.online) return 'sad';
-    if (device.media?.playing) return 'happy';
-    if (hour < 5) return 'sleepy';
-    if (this.uptime >= 10) return 'exhausted';
-    if (this.uptime >= 5) return 'tired';
-    if (hour >= 5 && hour < 9) return 'content';
-    // Tidak ada yang istimewa: ganti-ganti santai tiap satu-dua menit.
-    if (Date.now() > this.neutralUntil) {
-      this.neutral = pick<Emotion>(['idle', 'idle', 'content', 'curious', 'smug']);
-      this.neutralUntil = Date.now() + (45 + Math.random() * 55) * 1000;
-    }
-    return this.neutral;
+    if (pomodoro.running && pomodoro.mode === 'focus') return 'focus';
+    if (pomodoro.running) return 'rest';
+    if (!device.online) return 'offline';
+    if (device.media?.playing) return 'music';
+    if (hour < 5) return 'lateNight';
+    if (this.uptime >= 10) return 'uptimeVeryLong';
+    if (this.uptime >= 5) return 'uptimeLong';
+    if (hour >= 5 && hour < 9) return 'morning';
+    return 'normal';
   }
 
-  /** Dipanggil tiap 5 sampai 10 detik: pilih suasana, lalu berkedip, melirik, atau iseng. */
-  private tick() {
-    if (!features.companion || this.base === 'sleep' || this.holding) return;
-    const next = this.mood();
-    if (next !== this.base) { this.base = next; this.emotion = next; }
+  /** Dipanggil tiap 5 sampai 10 detik. `flavor` false: hanya menyegarkan suasana (tanpa iseng). */
+  private tick(flavor = true) {
+    if (!features.companion) return;
+    const cfg = this.cfg;
+    if (cfg.mode === 'fixed') {
+      if (this.base !== cfg.fixed || this.emotion !== cfg.fixed) { this.base = cfg.fixed; this.emotion = cfg.fixed; }
+      if (flavor) void this.blinkOnce();
+      return;
+    }
+    if (this.sleeping || this.holding) return;
+    const s = this.state();
+    let next = pickEmotion(cfg, s) ?? 'idle';
+    if (s === 'normal' && cfg.mode === 'dynamic') {
+      // Tidak ada yang istimewa: ganti-ganti santai tiap satu-dua menit.
+      if (Date.now() > this.neutralUntil) {
+        this.neutral = pick<Emotion>(['idle', 'idle', 'content', 'curious', 'smug']);
+        this.neutralUntil = Date.now() + (45 + Math.random() * 55) * 1000;
+      }
+      next = this.neutral;
+    }
+    if (next !== this.base || this.emotion !== next) { this.base = next; this.emotion = next; }
+    if (!flavor) return;
+    if (cfg.mode !== 'dynamic') { void this.blinkOnce(); return; }
     const hour = new Date().getHours();
     const r = Math.random();
     if (r < 0.12) void this.lookAround();
@@ -208,25 +252,52 @@ class Face {
     else void this.blinkOnce();
   }
 
-  /** Kabar muncul: kadang kaget dulu, kadang biasa saja, lalu bereaksi sesuai isinya. */
-  private reactToNews(icon: string, title: string, tint: string) {
+  // MARK: Reaksi pada kabar
+
+  /** Kabar muncul. Dinamis: kadang kaget dulu, kadang biasa saja. Per kejadian: persis ekspresi pilihan user. */
+  private reactToSituation(id: SituationId) {
+    const cfg = this.cfg;
+    if (cfg.mode === 'fixed') return;
+    const chosen = pickEmotion(cfg, id);
+    if (!chosen) return;
+    const long = id === 'lowBatteryNotice' ? 4.5 : 2.6;
     const steps: Step[] = [];
-    if (Math.random() < 0.5) steps.push(['surprised', 0.7, 'shake']);
-    const t = title.toLowerCase();
-    const bad = /gagal|failed|terputus|offline/.test(t);
-    if (icon === 'zap') steps.push([/penuh|fully/.test(t) ? 'joy' : 'happy', 2.6, 'bounce']);
-    else if (icon === 'battery-low' || icon === 'battery-warning') steps.push([/lemah|low/.test(t) ? 'scared' : 'worried', 4, /lemah|low/.test(t) ? 'shake' : 'none']);
-    else if (icon.startsWith('battery')) steps.push(['worried', 2.4, 'none']);
-    else if (icon === 'wifi') steps.push(['happy', 3, 'none']);
-    else if (icon === 'wifi-off') steps.push(['sad', 3, 'none']);
-    else if (icon === 'headphones') steps.push([pick<Emotion>(['excited', 'love']), 3, 'bounce']);
-    else if (icon === 'caps-on') steps.push(['surprised', 1.2, 'shake']);
-    else if (icon === 'caps-off') return;
-    else if (icon === 'keyboard') steps.push(['curious', 1.6, 'none']);
-    else if (icon === 'circle-check') steps.push(['joy', 2.6, 'bounce']);
-    else if (icon === 'circle-x' || icon === 'triangle-alert' || bad) steps.push([pick<Emotion>(['angry', 'sad']), 3, 'none']);
-    else steps.push(['curious', 1.8, 'none']);
+    if (cfg.mode === 'dynamic') {
+      if (id === 'alert') {
+        this.queue(Math.random() < 0.5 ? [['surprised', 0.9, 'shake'], [chosen, 1.6, motionOf(chosen)]] : [[chosen, 2, motionOf(chosen)]]);
+        return;
+      }
+      if (Math.random() < 0.5) steps.push(['surprised', 0.7, 'shake']);
+      let e = chosen;
+      if (id === 'audioConnected') e = pick<Emotion>(['excited', 'love']);
+      else if (id === 'downloadFailed' || id === 'taskFailed') e = pick<Emotion>(['angry', 'sad']);
+      steps.push([e, long, motionOf(e)]);
+    } else {
+      steps.push([chosen, long, motionOf(chosen)]);
+    }
     this.queue(steps);
+  }
+
+  /** Mengenali jenis kabar dari ikon dan judulnya. */
+  private reactToNews(icon: string, title: string) {
+    const t = title.toLowerCase();
+    const download = /unduh|download/.test(t);
+    const low = /lemah|low/.test(t);
+    const full = /penuh|fully/.test(t);
+    let id: SituationId | null;
+    if (icon === 'zap') id = full ? 'chargerFull' : 'charging';
+    else if (icon === 'battery-low' || icon === 'battery-warning') id = low ? 'lowBatteryNotice' : 'unplugged';
+    else if (icon.startsWith('battery')) id = 'unplugged';
+    else if (icon === 'wifi') id = 'networkUp';
+    else if (icon === 'wifi-off') id = 'networkDown';
+    else if (icon === 'headphones') id = 'audioConnected';
+    else if (icon === 'caps-on') id = 'capsLock';
+    else if (icon === 'caps-off') id = null;
+    else if (icon === 'keyboard') id = 'inputSource';
+    else if (icon === 'circle-check') id = download ? 'downloadDone' : 'taskDone';
+    else if (icon === 'circle-x' || icon === 'triangle-alert') id = download ? 'downloadFailed' : 'taskFailed';
+    else id = 'alert';
+    if (id) this.reactToSituation(id);
   }
 
   /** Mulai berkedip dan berganti suasana (dipanggil saat wajah tampil); mengembalikan fungsi untuk berhenti. */
