@@ -190,7 +190,7 @@ pub fn set_default_output(id: &str) -> Result<(), String> {
         let unknown: IUnknown = CoCreateInstance(&CLSID_POLICY_CONFIG_CLIENT, None, CLSCTX_ALL)
             .map_err(|e| e.to_string())?;
         let mut policy = std::ptr::null_mut();
-        unknown.vtable().QueryInterface(unknown.as_raw(), &IID_POLICY_CONFIG, &mut policy)
+        (unknown.vtable().QueryInterface)(unknown.as_raw(), &IID_POLICY_CONFIG, &mut policy)
             .ok().map_err(|e| e.to_string())?;
         if policy.is_null() { return Err("Windows tidak memberi akses ke pemilih output".into()); }
         let vtable = *(policy as *mut *const *const std::ffi::c_void);
