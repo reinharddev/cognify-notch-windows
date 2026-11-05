@@ -79,6 +79,7 @@ class Weather {
 
   restart() {
     clearInterval(this.timer);
+    this.gen++;
     this.now = null;
     if (!features.weather) { this.problem = ''; return; }
     if (!this.city && !this.coords) { this.problem = L('Isi nama kota di Pengaturan', 'Enter a city in Settings'); return; }
@@ -86,7 +87,11 @@ class Weather {
     this.timer = window.setInterval(() => void this.refresh(), 30 * 60_000);
   }
 
+  /** Naik tiap restart; hasil permintaan lama (kota sudah diganti) dibuang. */
+  private gen = 0;
+
   private async refresh() {
+    const gen = this.gen;
     try {
       if (!this.place && this.coords) {
         const [lat, lon] = this.coords.split(',').map(Number);
@@ -94,12 +99,14 @@ class Weather {
       }
       if (!this.place) {
         const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams({ name: this.city, count: '1', language: L('id', 'en') })}`)).json();
+        if (gen !== this.gen) return;
         const item = g.results?.[0];
         if (!item) { this.problem = L(`Kota "${this.city}" tidak ditemukan`, `City "${this.city}" not found`); this.now = null; return; }
         this.place = { lat: item.latitude, lon: item.longitude, name: item.name };
       }
       const { lat, lon, name } = this.place;
       const f = await (await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(3)}&longitude=${lon.toFixed(3)}&current=temperature_2m,weather_code&daily=sunrise,sunset&timezone=auto&forecast_days=2`)).json();
+      if (gen !== this.gen) return;
       const off = Number(f.utc_offset_seconds ?? 0);
       const at = (t?: string) => (t ? Date.parse(t + ':00Z') - off * 1000 : NaN); // "2026-10-30T05:25" di zona lokasi
       const sun = f.daily?.sunrise?.length >= 2 && f.daily?.sunset?.length >= 1
@@ -109,6 +116,7 @@ class Weather {
       this.now = { temp: Math.round(f.current.temperature_2m), icon: symbol(f.current.weather_code), place: name || String(f.timezone ?? '').split('/').pop()?.replace(/_/g, ' ') || L('Lokasi saya', 'My location'), code: f.current.weather_code, sun: sun && !Object.values(sun).some(Number.isNaN) ? sun : null };
       this.problem = '';
     } catch {
+      if (gen !== this.gen) return;
       this.problem = L('Cuaca tidak bisa dimuat', 'Couldn\'t load weather');
     }
   }

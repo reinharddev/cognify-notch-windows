@@ -18,9 +18,9 @@ export type Reaction = 'none' | 'shake' | 'bounce' | 'pop';
 
 /** top/bot: kelopak atas/bawah menutup 0..1, tilt: kemiringan kelopak (derajat, + = ujung dalam turun), sx/sy: ukuran mata,
  *  skew: mata kanan lebih besar dari kiri, gx/gy: arah pandang, mw/mc/mo: lebar, lengkung, dan buka mulut (mode kepala). */
-export interface Pose { top: number; bot: number; tilt: number; sx: number; sy: number; gx: number; gy: number; skew: number; mw: number; mc: number; mo: number; deco: Deco }
+export interface Pose { top: number; bot: number; tilt: number; sx: number; sy: number; gx: number; gy: number; skew: number; mw: number; mc: number; mo: number; mr: number; deco: Deco }
 
-const P = (o: Partial<Pose> = {}): Pose => ({ top: 0, bot: 0, tilt: 0, sx: 1, sy: 1, gx: 0, gy: 0, skew: 0, mw: 3.6, mc: 0.9, mo: 0, deco: 'none', ...o });
+const P = (o: Partial<Pose> = {}): Pose => ({ top: 0, bot: 0, tilt: 0, sx: 1, sy: 1, gx: 0, gy: 0, skew: 0, mw: 3.6, mc: 0.9, mo: 0, mr: 0, deco: 'none', ...o });
 
 export const POSES: Record<Emotion, Pose> = {
   idle: P(),
@@ -30,17 +30,17 @@ export const POSES: Record<Emotion, Pose> = {
   excited: P({ sx: 1.15, sy: 1.15, mw: 5.4, mc: 3.6, mo: 3.6 }),
   love: P({ mw: 4.5, mc: 3.6, deco: 'heart' }),
   hello: P({ bot: 0.6, mw: 5.5, mc: 4, mo: 1.8 }),
-  surprised: P({ sx: 1.2, sy: 1.25, mw: 1.8, mc: 0, mo: 4, deco: 'bang' }),
-  scared: P({ top: 0.3, tilt: -14, sx: 1.2, sy: 1.2, mw: 4, mc: -1.8, mo: 2.2, deco: 'sweat' }),
+  surprised: P({ sx: 1.2, sy: 1.25, mw: 3.2, mc: 0, mo: 3.2, mr: 1, deco: 'bang' }),
+  scared: P({ top: 0.3, tilt: -14, sx: 1.2, sy: 1.2, mw: 4, mc: -1.8, mo: 2.6, mr: 0.55, deco: 'sweat' }),
   curious: P({ gx: 2.5, skew: 0.25, mw: 2.7, mc: 0.5 }),
   confused: P({ top: 0.2, tilt: -6, skew: 0.15, mw: 3.2, mc: -1, deco: 'question' }),
-  dizzy: P({ mw: 3.6, mc: 0, mo: 1.4, deco: 'spiral' }),
+  dizzy: P({ mw: 3.6, mc: 0, mo: 1.8, mr: 0.65, deco: 'spiral' }),
   suspicious: P({ top: 0.45, bot: 0.3, gx: 3, mw: 3.2, mc: -0.5 }),
   smug: P({ top: 0.35, tilt: -4, mw: 4.5, mc: 1.4 }),
   bored: P({ top: 0.55, gy: 1.5, mw: 3.6, mc: -0.5 }),
   tired: P({ top: 0.6, gy: 1.5, mw: 3.6, mc: -1 }),
   exhausted: P({ top: 0.8, tilt: -6, gy: 2, mw: 3.2, mc: -1.5, mo: 1.5, deco: 'sweat' }),
-  yawn: P({ top: 0.85, mw: 4.5, mc: 0, mo: 5.5 }),
+  yawn: P({ top: 0.85, mw: 4.5, mc: 0, mo: 5.5, mr: 1 }),
   worried: P({ top: 0.35, tilt: -14, mw: 3.6, mc: -1.8, deco: 'sweat' }),
   sad: P({ top: 0.4, tilt: -18, mw: 4, mc: -2.7 }),
   annoyed: P({ top: 0.5, tilt: 10, mw: 3.6, mc: -1 }),
@@ -56,6 +56,7 @@ const wait = (s: number) => new Promise<void>((r) => setTimeout(r, s * 1000));
 
 class Face {
   emotion = $state<Emotion>('idle');
+  pose = $state<Pose>({ ...POSES.idle });
   blink = $state(0);
   wink = $state(0);
   /** Sedang berkedip: kelopak menutup cepat lalu membuka pelan, tanpa pantulan. */
@@ -75,8 +76,9 @@ class Face {
   private neutral: Emotion = 'idle';
   private neutralUntil = 0;
   private uptime = 0;
-  /** Reaksi pada kabar menunggu kartunya hilang: di Windows kartu menggantikan seluruh pill. */
-  private pending: Step[] | null = null;
+  /** Reaksi menunggu kartunya hilang: di Windows kartu menggantikan seluruh pill. */
+  private pending: Step[][] = [];
+  private draining = false;
 
   private get cfg(): CompanionConfig {
     return { mode: ui.companionMode, fixed: ui.companionFixed, blink: ui.companionBlink, map: ui.companionMap };
@@ -90,6 +92,33 @@ class Face {
     void cmd<number>('uptime_days').then((d) => { this.uptime = d ?? 0; });
     $effect.root(() => {
       $effect(() => {
+        const targetEmotion = this.emotion;
+        let frame = 0;
+        let previous = 0;
+        const target = POSES[targetEmotion];
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          this.pose = { ...target };
+          return;
+        }
+        const animate = (now: number) => {
+          const dt = previous ? Math.min((now - previous) / 1000, 0.05) : 0;
+          previous = now;
+          const k = dt ? 1 - Math.exp(-dt * 10) : 1;
+          const next = { ...this.pose };
+          let remaining = 0;
+          for (const key of ['top', 'bot', 'tilt', 'sx', 'sy', 'gx', 'gy', 'skew', 'mw', 'mc', 'mo', 'mr'] as const) {
+            next[key] += (target[key] - next[key]) * k;
+            remaining = Math.max(remaining, Math.abs(target[key] - next[key]));
+          }
+          next.deco = target.deco;
+          this.pose = next;
+          if (remaining > 0.004) frame = requestAnimationFrame(animate);
+          else this.pose = { ...target };
+        };
+        frame = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(frame);
+      });
+      $effect(() => {
         const n = news.current;
         untrack(() => { if (n && features.companion) this.reactToNews(n.icon, n.title); });
       });
@@ -101,7 +130,7 @@ class Face {
       $effect(() => {
         const showing = !!news.current || !!news.alert || !!news.level;
         untrack(() => {
-          if (!showing && this.pending) { const steps = this.pending; this.pending = null; void this.play(steps); }
+          if (!showing && this.pending.length) void this.drain();
         });
       });
       // Pilihan wajah berubah di Pengaturan: terapkan segera.
@@ -118,7 +147,7 @@ class Face {
     this.seq++;
     this.holding = false;
     this.sleeping = false;
-    this.pending = null;
+    this.pending = [];
     this.tick(false);
   }
 
@@ -137,8 +166,8 @@ class Face {
     this.sleeping = false;
     this.base = 'idle';
     const hello = pickEmotion(this.cfg, 'waking');
-    if (hello) void this.play([[hello, 1.6, motionOf(hello)]]);
-    else this.emotion = this.base;
+    if (hello) void this.play([[hello, 1.6, motionOf(hello)]]).then(() => this.drain());
+    else { this.emotion = this.base; void this.drain(); }
   }
 
   react(kind: Reaction) {
@@ -160,10 +189,22 @@ class Face {
     this.emotion = this.base;
   }
 
-  /** Reaksi pada kabar: bila kartu sedang tampil, ditunda sampai kartu hilang. */
+  /** Reaksi pada kabar: antrekan semuanya sampai kartu hilang dan animasi sebelumnya selesai. */
   private queue(steps: Step[]) {
-    if (news.current || news.alert || news.level) this.pending = steps;
-    else void this.play(steps);
+    this.pending.push(steps);
+    void this.drain();
+  }
+
+  private async drain() {
+    if (this.draining || this.sleeping) return;
+    this.draining = true;
+    try {
+      while (this.pending.length && !news.current && !news.alert && !news.level && !this.sleeping) {
+        await this.play(this.pending.shift()!);
+      }
+    } finally {
+      this.draining = false;
+    }
   }
 
   /** Kedip halus: menutup 110 ms, tertahan sebentar, membuka 260 ms (lihat Eyes.svelte). */

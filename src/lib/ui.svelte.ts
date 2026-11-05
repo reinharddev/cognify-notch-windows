@@ -20,8 +20,8 @@ export const EDGE_MARGIN = 12;
 
 class Ui {
   closedWidth = $state(clampW(load('ui.closedWidth', CLOSED_DEFAULT)));
-  /** 'blink': hanya berkedip (bawaan). 'follow': mata ikut melihat ke arah kursor. */
-  eyesMode = $state<EyesMode>(load<string>('ui.eyesMode', 'blink') === 'follow' ? 'follow' : 'blink');
+  /** 'follow': mata mengikuti arah kursor (bawaan). 'blink': hanya berkedip. */
+  eyesMode = $state<EyesMode>(load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink');
   /** Notch dibuka dengan klik, bukan saat kursor diarahkan. */
   openOnClick = $state(load('ui.openOnClick', false));
   /** Jeda sebelum terbuka dan sebelum menutup (milidetik). */
@@ -76,7 +76,7 @@ class Ui {
   }
   reload() {
     this.closedWidth = clampW(load('ui.closedWidth', CLOSED_DEFAULT));
-    this.eyesMode = load<string>('ui.eyesMode', 'blink') === 'follow' ? 'follow' : 'blink';
+    this.eyesMode = load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink';
     this.openOnClick = load('ui.openOnClick', false);
     this.hoverDelay = load('ui.hoverDelay', 90);
     this.closeDelay = load('ui.closeDelay', 350);

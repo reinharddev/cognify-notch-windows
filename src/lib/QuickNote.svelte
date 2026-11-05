@@ -1,7 +1,8 @@
 <script lang="ts">
   import { Inbox } from '@lucide/svelte';
   import { notes } from './state.svelte';
-  import { annotated, preview } from './calc';
+  import { annotated, currencyPair, formatCurrency, preview } from './calc';
+  import { cmdTry } from './bridge';
   import { features } from './system.svelte';
   import { news } from './news.svelte';
   import { L } from './i18n';
@@ -10,7 +11,30 @@
   // dan tombol Simpan berbentuk pil.
   let text = $state('');
   let focused = $state(false);
-  const result = $derived(features.calculator ? preview(text) : null);
+  const currency = $derived(features.calculator ? currencyPair(text) : null);
+  let rateResult = $state('');
+  let rateLoading = $state(false);
+  let rateError = $state(false);
+  let requestId = 0;
+  const result = $derived(currency ? rateResult : features.calculator ? preview(text) : null);
+
+  $effect(() => {
+    const pair = currency;
+    const request = ++requestId;
+    rateResult = '';
+    rateError = false;
+    if (!pair) { rateLoading = false; return; }
+    rateLoading = true;
+    const timer = window.setTimeout(async () => {
+      const response = await cmdTry<number>('currency_rate', { from: pair.from, to: pair.to });
+      if (request !== requestId) return;
+      if (response.ok && typeof response.value === 'number' && Number.isFinite(response.value)) {
+        rateResult = formatCurrency(pair.amount, pair.from, pair.to, response.value);
+      } else rateError = true;
+      rateLoading = false;
+    }, 450);
+    return () => window.clearTimeout(timer);
+  });
   const save = () => {
     if (!text.trim()) return;
     notes.add(features.calculator ? annotated(text.trim()) : text);
@@ -27,10 +51,17 @@
   <span class="label">{L('Catatan cepat', 'Quick note')}</span>
   <textarea class:focus={focused} bind:value={text} onfocus={() => (focused = true)} onblur={() => (focused = false)}
     placeholder={L('Tulis sesuatu, tekan Enter…', 'Type something, press Enter…')} aria-label={L('Catatan cepat', 'Quick note')}
-    onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } }}></textarea>
+    onkeydown={(e) => {
+      if (e.ctrlKey || e.metaKey) e.stopPropagation(); // biarkan pintasan edit ditangani textarea
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+    }}></textarea>
   <div class="foot">
     {#if result}
-      <button class="res" title={L('Klik untuk menyalin hasil', 'Click to copy the result')} onclick={copyResult}>= {result}</button>
+      <button class="res" title={currency ? L('Kurs Yahoo Finance · klik untuk menyalin', 'Yahoo Finance rate · click to copy') : L('Klik untuk menyalin hasil', 'Click to copy the result')} onclick={copyResult}>{currency ? '' : '= '}{result}</button>
+    {:else if currency && rateLoading}
+      <span class="hint">{L('Mengambil kurs Yahoo…', 'Fetching Yahoo rate…')}</span>
+    {:else if currency && rateError}
+      <span class="hint">{L('Kurs tidak tersedia', 'Rate unavailable')}</span>
     {:else}
       <span class="hint"><Inbox size={11} /> {L('Seret file ke notch → tray', 'Drop files on the notch → tray')}</span>
     {/if}

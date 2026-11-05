@@ -28,9 +28,9 @@ button { font: inherit; color: inherit; }
 .bar { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .12); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: inherit; background: var(--tint, var(--accent)); transition: width .3s; }
 .empty { display: grid; place-items: center; height: 100%; color: rgba(255, 255, 255, .4); text-align: center; padding: 0 20px; }
-input[type=text], textarea {
+input:not([type]), input[type=text], textarea {
   font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 0; border-radius: 9px; padding: 6px 10px;
-  outline: none; user-select: text; width: 100%;
+  outline: none; user-select: text; -webkit-user-select: text; width: 100%;
 }
 input[type=text]:focus, textarea:focus { background: rgba(255, 255, 255, .13); }
 textarea { resize: none; }

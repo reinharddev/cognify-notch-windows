@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { face, POSES, type Pose } from './face.svelte';
+  import { face } from './face.svelte';
   import { ui } from './ui.svelte';
   import { notch } from './notch.svelte';
 
@@ -25,14 +25,13 @@
 
   const gap = $derived(Math.round(notch.closed.idle.w * 0.42));
   const follow = $derived(ui.eyesMode === 'follow');
-  const p = $derived<Pose>(POSES[face.emotion]);
+  const p = $derived(face.pose);
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
 
-  // Mulut: lengkung dan buka, sama dengan MouthShape di Mac.
+  // Mulut melengkung, dengan bentuk oval yang menyatu lembut untuk ekspresi kaget.
   const mouth = $derived.by(() => {
     const y = 0, corner = y - p.mc * 0.3, ctl = y + p.mc * 0.7, w = p.mw;
-    const top = `M${-w} ${corner}Q0 ${ctl} ${w} ${corner}`;
-    return p.mo > 0.3 ? `${top}Q0 ${ctl + p.mo * 2} ${-w} ${corner}Z` : top;
+    return `M${-w} ${corner}Q0 ${ctl} ${w} ${corner}`;
   });
 
   const uid = Math.random().toString(36).slice(2, 7);
@@ -52,7 +51,14 @@
     <g class="shape" style:transform="scale({p.sx}, {p.sy * size})" style:opacity={hidden ? 0 : 1 - closed} style:transition={lt}>
       <clipPath id="c{uid}{right ? 'r' : 'l'}"><rect x="-4.2" y="-6.2" width="8.4" height="12.4" rx="3.7" /></clipPath>
       <g clip-path="url(#c{uid}{right ? 'r' : 'l'})">
-        <rect class="body" x="-4" y="-6" width="8" height="12" rx="3.5" />
+        <defs>
+          <linearGradient id="eyeFill{uid}{right ? 'r' : 'l'}" x1="0" y1="-6" x2="0" y2="6" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#fff" />
+            <stop offset="0.58" stop-color="#f7f8fa" />
+            <stop offset="1" stop-color="#d8dbe2" />
+          </linearGradient>
+        </defs>
+        <rect class="body" x="-4" y="-6" width="8" height="12" rx="3.5" fill="url(#eyeFill{uid}{right ? 'r' : 'l'})" />
         <rect class="lid" x="-14" y="-32" width="28" height="32" style:transform="rotate({tilt}deg) translate(0px, {-6 + 13 * top}px)" style:transition={lt} />
         <circle class="lid" r="8.4" style:transform="rotate({tilt}deg) translate(0px, {14.4 - 12 * p.bot}px)" style:transition={lt} />
       </g>
@@ -75,7 +81,8 @@
       <g transform="translate(-8.5 -4)">{@render eye(false, 0.85)}</g>
       <g transform="translate(8.5 -4)">{@render eye(true, 0.85)}</g>
       <g transform="translate(0 10)">
-        <path class="mouth" style:d="path('{mouth}')" style:fill-opacity={clamp(p.mo / 2)} />
+        <path class="mouth" style:d="path('{mouth}')" style:opacity={1 - p.mr} />
+        <ellipse class="mouth-o" cx="0" cy="0" rx={Math.max(1, p.mw * 0.55)} ry={Math.max(1, p.mo * 0.58)} style:opacity={p.mr} />
       </g>
     </svg>
   {:else}
@@ -91,17 +98,20 @@
   .notchEye, .head { overflow: visible; }
   .notchEye { margin: 0 4px; }
   .head { width: 100%; height: 100%; }
-  .eye, .shape, .lid, .shut, .heart, .spiral, .z, .sym, .drop, .mouth { transition: transform .35s cubic-bezier(.34, 1.4, .5, 1), opacity .25s ease, d .35s ease, fill-opacity .25s ease; }
+  .eye { transition: transform .08s linear; }
+  .heart, .spiral, .z, .sym, .drop { transition: opacity .2s ease; }
+  .mouth, .mouth-o { transition: opacity .18s ease; }
   .eye, .shape, .lid { transform-origin: 0 0; transform-box: view-box; }
   .body { fill: #fff; }
-  .lid { fill: #000; }
+  .lid { fill: #000; stroke: #000; stroke-width: .5px; }
   .shut { fill: #fff; }
   .heart { fill: #ff6b8b; }
   .spiral { font: 800 11px system-ui, sans-serif; fill: #fff; transform-origin: 0 0; animation: spin .7s linear infinite; }
   .z { font: 800 8px system-ui, sans-serif; fill: #fff; }
   .sym { font: 800 10px system-ui, sans-serif; fill: #fff; }
   .drop { fill: #7dd3fc; }
-  .mouth { fill: #fff; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .mouth { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .mouth-o { fill: #fff; stroke: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @media (prefers-reduced-motion: reduce) { .spiral { animation: none; } }
 </style>

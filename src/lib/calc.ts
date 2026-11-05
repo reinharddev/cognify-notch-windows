@@ -126,6 +126,21 @@ export function evaluate(raw: string): string | null {
   return v !== null && Number.isFinite(v) ? format(v) : null;
 }
 
+/** Pasangan mata uang untuk kurs Yahoo, mis. "1 usd to idr". */
+export function currencyPair(raw: string): { amount: number; from: string; to: string } | null {
+  const m = raw.trim().match(/^([\d.,]+)\s*([a-z]{3})\s+(?:to|ke|jadi|berapa)\s+([a-z]{3})$/i);
+  if (!m) return null;
+  const amount = Number(normalize(m[1]));
+  const from = m[2].toUpperCase();
+  const to = m[3].toUpperCase();
+  return Number.isFinite(amount) && from !== to ? { amount, from, to } : null;
+}
+
+export function formatCurrency(amount: number, from: string, to: string, rate: number): string {
+  const format = (value: number) => new Intl.NumberFormat(lang === 'en' ? 'en-US' : 'id-ID', { maximumFractionDigits: 4 }).format(value);
+  return `${format(amount)} ${from} ≈ ${format(amount * rate)} ${to}`;
+}
+
 /** Hitungan di tengah kalimat ("beli susu 5 * 12000"): bagian hitungan terakhir di satu baris, nilai, dan hasil siap tampil.
  *  Tanggal ("22-10-2026"), jam ("16:06"), dan angka yang cuma dipisah tanda minus tanpa spasi tidak dianggap hitungan. */
 export function inline(line: string): { expression: string; value: number; result: string } | null {

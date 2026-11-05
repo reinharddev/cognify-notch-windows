@@ -6,7 +6,7 @@ import { TINT, type IconName } from './icons';
 import { L } from './i18n';
 import { load, save } from './store.svelte';
 
-export interface Power { percent: number; charging: boolean; plugged: boolean }
+export interface Power { percent: number; charging: boolean; plugged: boolean; power_saver: boolean; power_saver_available: boolean }
 export interface MediaInfo {
   title: string; artist: string; album: string; app: string; playing: boolean;
   position: number; duration: number; thumb: string | null;
@@ -16,6 +16,8 @@ export interface ClipItem { id: string; kind: 'text' | 'link' | 'image'; text: s
 
 class Features {
   media = $state(true); lyrics = $state(true); clipboard = $state(true); weather = $state(false);
+  unlimitedClipboard = $state(true);
+  clipboardLimit = $state(40);
   charger = $state(true); devices = $state(true); downloads = $state(true); keys = $state(true); network = $state(true);
   hideFullscreen = $state(true);
   spectrum = $state(true); camera = $state(true); shortcuts = $state(true); hud = $state(true); hotkey = $state(true);
@@ -24,11 +26,15 @@ class Features {
   updates = $state(true);
   autoInstall = $state(true);
   constructor() {
-    Object.assign(this, load('features', {}));
+    const stored = load<Record<string, unknown>>('features', {});
+    Object.assign(this, stored);
+    // Earlier versions used a 40-item cap by default.
+    if (stored.clipboardLimit === undefined) this.unlimitedClipboard = true;
+    this.clipboardLimit = Math.max(1, Math.min(100_000, Math.trunc(Number(this.clipboardLimit)) || 40));
   }
   reload() { Object.assign(this, load('features', {})); }
   persist() {
-    save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, weather: this.weather, charger: this.charger,
+    save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, unlimitedClipboard: this.unlimitedClipboard, clipboardLimit: this.clipboardLimit, weather: this.weather, charger: this.charger,
       devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, spectrum: this.spectrum, camera: this.camera, shortcuts: this.shortcuts, hud: this.hud, hotkey: this.hotkey,
       water: this.water, todo: this.todo, clockTools: this.clockTools, calculator: this.calculator, lyricsWing: this.lyricsWing, companion: this.companion, updates: this.updates, autoInstall: this.autoInstall });
     void cmd('set_clipboard_watch', { on: this.clipboard });

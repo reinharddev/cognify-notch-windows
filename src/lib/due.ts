@@ -48,7 +48,12 @@ export function parseDay(text: string, now: Date): { date: Date; weekday: boolea
   m = /\b(?:minggu depan|next week)\b/.exec(text);
   if (m) return hit(m as never, addDays(today, 7), m);
   m = /\b(?:bulan depan|next month)\b/.exec(text);
-  if (m) { const d = new Date(today); d.setMonth(d.getMonth() + 1); return hit(m as never, d, m); }
+  if (m) {
+    // 31 Januari + 1 bulan = 28/29 Februari (bukan 3 Maret), seperti versi Mac.
+    const d = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    d.setDate(Math.min(today.getDate(), new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()));
+    return hit(m as never, d, m);
+  }
   m = /\b(?:tahun depan|next year)\b/.exec(text);
   if (m) { const d = new Date(today); d.setFullYear(d.getFullYear() + 1); return hit(m as never, d, m); }
   m = /\b(?:tahun|year)\s+(\d{4})\b/.exec(text);

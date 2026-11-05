@@ -199,6 +199,27 @@ async fn fetch_text(url: String) -> Result<String, String> {
     .map_err(|e| e.to_string())?
 }
 
+/// Kurs mata uang dari Yahoo Finance (chart quote), mis. USDIDR=X.
+#[tauri::command]
+async fn currency_rate(from: String, to: String) -> Result<f64, String> {
+    let from = from.trim().to_ascii_uppercase();
+    let to = to.trim().to_ascii_uppercase();
+    let valid = |code: &str| code.len() == 3 && code.bytes().all(|b| b.is_ascii_uppercase());
+    if !valid(&from) || !valid(&to) || from == to {
+        return Err("Pasangan mata uang tidak valid".into());
+    }
+    tauri::async_runtime::spawn_blocking(move || {
+        let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{from}{to}=X?range=1d&interval=1d");
+        let agent: ureq::Agent = ureq::Agent::config_builder().timeout_global(Some(Duration::from_secs(8))).build().into();
+        let body = agent.get(&url).header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131 Safari/537.36").call().map_err(|e| e.to_string())?.body_mut().with_config().limit(1_000_000).read_to_string().map_err(|e| e.to_string())?;
+        let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
+        let rate = json["chart"]["result"][0]["meta"]["regularMarketPrice"].as_f64()
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .ok_or_else(|| "Yahoo Finance tidak menyediakan kurs untuk pasangan ini".to_string())?;
+        Ok(rate)
+    }).await.map_err(|e| e.to_string())?
+}
+
 /// Membaca file kalender .ics yang dipilih pengguna.
 #[tauri::command]
 fn read_ics_file(path: String) -> Result<String, String> {
@@ -280,6 +301,27 @@ fn set_volume(value: f32) {
         winsys::init_thread();
         winsys::set_volume(value);
     });
+}
+
+#[tauri::command]
+fn set_power_saver(enabled: bool) -> Result<bool, String> {
+    winsys::set_power_saver(enabled)
+}
+
+#[tauri::command]
+async fn audio_outputs() -> Result<Vec<winsys::AudioOutput>, String> {
+    tauri::async_runtime::spawn_blocking(|| {
+        winsys::init_thread();
+        winsys::audio_outputs()
+    }).await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn set_audio_output(id: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        winsys::init_thread();
+        winsys::set_default_output(&id)
+    }).await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]
@@ -397,11 +439,11 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
         let mut inside = false;
         let mut wait = 50u64;
         // Untuk mata: tidur setelah 2,5 menit tanpa gerakan kursor, bangun saat bergerak lagi, dan (bila
-        // diminta) arah pandang yang dibulatkan ke beberapa langkah, dikirim hanya saat langkahnya berubah.
+        // diminta) arah pandang kontinu, dikirim saat gerakannya cukup terasa.
         let mut last_pos = (i32::MIN, i32::MIN);
         let mut last_move = Instant::now();
         let mut asleep = false;
-        let mut look = (0i8, 0i8);
+        let mut look = (0.0f64, 0.0f64);
         loop {
             std::thread::sleep(Duration::from_millis(wait));
             let shared = app.state::<Shared>();
@@ -432,11 +474,12 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             let want = if shared.eyes_follow.load(Ordering::Relaxed) && rect.w > 0.0 {
                 let cx = x - (rect.x + rect.w / 2.0);
                 let cy = y - (rect.y + 18.0);
-                ((cx / 140.0).round().clamp(-2.0, 2.0) as i8, (cy / 120.0).round().clamp(-1.0, 2.0) as i8)
+                ((cx / 90.0).clamp(-2.4, 2.4), (cy / 70.0).clamp(-1.6, 1.6))
             } else {
-                (0, 0)
+                (0.0, 0.0)
             };
-            if want != look {
+            // Emit smaller gaze changes so the face responds to subtle cursor motion instead of snapping between steps.
+            if (want.0 - look.0).abs() > 0.025 || (want.1 - look.1).abs() > 0.025 {
                 look = want;
                 let _ = app.emit("eye-look", [look.0, look.1]);
             }
@@ -734,6 +777,7 @@ pub fn run() {
             play_chime,
             set_hotkey,
             fetch_text,
+            currency_rate,
             link::link_consent,
             link::link_write,
             link::link_clear,
@@ -750,6 +794,9 @@ pub fn run() {
             media_cmd,
             media_seek,
             set_volume,
+            audio_outputs,
+            set_audio_output,
+            set_power_saver,
             update_supported,
             update_check,
             update_download,

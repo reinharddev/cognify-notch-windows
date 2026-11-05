@@ -17,6 +17,19 @@ const localDay = (ms: number) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+/** Ringkasan teks cuaca (sama dengan versi Mac), bukan emoji. */
+function weatherText(code: number) {
+  if (code === 0) return 'Cerah';
+  if (code <= 2) return 'Cerah berawan';
+  if (code === 3) return 'Berawan';
+  if (code === 45 || code === 48) return 'Berkabut';
+  if (code >= 51 && code <= 57) return 'Gerimis';
+  if ((code >= 61 && code <= 67) || (code >= 80 && code <= 82)) return 'Hujan';
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return 'Salju';
+  if (code >= 95) return 'Badai petir';
+  return 'Berawan';
+}
+
 /** Susun isi notch-data.json dari keadaan Notch saat ini. Bagian clipboard hanya ada bila pengguna mengizinkan. */
 export function buildPayload(consent: Consent, appVersion: string, now = Date.now()) {
   const today = water.today;
@@ -38,7 +51,7 @@ export function buildPayload(consent: Consent, appVersion: string, now = Date.no
     },
     agenda: agenda.events.slice(0, 50).map((e) => ({ id: e.id, title: e.title, start: iso(e.start), ...(e.end ? { end: iso(e.end) } : {}), allDay: e.allDay })),
   };
-  if (weather.now) data.now = { weather: { tempC: weather.now.temp, summary: weather.now.icon, place: weather.now.place } };
+  if (weather.now) data.now = { weather: { tempC: weather.now.temp, summary: weatherText(weather.now.code), place: weather.now.place } };
   if (consent.clipboard) {
     data.clipboard = clipboard.items
       .filter((c) => c.kind !== 'image')

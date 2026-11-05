@@ -75,7 +75,10 @@ function fail(title: string, detail: string) {
 }
 
 let downloadTries = 0;
+let retryTimer = 0;
 async function downloadInBackground() {
+  clearTimeout(retryTimer); // satu unduhan/percobaan ulang saja pada satu waktu
+  if (update.stage === 'downloading') return;
   update.stage = 'downloading';
   update.text = L(`Mengunduh versi ${update.version}…`, `Downloading version ${update.version}…`);
   const r = await cmdTry('update_download');
@@ -83,7 +86,7 @@ async function downloadInBackground() {
     // Kembali ke "ditemukan" (bukan "siap"), lalu coba lagi 5 menit kemudian, paling banyak 3 kali.
     update.stage = 'found';
     fail(L('Gagal mengunduh pembaruan', 'Couldn\'t download the update'), r.error);
-    if (++downloadTries < 3) setTimeout(() => void downloadInBackground(), 5 * 60_000);
+    if (++downloadTries < 3) retryTimer = window.setTimeout(() => void downloadInBackground(), 5 * 60_000);
     return;
   }
   downloadTries = 0;

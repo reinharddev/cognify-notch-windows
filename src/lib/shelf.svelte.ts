@@ -3,11 +3,10 @@ import { cmd, on } from './bridge';
 import { features } from './system.svelte';
 import type { ClipItem } from './system.svelte';
 
-const MAX_TEXT = 40, MAX_IMAGES = 8;
 const uid = () => crypto.randomUUID();
 
 // ---------- Riwayat clipboard ----------
-// Teks dan tautan disimpan di PC ini (maks. 40); gambar hanya di memori selama app berjalan (maks. 8).
+// Isi disimpan di PC ini; gambar hanya di memori selama app berjalan.
 // Isi yang ditandai rahasia oleh pengelola kata sandi tidak pernah dikirim Rust.
 class Clipboard {
   items = $state<ClipItem[]>(load<ClipItem[]>('clip', []));
@@ -21,11 +20,12 @@ class Clipboard {
       this.persist();
     });
   }
+  applyLimit() { this.items = this.sort(this.items); this.persist(); }
   private sort(list: ClipItem[]) {
     const pinned = list.filter((i) => i.pinned);
-    const text = list.filter((i) => !i.pinned && i.kind !== 'image').slice(0, MAX_TEXT);
-    const img = list.filter((i) => !i.pinned && i.kind === 'image').slice(0, MAX_IMAGES);
-    return [...pinned, ...[...text, ...img].sort((a, b) => b.t - a.t)];
+    const recent = list.filter((i) => !i.pinned).sort((a, b) => b.t - a.t);
+    const limit = Math.max(1, Math.min(100_000, Math.trunc(features.clipboardLimit) || 1));
+    return [...pinned, ...(features.unlimitedClipboard ? recent : recent.slice(0, limit))];
   }
   private persist() { save('clip', this.items.filter((i) => i.kind !== 'image')); }
   pin(id: string) { this.items = this.sort(this.items.map((i) => (i.id === id ? { ...i, pinned: !i.pinned } : i))); this.persist(); }

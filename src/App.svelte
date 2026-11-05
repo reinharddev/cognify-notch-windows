@@ -4,9 +4,9 @@
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import { Bell, Brain, Coffee, Download, Hourglass } from '@lucide/svelte';
+  import { Bell, Brain, Coffee, Download, Hourglass, Leaf } from '@lucide/svelte';
   const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell } as const;
-  import { cmd, inTauri, on, openSettings } from './lib/bridge';
+  import { cmd, cmdTry, inTauri, on, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
   import { news } from './lib/news.svelte';
@@ -67,10 +67,36 @@
     const i = ls.lines.findLastIndex((l) => l.time <= pos + 0.25);
     return i >= 0 ? ls.lines[i].text : '';
   });
+  const wingLabel = $derived(wingLine || device.media?.title || '');
+  let wingView = $state<HTMLSpanElement>();
+  let wingText = $state<HTMLSpanElement>();
+  let wingOverflow = $state(0);
+  $effect(() => {
+    void wingLabel;
+    const view = wingView, text = wingText;
+    if (!view || !text) { wingOverflow = 0; return; }
+    let frame = 0;
+    const measure = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => { wingOverflow = Math.max(0, text.scrollWidth - view.clientWidth); });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(view);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); };
+  });
     const pages = $derived(ui.pages);
   const page = $derived(pages[Math.min(notch.page, pages.length - 1)]);
   const time = $derived(headerStamp(ticker.now));
-  $effect(() => { artColors.update(((ui.lyricAuto || ui.equalizerAuto) ? device.media?.thumb : undefined) ?? undefined); });
+  async function togglePowerSaver() {
+    const power = device.power;
+    if (!power?.power_saver_available) return;
+    const enabled = !power.power_saver;
+    const result = await cmdTry<boolean>('set_power_saver', { enabled });
+    if (result.ok && device.power) device.power = { ...device.power, power_saver: result.value ?? enabled };
+    else if (!result.ok) news.device(L('Mode hemat daya gagal diubah', 'Could not change power mode'), result.error, 'battery-warning', '#ff9f0a');
+  }
+  $effect(() => { artColors.update(device.media?.thumb ?? undefined); });
   // Halaman Langit: warna tulisan menyesuaikan terang gelapnya langit.
   const ink = $derived(page.id === 'sky' ? skyInk(weather.clockOverride ?? ticker.now, weather.now?.sun ?? null, weather.now?.code ?? null, weather.kindShift) : undefined);
 
@@ -157,6 +183,11 @@
             {#if device.power}
               <span class="batt" class:chg={device.power.charging} class:low={device.power.percent <= 20 && !device.power.charging}
                 title={L(`Baterai ${device.power.percent}%`, `Battery ${device.power.percent}%`)}>{device.power.charging ? '⚡' : ''}{device.power.percent}%</span>
+              {#if device.power.power_saver_available}
+                <button class="power-saver" class:on={device.power.power_saver} aria-label={L('Mode hemat daya', 'Power saver mode')}
+                  title={device.power.power_saver ? L('Efisiensi daya aktif · klik untuk mematikan', 'Power efficiency on · click to turn off') : L('Nyalakan efisiensi daya', 'Turn on power efficiency')}
+                  onclick={(event) => { event.stopPropagation(); void togglePowerSaver(); }}><Leaf size={12} /></button>
+              {/if}
             {/if}
             <span class="clock">{time}</span>
             <button class="gear" aria-label={L('Pengaturan', 'Settings')} onclick={openSettings}>⚙</button>
@@ -222,7 +253,11 @@
       <div class="layer center" style:--lw="{notch.closed.media.w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
-          <span class="song" style:color={wingLine ? (ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined : undefined}>{wingLine || device.media.title}</span>
+          <span class="song" class:scrolling={wingOverflow > 0} bind:this={wingView} title={wingLabel}
+            style:--scroll-x="-{wingOverflow}px" style:--scroll-time="{Math.max(5, wingOverflow / 18)}s"
+            style:color={wingLine ? (ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined : undefined}>
+            <span bind:this={wingText}>{wingLabel}</span>
+          </span>
           <Equalizer />
         </div>
       </div>
@@ -237,8 +272,7 @@
 <style>
   main { position: relative; height: 100vh; transition: opacity .2s; overflow: hidden; }
   .shell { position: absolute; background: #000; overflow: hidden; will-change: left, top, width, height; box-sizing: border-box; }
-  /* Mode pill: mengambang, jadi diberi garis tipis dan bayangan supaya terlihat di atas jendela lain. */
-  .shell.pillmode { box-shadow: 0 8px 28px rgba(0, 0, 0, .5), 0 0 0 1px rgba(255, 255, 255, .09); }
+  /* Mode pill tetap bersih tanpa garis atau bayangan di sekeliling lingkaran. */
   /* Pill di dekat tepi: isi menempel ke sisi pill, bukan ke tengah, supaya bentuk tumbuh ke sisi yang masih punya ruang. */
   .shell.ax-left .layer { left: 0; margin-left: 0; }
   .shell.ax-right .layer { left: auto; right: 0; margin-left: 0; }
@@ -254,7 +288,15 @@
   .lic { display: grid; place-items: center; flex: none; color: var(--tint); }
   .grow { flex: 1; }
   .dlb { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .75); flex: none; }
-  .song { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: rgba(255, 255, 255, .85); }
+  .song { flex: 1; min-width: 0; padding-inline: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; color: rgba(255, 255, 255, .85); }
+  .song > span { display: block; width: max-content; min-width: 100%; white-space: nowrap; }
+  .song.scrolling > span { animation: lyric-scroll var(--scroll-time) linear infinite; }
+  @keyframes lyric-scroll { 0%, 10% { transform: translateX(0); } 90%, 100% { transform: translateX(var(--scroll-x)); } }
+  @media (prefers-reduced-motion: reduce) {
+    .song.scrolling { overflow-x: auto; scrollbar-width: none; }
+    .song.scrolling::-webkit-scrollbar { display: none; }
+    .song.scrolling > span { animation: none; }
+  }
   header { white-space: nowrap; height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
   .title { border: 0; background: none; padding: 0; cursor: default; font-size: 13px; }
   .right { display: flex; align-items: center; gap: 10px; }
@@ -263,6 +305,9 @@
   .batt { font-size: 11px; font-weight: 600; }
   .batt.chg { color: #5fd38d; }
   .batt.low { color: #ff6b63; }
+  .power-saver { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; }
+  .power-saver:hover { background: rgba(255,255,255,.1); }
+  .power-saver.on { border-color: rgba(76,217,100,.55); background: rgba(76,217,100,.17); color: #4cd964; }
   .gear { border: 0; background: none; cursor: pointer; opacity: .5; font-size: 14px; padding: 0 2px; }
   .gear:hover { opacity: 1; }
   .banner { display: flex; align-items: center; gap: 14px; padding: 0 8px; }

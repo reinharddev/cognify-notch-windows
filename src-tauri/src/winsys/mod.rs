@@ -17,12 +17,21 @@ pub struct Power {
     pub percent: u8,
     pub charging: bool,
     pub plugged: bool,
+    pub power_saver: bool,
+    pub power_saver_available: bool,
 }
 
 #[derive(Clone, PartialEq, Serialize)]
 pub struct Volume {
     pub volume: f32,
     pub muted: bool,
+}
+
+#[derive(Clone, PartialEq, Serialize)]
+pub struct AudioOutput {
+    pub id: String,
+    pub name: String,
+    pub is_default: bool,
 }
 
 #[derive(Clone, PartialEq, Serialize)]

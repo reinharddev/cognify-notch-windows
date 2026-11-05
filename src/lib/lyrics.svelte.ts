@@ -2,12 +2,13 @@
 // dan hanya saat halaman Musik terbuka. Hasil disimpan di PC ini, jadi lagu yang sama tidak diminta dua kali.
 import { load, save } from './store.svelte';
 import type { MediaInfo } from './system.svelte';
+import { lyricReading } from './lyric-reading';
 
-export interface Line { time: number; text: string }
+export interface Line { time: number; text: string; reading?: string }
 export type LyricsState =
   | { kind: 'idle' | 'loading' | 'instrumental' | 'missing' | 'failed' }
   | { kind: 'synced'; lines: Line[] }
-  | { kind: 'plain'; text: string };
+  | { kind: 'plain'; text: string; lines: Line[] };
 
 interface Rec { syncedLyrics?: string | null; plainLyrics?: string | null; instrumental?: boolean; duration?: number }
 
@@ -22,10 +23,18 @@ export function parseLrc(lrc: string): Line[] {
   return out.sort((a, b) => a.time - b.time);
 }
 
-function stateOf(r: Rec): LyricsState {
+async function withReadings(lines: Line[]): Promise<Line[]> {
+  return Promise.all(lines.map(async (line) => ({ ...line, reading: await lyricReading(line.text) ?? undefined })));
+}
+
+async function stateOf(r: Rec): Promise<LyricsState> {
   if (r.instrumental) return { kind: 'instrumental' };
-  if (r.syncedLyrics) { const lines = parseLrc(r.syncedLyrics); if (lines.length) return { kind: 'synced', lines }; }
-  if (r.plainLyrics?.trim()) return { kind: 'plain', text: r.plainLyrics.trim() };
+  if (r.syncedLyrics) { const lines = parseLrc(r.syncedLyrics); if (lines.length) return { kind: 'synced', lines: await withReadings(lines) }; }
+  if (r.plainLyrics?.trim()) {
+    const text = r.plainLyrics.trim();
+    const lines = await withReadings(text.split(/\r?\n/).map((line) => ({ time: 0, text: line })));
+    return { kind: 'plain', text, lines };
+  }
   return { kind: 'missing' };
 }
 
@@ -40,18 +49,18 @@ async function fetchLyrics(song: MediaInfo): Promise<LyricsState> {
   const cacheKey = `lyrics.${(song.title + '|' + song.artist).toLowerCase()}`;
   const cached = load<Rec | 0 | null>(cacheKey, null);
   if (cached === 0) return { kind: 'missing' };
-  if (cached) return stateOf(cached);
+  if (cached) return await stateOf(cached);
   try {
     const q = new URLSearchParams({ track_name: song.title, artist_name: song.artist });
     if (song.album) q.set('album_name', song.album);
     if (song.duration > 0) q.set('duration', String(Math.round(song.duration)));
     const exact = await get<Rec>(`https://lrclib.net/api/get?${q}`);
-    if (exact && (exact.syncedLyrics || exact.plainLyrics || exact.instrumental)) { save(cacheKey, exact); return stateOf(exact); }
+    if (exact && (exact.syncedLyrics || exact.plainLyrics || exact.instrumental)) { save(cacheKey, exact); return await stateOf(exact); }
     const found = (await get<Rec[]>(`https://lrclib.net/api/search?${new URLSearchParams({ track_name: song.title, artist_name: song.artist })}`)) ?? [];
     const target = song.duration || 0;
     const best = found.filter((r) => r.syncedLyrics || r.plainLyrics)
       .sort((a, b) => (Math.abs((a.duration ?? target) - target) + (a.syncedLyrics ? 0 : 1000)) - (Math.abs((b.duration ?? target) - target) + (b.syncedLyrics ? 0 : 1000)))[0];
-    if (best && (!target || Math.abs((best.duration ?? target) - target) < 8)) { save(cacheKey, best); return stateOf(best); }
+    if (best && (!target || Math.abs((best.duration ?? target) - target) < 8)) { save(cacheKey, best); return await stateOf(best); }
     save(cacheKey, 0);
     return { kind: 'missing' };
   } catch {

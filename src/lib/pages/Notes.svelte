@@ -28,8 +28,11 @@
     <span class="label">{L('Catatan', 'Notes')}{notes.items.length ? ` · ${notes.items.length}` : ''}</span>
     <label class="add" class:focus={focused}>
       <Plus size={11} />
-      <input bind:value={draft} placeholder={L('Tambah catatan…', 'Add a note…')} aria-label={L('Tambah catatan', 'Add a note')}
-        onfocus={() => (focused = true)} onblur={() => (focused = false)} onkeydown={(e) => { if (e.key === 'Enter') add(); }} />
+      <input type="text" bind:value={draft} placeholder={L('Tambah catatan…', 'Add a note…')} aria-label={L('Tambah catatan', 'Add a note')}
+        onfocus={() => (focused = true)} onblur={() => (focused = false)} onkeydown={(e) => {
+          if (e.ctrlKey || e.metaKey) e.stopPropagation(); // biarkan pintasan edit ditangani input
+          if (e.key === 'Enter') add();
+        }} />
       {#if draft.trim()}<button class="save" onclick={add}>{L('Simpan', 'Save')}</button>{/if}
     </label>
   </div>

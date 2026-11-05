@@ -1,7 +1,7 @@
 //! Implementasi Windows.
 use std::path::Path;
 
-use windows::core::{w, HSTRING, PCWSTR, PWSTR};
+use windows::core::{w, GUID, HSTRING, HRESULT, IUnknown, Interface, PCWSTR, PWSTR};
 use windows::Foundation::TimeSpan;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession as Session, GlobalSystemMediaTransportControlsSessionManager as Manager,
@@ -10,10 +10,10 @@ use windows::Media::Control::{
 use windows::Networking::Connectivity::{NetworkConnectivityLevel, NetworkInformation};
 use windows::Storage::Streams::{DataReader, IRandomAccessStreamReference};
 use windows::Win32::Devices::FunctionDiscovery::PKEY_Device_FriendlyName;
-use windows::Win32::Foundation::{CloseHandle, HGLOBAL, HWND};
+use windows::Win32::Foundation::{CloseHandle, FreeLibrary, HGLOBAL, HWND};
 use windows::Win32::Globalization::{GetLocaleInfoW, LOCALE_SISO639LANGNAME};
 use windows::Win32::Media::Audio::Endpoints::{IAudioEndpointVolume, IAudioMeterInformation};
-use windows::Win32::Media::Audio::{eMultimedia, eRender, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator};
+use windows::Win32::Media::Audio::{eMultimedia, eRender, DEVICE_STATE_ACTIVE, IMMDevice, IMMDeviceEnumerator, MMDeviceEnumerator};
 use windows::Win32::System::Com::StructuredStorage::{PropVariantClear, PropVariantToStringAlloc};
 use windows::Win32::System::Com::{CoCreateInstance, CoInitializeEx, CoTaskMemFree, CLSCTX_ALL, COINIT_MULTITHREADED, STGM_READ};
 use windows::Win32::System::DataExchange::{
@@ -21,6 +21,7 @@ use windows::Win32::System::DataExchange::{
     RegisterClipboardFormatW,
 };
 use windows::Win32::System::Memory::{GlobalLock, GlobalUnlock};
+use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
@@ -33,7 +34,7 @@ use windows::Win32::UI::WindowsAndMessaging::{
     GetForegroundWindow, GetWindowThreadProcessId, SW_SHOWNORMAL,
 };
 
-use super::{ClipEvent, Media, Power, Volume};
+use super::{AudioOutput, ClipEvent, Media, Power, Volume};
 
 /// Setiap thread pekerja yang memanggil COM atau WinRT harus memanggil ini dulu.
 pub fn init_thread() {
@@ -50,7 +51,49 @@ pub fn power() -> Option<Power> {
     if s.BatteryFlag & 128 != 0 || s.BatteryLifePercent > 100 {
         return None;
     }
-    Some(Power { percent: s.BatteryLifePercent, charging: s.BatteryFlag & 8 != 0, plugged: s.ACLineStatus == 1 })
+    let saver = power_saver_status();
+    Some(Power {
+        percent: s.BatteryLifePercent,
+        charging: s.BatteryFlag & 8 != 0,
+        plugged: s.ACLineStatus == 1,
+        power_saver: saver.unwrap_or(false),
+        power_saver_available: saver.is_some(),
+    })
+}
+
+const POWER_MODE_BEST_EFFICIENCY: GUID = GUID::from_u128(0x961cc777_2547_4f9d_8174_7d86181b8a7a);
+const POWER_MODE_BALANCED: GUID = GUID::from_u128(0x00000000_0000_0000_0000_000000000000);
+
+/// Mode daya DC di Windows 11. API dimuat dinamis agar Windows 10 tetap bisa menjalankan app.
+fn power_saver_status() -> Option<bool> {
+    unsafe {
+        let module = LoadLibraryW(w!("PowrProf.dll")).ok()?;
+        let address = GetProcAddress(module, windows::core::s!("PowerGetUserConfiguredDCPowerMode"));
+        let result = address.map(|address| {
+            let get: unsafe extern "system" fn(*mut GUID) -> u32 = std::mem::transmute(address);
+            let mut mode = GUID::zeroed();
+            (get(&mut mode) == 0).then_some(mode == POWER_MODE_BEST_EFFICIENCY)
+        }).flatten();
+        let _ = FreeLibrary(module);
+        result
+    }
+}
+
+pub fn set_power_saver(enabled: bool) -> Result<bool, String> {
+    unsafe {
+        let module = LoadLibraryW(w!("PowrProf.dll")).map_err(|_| "Mode hemat daya cepat perlu Windows 11".to_string())?;
+        let address = GetProcAddress(module, windows::core::s!("PowerSetUserConfiguredDCPowerMode"));
+        let Some(address) = address else {
+            let _ = FreeLibrary(module);
+            return Err("Mode hemat daya cepat perlu Windows 11".into());
+        };
+        let set: unsafe extern "system" fn(*const GUID) -> u32 = std::mem::transmute(address);
+        let mode = if enabled { &POWER_MODE_BEST_EFFICIENCY } else { &POWER_MODE_BALANCED };
+        let status = set(mode);
+        let _ = FreeLibrary(module);
+        if status != 0 { return Err(format!("Windows gagal mengubah mode daya ({status})")); }
+        Ok(power_saver_status().unwrap_or(enabled))
+    }
 }
 
 // ---------- Suara ----------
@@ -88,9 +131,9 @@ pub fn peak() -> f32 {
     }
 }
 
-pub fn output_name() -> Option<String> {
+fn friendly_name(device: &IMMDevice) -> Option<String> {
     unsafe {
-        let store = endpoint().ok()?.OpenPropertyStore(STGM_READ).ok()?;
+        let store = device.OpenPropertyStore(STGM_READ).ok()?;
         let mut value = store.GetValue(&PKEY_Device_FriendlyName).ok()?;
         let text = PropVariantToStringAlloc(&value).ok().map(|p: PWSTR| {
             let s = p.to_string().unwrap_or_default();
@@ -100,6 +143,71 @@ pub fn output_name() -> Option<String> {
         let _ = PropVariantClear(&mut value);
         text.filter(|s| !s.is_empty())
     }
+}
+
+fn endpoint_id(device: &IMMDevice) -> Option<String> {
+    unsafe {
+        let id = device.GetId().ok()?;
+        let text = id.to_string().ok();
+        CoTaskMemFree(Some(id.0 as *const _));
+        text
+    }
+}
+
+pub fn output_name() -> Option<String> {
+    friendly_name(&endpoint().ok()?)
+}
+
+/// Perangkat keluaran aktif beserta penanda default untuk menu di notch.
+pub fn audio_outputs() -> Vec<AudioOutput> {
+    unsafe {
+        let enumerator: IMMDeviceEnumerator = match CoCreateInstance(&MMDeviceEnumerator, None, CLSCTX_ALL) {
+            Ok(value) => value,
+            Err(_) => return Vec::new(),
+        };
+        let Ok(collection) = enumerator.EnumAudioEndpoints(eRender, DEVICE_STATE_ACTIVE) else { return Vec::new() };
+        let Ok(count) = collection.GetCount() else { return Vec::new() };
+        let default = enumerator.GetDefaultAudioEndpoint(eRender, eMultimedia).ok().and_then(|d| endpoint_id(&d));
+        (0..count).filter_map(|index| {
+            let device = collection.Item(index).ok()?;
+            let id = endpoint_id(&device)?;
+            let name = friendly_name(&device)?;
+            Some(AudioOutput { is_default: default.as_deref() == Some(id.as_str()), id, name })
+        }).collect()
+    }
+}
+
+/// Mengubah output default untuk console, multimedia, dan komunikasi.
+/// SetDefaultEndpoint berasal dari IPolicyConfig Windows; endpointnya terlebih dahulu
+/// dibatasi ke daftar endpoint aktif yang ditampilkan di menu.
+pub fn set_default_output(id: &str) -> Result<(), String> {
+    if !audio_outputs().iter().any(|device| device.id == id) {
+        return Err("Perangkat output tidak ditemukan atau sudah terputus".into());
+    }
+    const CLSID_POLICY_CONFIG_CLIENT: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
+    const IID_POLICY_CONFIG: GUID = GUID::from_u128(0xf8679f50_850a_41cf_9c72_430f290290c8);
+    unsafe {
+        let unknown: IUnknown = CoCreateInstance(&CLSID_POLICY_CONFIG_CLIENT, None, CLSCTX_ALL)
+            .map_err(|e| e.to_string())?;
+        let mut policy = std::ptr::null_mut();
+        unknown.vtable().QueryInterface(unknown.as_raw(), &IID_POLICY_CONFIG, &mut policy)
+            .ok().map_err(|e| e.to_string())?;
+        if policy.is_null() { return Err("Windows tidak memberi akses ke pemilih output".into()); }
+        let vtable = *(policy as *mut *const *const std::ffi::c_void);
+        let set_default: unsafe extern "system" fn(*mut std::ffi::c_void, PCWSTR, i32) -> HRESULT =
+            std::mem::transmute(*vtable.add(13));
+        let release: unsafe extern "system" fn(*mut std::ffi::c_void) -> u32 =
+            std::mem::transmute(*vtable.add(2));
+        let wide: Vec<u16> = id.encode_utf16().chain(std::iter::once(0)).collect();
+        for role in 0..=2 {
+            if let Err(error) = set_default(policy, PCWSTR(wide.as_ptr()), role).ok() {
+                release(policy);
+                return Err(error.to_string());
+            }
+        }
+        release(policy);
+    }
+    Ok(())
 }
 
 // ---------- Layar, keyboard, jaringan ----------

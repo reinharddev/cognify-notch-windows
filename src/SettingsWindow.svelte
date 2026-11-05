@@ -1,5 +1,6 @@
 <script lang="ts">
   import { features } from './lib/system.svelte';
+  import { clipboard } from './lib/shelf.svelte';
   import { cmd, emitPrefs, inTauri, pickFiles } from './lib/bridge';
   import { agenda } from './lib/agenda.svelte';
   import { hotkey, HOTKEYS } from './lib/hotkey.svelte';
@@ -103,6 +104,8 @@
     setTimeout(() => location.reload(), 150);
   }
   const changedFeature = (key: string) => { features.persist(); if (key === 'weather') weather.restart(); void emitPrefs('features'); };
+  const setClipboardUnlimited = (unlimited: boolean) => { features.unlimitedClipboard = unlimited; clipboard.applyLimit(); changedFeature('unlimitedClipboard'); };
+  const setClipboardLimit = (raw: string) => { const n = Number(raw); if (!Number.isFinite(n)) return; features.clipboardLimit = Math.max(1, Math.min(100_000, Math.trunc(n))); clipboard.applyLimit(); changedFeature('clipboardLimit'); };
   const setWidth = () => { ui.persist(); void emitPrefs('ui'); };
   const setEyes = (m: 'blink' | 'follow') => { ui.eyesMode = m; ui.persist(); void emitPrefs('ui'); };
   const setChoice = (id: string, v: string) => {
@@ -363,7 +366,17 @@
     <h2>{L('Musik', 'Music')}</h2>
     <div class="card list">{@render tog('media')}{@render tog('spectrum')}{@render tog('lyrics')}{@render tog('lyricsWing')}</div>
     <h2>{L('Produktivitas', 'Productivity')}</h2>
-    <div class="card list">{@render tog('shortcuts')}{@render tog('clipboard')}{@render tog('water')}{@render tog('todo')}{@render tog('clockTools')}{@render tog('calculator')}{@render tog('camera')}</div>
+    <div class="card list">
+      {@render tog('shortcuts')}
+      {@render tog('clipboard')}
+      {#if features.clipboard}
+        <label class="opt"><span><b>{L('Batas riwayat clipboard', 'Clipboard history limit')}</b><small class="dim">{L('Bawaan tanpa batas. Item tersemat tidak ikut dihitung; gambar hanya ada selama app berjalan.', 'Unlimited by default. Pinned items do not count; images stay only while the app is running.')}</small></span>
+          <select value={features.unlimitedClipboard ? 'unlimited' : 'custom'} onchange={(e) => setClipboardUnlimited(e.currentTarget.value === 'unlimited')} aria-label={L('Batas riwayat clipboard', 'Clipboard history limit')}><option value="unlimited">{L('Tanpa batas', 'Unlimited')}</option><option value="custom">{L('Kustom', 'Custom')}</option></select></label>
+        {#if !features.unlimitedClipboard}<label class="opt"><span><b>{L('Jumlah item', 'Item count')}</b><small class="dim">{L('Item tersemat tetap dipertahankan.', 'Pinned items are preserved.')}</small></span>
+          <input class="num" type="number" min="1" max="100000" step="1" value={features.clipboardLimit} onchange={(e) => setClipboardLimit(e.currentTarget.value)} aria-label={L('Jumlah item riwayat clipboard', 'Clipboard history item count')} /></label>{/if}
+      {/if}
+      {@render tog('water')}{@render tog('todo')}{@render tog('clockTools')}{@render tog('calculator')}{@render tog('camera')}
+    </div>
     <h2>{L('Sistem', 'System')}</h2>
     <div class="card list">{@render tog('hud')}{@render tog('charger')}{@render tog('devices')}{@render tog('downloads')}{@render tog('keys')}{@render tog('network')}{@render tog('hideFullscreen')}{@render tog('hotkey')}</div>
     </section>
