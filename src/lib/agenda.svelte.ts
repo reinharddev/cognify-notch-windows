@@ -48,7 +48,7 @@ class Agenda {
     if (!this.enabled || !inTauri) return;
     void this.refresh();
     this.timer = window.setInterval(() => void this.refresh(), 15 * 60_000);
-    // Pengingat 5 menit sebelum acara; cek tiap 30 detik tanpa permintaan jaringan.
+    // Pengingat sebelum acara (5 menit, atau sesuai acara Cognify); cek tiap 30 detik tanpa permintaan jaringan.
     this.remindTimer = window.setInterval(() => this.remind(), 30_000);
   }
 
@@ -87,7 +87,11 @@ class Agenda {
     for (const e of this.events) {
       if (e.allDay || this.warned.has(e.id)) continue;
       const left = e.start - now;
-      if (left > 0 && left <= 5 * 60_000) { this.warned.add(e.id); news.ring(e.title, L(`Mulai ${Math.ceil(left / 60000)} menit lagi`, `Starts in ${Math.ceil(left / 60000)} min`), e.meeting ? { icon: 'video' as const, action: { label: L('Gabung', 'Join'), run: () => void cmd('open_target', { target: e.meeting! }) } } : {}); }
+      // Acara Cognify memakai pengingat yang diatur di Cognify (tanpa nilai = tidak berbunyi); acara lain 5 menit sebelum mulai.
+      const fromCognify = e.id.startsWith('cognify:');
+      if (fromCognify && e.remindMin === undefined) continue;
+      const lead = fromCognify ? e.remindMin! * 60_000 : 5 * 60_000;
+      if (left > (fromCognify ? -60_000 : 0) && left <= lead) { this.warned.add(e.id); news.ring(e.title, left > 30_000 ? L(`Mulai ${Math.ceil(left / 60000)} menit lagi`, `Starts in ${Math.ceil(left / 60000)} min`) : L('Mulai sekarang', 'Starting now'), e.meeting ? { icon: 'video' as const, action: { label: L('Gabung', 'Join'), run: () => void cmd('open_target', { target: e.meeting! }) } } : {}); }
     }
   }
 }

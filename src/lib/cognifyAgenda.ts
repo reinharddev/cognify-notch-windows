@@ -15,7 +15,8 @@ export function parseCognifyAgenda(json: string, from: number, to: number): Agen
     if (Number.isNaN(start)) continue;
     const end = typeof e.end === 'string' && !Number.isNaN(Date.parse(e.end)) ? Date.parse(e.end) : null;
     if ((end ?? start) < from || start > to) continue;
-    out.push({ id: `cognify:${e.id}`, title: e.title, start, end, allDay: e.allDay === true, meeting: null });
+    const remind = typeof e.remindMin === 'number' && Number.isFinite(e.remindMin) && e.remindMin >= 0 ? Math.min(Math.round(e.remindMin), 10080) : undefined;
+    out.push({ id: `cognify:${e.id}`, title: e.title, start, end, allDay: e.allDay === true, meeting: null, ...(remind !== undefined ? { remindMin: remind } : {}) });
   }
   return out;
 }

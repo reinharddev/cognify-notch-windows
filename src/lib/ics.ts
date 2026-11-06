@@ -11,6 +11,8 @@ export interface AgendaEvent {
   meeting: string | null;
   /** Nama kalender sumbernya (tampil di bawah judul, seperti di Mac). */
   calendar?: string;
+  /** Acara kalender Cognify: menit sebelum mulai saat pengingat berbunyi (tanpa nilai = tanpa pengingat). */
+  remindMin?: number;
 }
 
 const MEETING = /https:\/\/[^\s<>"']*(zoom\.us\/(j|my|w|s)\/|meet\.google\.com\/[a-z]|teams\.microsoft\.com\/l\/meetup-join|teams\.live\.com\/meet|webex\.com\/(meet|join|[a-z0-9.-]+\/j\.php))[^\s<>"']*/i;
