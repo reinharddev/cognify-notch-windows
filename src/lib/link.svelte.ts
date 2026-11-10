@@ -1,4 +1,4 @@
-// Hubungan ke Cognify utama (protokol: docs/NOTCH_LINK.md di repo Cognify).
+// Hubungan ke Cognify utama (protokol: docs/notch/protokol-tautan.md di repo Cognify).
 // Notch hanya menulis salinan datanya ke %APPDATA%\Cognify Link\notch-data.json setelah pengguna
 // menyetujuinya di Cognify (link.json). Tanpa persetujuan tidak ada yang ditulis, dan berkas lama dihapus.
 // Tanpa jaringan: hanya berkas lokal, lewat tiga perintah Rust (link_consent, link_write, link_clear).

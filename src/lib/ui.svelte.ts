@@ -1,5 +1,6 @@
 import { load, save } from './store.svelte';
 import { PAGES } from './pages';
+import { hub } from './hub.svelte';
 import { features } from './system.svelte';
 import { EMOTIONS, type Emotion, type Mode } from './companion';
 
@@ -23,7 +24,7 @@ class Ui {
   /** 'follow': mata mengikuti arah kursor (bawaan). 'blink': hanya berkedip. */
   eyesMode = $state<EyesMode>(load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink');
   /** Notch dibuka dengan klik, bukan saat kursor diarahkan. */
-  openOnClick = $state(load('ui.openOnClick', false));
+  openOnClick = $state(load('ui.openOnClick', true));
   /** Jeda sebelum terbuka dan sebelum menutup (milidetik). */
   hoverDelay = $state(load('ui.hoverDelay', 90));
   closeDelay = $state(load('ui.closeDelay', 350));
@@ -77,7 +78,7 @@ class Ui {
   reload() {
     this.closedWidth = clampW(load('ui.closedWidth', CLOSED_DEFAULT));
     this.eyesMode = load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink';
-    this.openOnClick = load('ui.openOnClick', false);
+    this.openOnClick = load('ui.openOnClick', true);
     this.hoverDelay = load('ui.hoverDelay', 90);
     this.closeDelay = load('ui.closeDelay', 350);
     this.scale = load('ui.scale', 1);
@@ -121,6 +122,7 @@ class Ui {
         case 'water': return features.water;
         case 'todo': return features.todo;
         case 'clock': return features.clockTools;
+        case 'cognify': return hub.connected;
         default: return true;
       }
     };

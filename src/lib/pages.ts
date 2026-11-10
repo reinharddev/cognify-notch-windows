@@ -1,6 +1,6 @@
 import { L } from './i18n';
 
-// Dua belas halaman, urutan dan nama sama dengan versi Mac. Ikon memakai nama Lucide.
+// Tiga belas halaman (Cognify hanya tampil selagi terhubung), urutan dan nama sama dengan versi Mac. Ikon memakai nama Lucide.
 export const PAGES = [
   { id: 'home', icon: 'house', title: () => L('Beranda', 'Home') },
   { id: 'music', icon: 'music', title: () => L('Musik', 'Music') },
@@ -14,6 +14,7 @@ export const PAGES = [
   { id: 'tray', icon: 'inbox', title: () => 'Tray' },
   { id: 'mirror', icon: 'scan-face', title: () => L('Cermin', 'Mirror') },
   { id: 'shortcuts', icon: 'zap', title: () => L('Pintasan', 'Shortcuts') },
+  { id: 'cognify', icon: 'book-open', title: () => 'Cognify' },
 ] as const;
 
 export type PageId = (typeof PAGES)[number]['id'];

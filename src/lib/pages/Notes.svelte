@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { Copy, FileText, Plus, Trash2 } from '@lucide/svelte';
+  import { Copy, FilePlus, FileText, Plus, Trash2 } from '@lucide/svelte';
   import { annotated } from '../calc';
   import { features } from '../system.svelte';
   import { notes } from '../state.svelte';
   import { noteStamp } from '../relative';
   import { news } from '../news.svelte';
+  import { hub } from '../hub.svelte';
   import { L } from '../i18n';
 
   // Halaman Catatan seperti di Mac: kolom tambah catatan di atas, lalu daftarnya.
@@ -45,6 +46,7 @@
           <span class="body"><span class="t">{n.text}</span><small>{noteStamp(n.t)}</small></span>
           <span class="acts">
             <button aria-label={L('Salin', 'Copy')} title={L('Salin', 'Copy')} onclick={() => copy(n.text)}><Copy size={12} /></button>
+            {#if hub.connected}<button aria-label={L('Jadikan dokumen', 'Make doc')} title={L('Jadikan dokumen di Cognify', 'Make a document in Cognify')} onclick={() => void hub.noteToDoc(n.text)}><FilePlus size={12} /></button>{/if}
             <button aria-label={L('Hapus', 'Delete')} title={L('Hapus', 'Delete')} onclick={() => notes.remove(n.id)}><Trash2 size={12} /></button>
           </span>
         </div>

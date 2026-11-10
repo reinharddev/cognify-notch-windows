@@ -1,5 +1,5 @@
 //! Hubungan dengan Cognify utama lewat berkas di folder bersama `%APPDATA%\Cognify Link\`
-//! (protokol: docs/NOTCH_LINK.md di repo Cognify). Notch hanya menulis `notch-data.json` setelah
+//! (protokol: docs/notch/protokol-tautan.md di repo Cognify). Notch hanya menulis `notch-data.json` setelah
 //! pengguna menekan "Hubungkan ke Cognify Notch" di Cognify, yang menulis `link.json`.
 //! Tanpa jaringan dan tanpa port; penulisan selalu atomik.
 
@@ -14,6 +14,12 @@ const CONSENT: &str = "link.json";
 const DATA: &str = "notch-data.json";
 const AGENDA: &str = "cognify-agenda.json";
 const MAX_AGENDA_BYTES: u64 = 1024 * 1024;
+const HUB: &str = "cognify-hub.json";
+const INBOX: &str = "inbox";
+const RESULTS: &str = "results";
+const MAX_HUB_BYTES: u64 = 1024 * 1024;
+const MAX_COMMAND_BYTES: usize = 64 * 1024;
+const MAX_RESULT_BYTES: u64 = 256 * 1024;
 const MAX_BYTES: usize = 5 * 1024 * 1024;
 
 #[derive(Serialize, Default, Debug, PartialEq)]
@@ -70,6 +76,115 @@ fn read_agenda(dir: &Path) -> Option<String> {
     fs::read_to_string(path).ok()
 }
 
+/// Ringkasan Cognify (cognify-hub.json), hanya selagi terhubung. Teks mentah JSON; UI yang menguraikannya.
+fn read_hub(dir: &Path) -> Option<String> {
+    if !read_consent(dir).enabled {
+        return None;
+    }
+    let path = dir.join(HUB);
+    if fs::metadata(&path).ok()?.len() > MAX_HUB_BYTES {
+        return None;
+    }
+    fs::read_to_string(path).ok()
+}
+
+#[derive(Serialize, Default, Debug, PartialEq)]
+pub struct Lesson { pub id: String, pub title: String, pub start: String, pub end: String, pub room: Option<String> }
+#[derive(Serialize, Debug, PartialEq)]
+pub struct DocRef { pub id: String, pub title: String, pub kind: String }
+#[derive(Serialize, Debug, PartialEq)]
+pub struct ToolRef { pub id: String, pub name: String }
+#[derive(Serialize, Default, Debug, PartialEq)]
+pub struct Hub { pub lessons: Vec<Lesson>, pub pinned: Vec<DocRef>, pub recent: Vec<DocRef>, pub tools: Vec<ToolRef> }
+#[derive(Serialize, Debug, PartialEq)]
+pub struct Hit { pub id: String, pub title: String, pub kind: String, pub snippet: String }
+
+fn text<'a>(v: &'a serde_json::Value, key: &str) -> Option<&'a str> {
+    v[key].as_str().filter(|s| !s.is_empty())
+}
+
+fn docs(v: &serde_json::Value) -> Vec<DocRef> {
+    v.as_array().map(|a| a.iter().filter_map(|d| {
+        let kind = text(d, "kind").filter(|k| matches!(*k, "doc" | "board" | "table")).unwrap_or("doc");
+        Some(DocRef { id: text(d, "id")?.into(), title: text(d, "title")?.into(), kind: kind.into() })
+    }).take(8).collect()).unwrap_or_default()
+}
+
+/// Uraikan cognify-hub.json. Elemen rusak dilewati, bidang tak dikenal diabaikan, bentuk salah = hub kosong.
+fn parse_hub(json: &str) -> Hub {
+    let Ok(v) = serde_json::from_str::<serde_json::Value>(json) else { return Hub::default() };
+    if v["schema"] != serde_json::json!(1) {
+        return Hub::default();
+    }
+    let lessons = v["lessons"].as_array().map(|a| a.iter().filter_map(|l| {
+        let (start, end) = (text(l, "start")?, text(l, "end")?);
+        Some(Lesson { id: text(l, "id")?.into(), title: text(l, "title")?.into(), start: start.into(), end: end.into(), room: text(l, "room").map(Into::into) })
+    }).take(12).collect()).unwrap_or_default();
+    let tools = v["tools"].as_array().map(|a| a.iter().filter_map(|t| {
+        Some(ToolRef { id: text(t, "id")?.into(), name: text(t, "name")?.into() })
+    }).take(24).collect()).unwrap_or_default();
+    Hub { lessons, pinned: docs(&v["docs"]["pinned"]), recent: docs(&v["docs"]["recent"]), tools }
+}
+
+/// Uraikan results/<id>.json: paling banyak 8 hasil; id harus cocok dengan pencarian.
+fn parse_hits(json: &str, id: &str) -> Option<Vec<Hit>> {
+    let v = serde_json::from_str::<serde_json::Value>(json).ok()?;
+    if v["id"].as_str() != Some(id) {
+        return None;
+    }
+    Some(v["hits"].as_array()?.iter().filter_map(|h| {
+        Some(Hit { id: text(h, "id")?.into(), title: text(h, "title")?.into(), kind: text(h, "kind").unwrap_or("doc").into(), snippet: h["snippet"].as_str().unwrap_or("").into() })
+    }).take(8).collect())
+}
+
+/// `<id>` perintah dan hasil hanya boleh huruf, angka, `-`, `_` (tanpa pemisah folder).
+fn valid_id(id: &str) -> bool {
+    !id.is_empty() && id.len() <= 64 && id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Tulis satu perintah ke `inbox/<id>.json` secara atomik. Ditolak tanpa persetujuan, id tak sah, bukan objek JSON, atau di atas 64 KB.
+fn write_command(dir: &Path, id: &str, json: &str) -> Result<(), String> {
+    if !read_consent(dir).enabled {
+        return Err("Hubungan ke Cognify belum diizinkan".into());
+    }
+    if !valid_id(id) {
+        return Err("Id perintah tidak sah".into());
+    }
+    if json.len() > MAX_COMMAND_BYTES {
+        return Err("Perintah terlalu besar".into());
+    }
+    let v = serde_json::from_str::<serde_json::Value>(json).map_err(|e| format!("Bukan JSON: {e}"))?;
+    if !v.is_object() || !v["type"].is_string() {
+        return Err("Perintah harus objek dengan bidang type".into());
+    }
+    let inbox = dir.join(INBOX);
+    fs::create_dir_all(&inbox).map_err(|e| e.to_string())?;
+    let tmp = inbox.join(format!("{id}.tmp"));
+    {
+        let mut f = fs::File::create(&tmp).map_err(|e| e.to_string())?;
+        f.write_all(json.as_bytes()).map_err(|e| e.to_string())?;
+        f.sync_all().map_err(|e| e.to_string())?;
+    }
+    fs::rename(&tmp, inbox.join(format!("{id}.json"))).map_err(|e| {
+        let _ = fs::remove_file(&tmp);
+        e.to_string()
+    })
+}
+
+/// Baca `results/<id>.json` lalu hapus. `None` bila belum ada (atau rusak/terlalu besar, yang juga dihapus).
+fn take_result(dir: &Path, id: &str) -> Option<String> {
+    if !valid_id(id) || !read_consent(dir).enabled {
+        return None;
+    }
+    let path = dir.join(RESULTS).join(format!("{id}.json"));
+    let len = fs::metadata(&path).ok()?.len();
+    let text = if len > MAX_RESULT_BYTES { None } else { fs::read_to_string(&path).ok() };
+    if text.is_some() || len > MAX_RESULT_BYTES {
+        let _ = fs::remove_file(&path);
+    }
+    text
+}
+
 fn clear_data(dir: &Path) {
     let _ = fs::remove_file(dir.join(DATA));
     let _ = fs::remove_file(dir.join(format!("{DATA}.tmp")));
@@ -88,6 +203,21 @@ pub fn link_write(json: String) -> Result<(), String> {
 #[tauri::command]
 pub fn link_read_agenda() -> Option<String> {
     dir().and_then(|d| read_agenda(&d))
+}
+
+#[tauri::command]
+pub fn link_read_hub() -> Option<Hub> {
+    dir().and_then(|d| read_hub(&d)).map(|t| parse_hub(&t))
+}
+
+#[tauri::command]
+pub fn link_send(id: String, json: String) -> Result<(), String> {
+    write_command(&dir().ok_or("Folder data tidak ditemukan")?, &id, &json)
+}
+
+#[tauri::command]
+pub fn link_take_result(id: String) -> Option<Vec<Hit>> {
+    dir().and_then(|d| take_result(&d, &id)).and_then(|t| parse_hits(&t, &id))
 }
 
 #[tauri::command]
@@ -165,5 +295,73 @@ mod tests {
         write_data(&d, "{}").unwrap();
         fs::remove_file(d.join(CONSENT)).unwrap();
         assert!(write_data(&d, "{}").is_err());
+    }
+
+    #[test]
+    fn the_hub_is_read_only_while_connected_and_within_the_size_limit() {
+        let d = temp();
+        fs::write(d.join(HUB), r#"{"schema":1}"#).unwrap();
+        assert_eq!(read_hub(&d), None);
+        fs::write(d.join(CONSENT), r#"{"enabled":true}"#).unwrap();
+        assert_eq!(read_hub(&d).as_deref(), Some(r#"{"schema":1}"#));
+        fs::write(d.join(HUB), "x".repeat(MAX_HUB_BYTES as usize + 1)).unwrap();
+        assert_eq!(read_hub(&d), None);
+    }
+
+    #[test]
+    fn commands_are_written_atomically_to_the_inbox_and_validated() {
+        let d = temp();
+        let cmd = r#"{"type":"open","path":"/p/abc"}"#;
+        assert!(write_command(&d, "a1", cmd).is_err(), "tanpa persetujuan ditolak");
+        fs::write(d.join(CONSENT), r#"{"enabled":true}"#).unwrap();
+        write_command(&d, "open-1_x", cmd).unwrap();
+        assert_eq!(fs::read_to_string(d.join("inbox/open-1_x.json")).unwrap(), cmd);
+        assert!(!d.join("inbox/open-1_x.tmp").exists());
+        for bad in ["", "../x", "a/b", "a.b", "a b"] {
+            assert!(write_command(&d, bad, cmd).is_err(), "{bad}");
+        }
+        assert!(write_command(&d, "b", "[1]").is_err());
+        assert!(write_command(&d, "b", "{rusak").is_err());
+        assert!(write_command(&d, "b", r#"{"x":1}"#).is_err());
+        let big = format!(r#"{{"type":"note_to_doc","text":"{}"}}"#, "x".repeat(MAX_COMMAND_BYTES));
+        assert!(write_command(&d, "b", &big).is_err());
+        assert!(!d.join("inbox/b.json").exists());
+    }
+
+    #[test]
+    fn a_search_result_is_read_once_then_deleted() {
+        let d = temp();
+        fs::write(d.join(CONSENT), r#"{"enabled":true}"#).unwrap();
+        assert_eq!(take_result(&d, "s1"), None);
+        fs::create_dir_all(d.join(RESULTS)).unwrap();
+        fs::write(d.join("results/s1.json"), r#"{"schema":1,"hits":[]}"#).unwrap();
+        assert_eq!(take_result(&d, "s1").as_deref(), Some(r#"{"schema":1,"hits":[]}"#));
+        assert!(!d.join("results/s1.json").exists());
+        assert_eq!(take_result(&d, "../x"), None);
+    }
+
+    #[test]
+    fn parses_the_hub_leniently() {
+        let hub = parse_hub(r#"{"schema":1,"extra":1,
+          "lessons":[{"id":"l1","title":"Fisika","start":"2026-11-09T01:00:00.000Z","end":"2026-11-09T02:30:00.000Z","room":"Lab"},
+                     {"id":"l2","title":"tanpa waktu"}, 5],
+          "docs":{"pinned":[{"id":"d1","title":"Bab 3","kind":"board"},{"title":"tanpa id"}],"recent":[{"id":"d2","title":"Sejarah","kind":"aneh"}]},
+          "tools":[{"id":"pdf-merge","name":"Gabungkan PDF"},{"id":"x"}]}"#);
+        assert_eq!(hub.lessons.len(), 1);
+        assert_eq!(hub.lessons[0].room.as_deref(), Some("Lab"));
+        assert_eq!(hub.pinned, vec![DocRef { id: "d1".into(), title: "Bab 3".into(), kind: "board".into() }]);
+        assert_eq!(hub.recent[0].kind, "doc", "jenis tak dikenal jadi doc");
+        assert_eq!(hub.tools, vec![ToolRef { id: "pdf-merge".into(), name: "Gabungkan PDF".into() }]);
+        assert_eq!(parse_hub("rusak"), Hub::default());
+        assert_eq!(parse_hub(r#"{"schema":2,"lessons":[]}"#), Hub::default());
+    }
+
+    #[test]
+    fn parses_search_hits_capped_at_eight_and_matching_the_id() {
+        let hits: Vec<String> = (0..10).map(|i| format!(r#"{{"id":"d{i}","title":"T{i}","kind":"doc","snippet":"s"}}"#)).collect();
+        let json = format!(r#"{{"schema":1,"id":"q1","q":"x","hits":[{}]}}"#, hits.join(","));
+        assert_eq!(parse_hits(&json, "q1").unwrap().len(), 8);
+        assert_eq!(parse_hits(&json, "q2"), None);
+        assert_eq!(parse_hits("rusak", "q1"), None);
     }
 }

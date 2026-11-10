@@ -9,7 +9,7 @@ import { pomodoro, clockTools } from './state.svelte';
 import { agenda } from './agenda.svelte';
 import { clock } from './store.svelte';
 import { relativeShort } from './relative';
-import { anchors, hideOffset, hotZone, pillCenter, place, type AnchorX, type AnchorY, type Edge } from './geometry';
+import { anchors, hideOffset, hotZone, pillCenter, pillLimits, place, type AnchorX, type AnchorY, type Edge } from './geometry';
 import { EDGE_MARGIN } from './ui.svelte';
 
 // Ukuran tiap bentuk (piksel CSS). Jendela Tauri lebarnya 720 dan tingginya 300.
@@ -190,9 +190,38 @@ class Notch {
     this.openTimer = window.setTimeout(() => this.show(), ui.hoverDelay);
   }
 
+  /** Sedang diseret dengan Alt (mode pill). Klik yang menyusul seretan diabaikan. */
+  dragging = $state(false);
+  private dragMoved = false;
+
+  /** Mulai seret: hanya mode pill yang tertutup, dengan Alt ditahan. Mengembalikan true bila seretan dimulai. */
+  startDrag(): boolean {
+    if (!this.pill || this.open || this.dragging) return false;
+    clearTimeout(this.openTimer);
+    this.dragging = true;
+    this.dragMoved = false;
+    return true;
+  }
+
+  /** Pindahkan pusat pill ke kursor (piksel jendela), dijepit ke batas aman layar. */
+  moveDrag(px: number, py: number) {
+    if (!this.dragging) return;
+    this.dragMoved = true;
+    const lim = pillLimits(this.viewport, this.viewportH, ui.pillWidth, SIZES.idle.h, EDGE_MARGIN);
+    ui.pillX = Math.min(lim.maxX, Math.max(lim.minX, px / this.viewport));
+    ui.pillY = Math.min(lim.maxY, Math.max(lim.minY, py / this.viewportH));
+  }
+
+  /** Selesai seret; true bila pill benar-benar bergeser (posisi perlu disimpan). */
+  endDrag(): boolean {
+    const moved = this.dragMoved;
+    this.dragging = false;
+    return moved;
+  }
+
   /** Klik pada notch yang tertutup (mode "buka dengan klik"). */
   click() {
-    if (this.open || !ui.openOnClick) return;
+    if (this.open || !ui.openOnClick || this.dragMoved) { this.dragMoved = false; return; }
     this.show();
   }
 

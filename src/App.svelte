@@ -6,7 +6,7 @@
   import { fly } from 'svelte/transition';
   import { Bell, Brain, Coffee, Download, Hourglass, Leaf } from '@lucide/svelte';
   const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell } as const;
-  import { cmd, cmdTry, inTauri, on, openSettings } from './lib/bridge';
+  import { cmd, cmdTry, emitPrefs, inTauri, on, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
   import { news } from './lib/news.svelte';
@@ -26,6 +26,8 @@
   import Tray from './lib/pages/Tray.svelte';
   import Mirror from './lib/pages/Mirror.svelte';
   import Shortcuts from './lib/pages/Shortcuts.svelte';
+  import Cognify from './lib/pages/Cognify.svelte';
+  import { hub } from './lib/hub.svelte';
   import Equalizer from './lib/Equalizer.svelte';
   import NoticeCard from './lib/NoticeCard.svelte';
   import Hud from './lib/Hud.svelte';
@@ -116,6 +118,7 @@
   onMount(() => {
     ui.applyAccent();
     void notchLink.start();
+    hub.start();
     const p0 = notch.pos;
     spring = new Spring({ x: p0.x, y: p0.y, w: p0.w, h: p0.h, r: p0.r }, (v) => {
       shellEl.style.left = `${v.x}px`;
@@ -168,6 +171,10 @@
   style:width="100%"
   style:opacity={device.hidden ? 0 : 1}
   onclick={() => notch.click()}
+  onpointerdown={(e) => { if (e.altKey && e.button === 0 && notch.startDrag()) { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); e.preventDefault(); } }}
+  onpointermove={(e) => { if (notch.dragging) notch.moveDrag(e.clientX, e.clientY); }}
+  onpointerup={() => { if (notch.endDrag()) { ui.persist(); void emitPrefs('ui'); } }}
+  onpointercancel={() => { if (notch.endDrag()) { ui.persist(); void emitPrefs('ui'); } }}
   onpointerenter={() => { if (!inTauri) notch.enter(); }}
   onpointerleave={() => { if (!inTauri) notch.leave(); }}
 >
@@ -220,7 +227,8 @@
               {:else if page.id === 'clipboard'}<Clipboard />
               {:else if page.id === 'tray'}<Tray />
               {:else if page.id === 'mirror'}<Mirror />
-              {:else if page.id === 'shortcuts'}<Shortcuts />{/if}
+              {:else if page.id === 'shortcuts'}<Shortcuts />
+              {:else if page.id === 'cognify'}<Cognify />{/if}
             </div>
           {/key}
         </section>

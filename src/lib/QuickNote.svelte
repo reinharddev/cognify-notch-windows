@@ -5,6 +5,7 @@
   import { cmdTry } from './bridge';
   import { features } from './system.svelte';
   import { news } from './news.svelte';
+  import { hub } from './hub.svelte';
   import { L } from './i18n';
 
   // Sama dengan QuickNote di Mac: kolom 66 px, hasil hitungan (bisa diklik untuk menyalin) atau petunjuk seret file,
@@ -66,6 +67,10 @@
       <span class="hint"><Inbox size={11} /> {L('Seret file ke notch → tray', 'Drop files on the notch → tray')}</span>
     {/if}
     <span class="grow"></span>
+    {#if hub.connected}
+      <button class="doc" disabled={!text.trim()} title={L('Kirim sebagai dokumen baru di Cognify', 'Send as a new document in Cognify')}
+        onclick={async () => { if (await hub.noteToDoc(text)) text = ''; }}>{L('Jadikan dokumen', 'Make doc')}</button>
+    {/if}
     <button class="save" disabled={!text.trim()} onclick={save}>{L('Simpan', 'Save')}</button>
   </div>
 </div>
@@ -81,5 +86,9 @@
   .res { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); cursor: pointer; }
   .grow { flex: 1; }
   .save { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 90%, transparent); cursor: pointer; }
+  .doc { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(255, 255, 255, .12); cursor: pointer; }
+  .doc:disabled { color: rgba(255, 255, 255, .4); cursor: default; }
+  .doc { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(255, 255, 255, .12); cursor: pointer; }
+  .doc:disabled { color: rgba(255, 255, 255, .4); cursor: default; }
   .save:disabled { background: color-mix(in srgb, var(--accent) 35%, transparent); color: rgba(255, 255, 255, .5); cursor: default; }
 </style>

@@ -214,7 +214,7 @@
           <label class="row">X <input class="num" type="number" min={pct(lim.minX)} max={pct(lim.maxX)} value={pct(ui.pillX)} onchange={(e) => setPct('x', Number(e.currentTarget.value))} /> %</label>
           <label class="row">Y <input class="num" type="number" min={pct(lim.minY)} max={pct(lim.maxY)} value={pct(ui.pillY)} onchange={(e) => setPct('y', Number(e.currentTarget.value))} /> %</label>
         </div>
-        <span class="dim">{L('Geser titik di peta atau isi angka. Pill selalu tetap di dalam layar; bila dekat tepi, panelnya tumbuh ke sisi yang masih punya ruang.', 'Drag the dot on the map or type numbers. The pill always stays on screen; near an edge, its panel grows toward the side with room.')}</span>
+        <span class="dim">{L('Tahan Alt lalu seret pill langsung di layar, atau geser titik di peta atau isi angka. Pill selalu tetap di dalam layar; bila dekat tepi, panelnya tumbuh ke sisi yang masih punya ruang.', 'Hold Alt and drag the pill right on screen, or drag the dot on the map or type numbers. The pill always stays on screen; near an edge, its panel grows toward the side with room.')}</span>
       {/if}
       </div>
     </section>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { House, Music, Timer, AlarmClock, Droplet, ListChecks, NotebookPen, ClipboardList, Inbox, ScanFace, Zap, CloudSun } from '@lucide/svelte';
+  import { House, Music, Timer, AlarmClock, Droplet, ListChecks, NotebookPen, ClipboardList, Inbox, ScanFace, Zap, CloudSun, BookOpen } from '@lucide/svelte';
   import { ui } from './ui.svelte';
   import { notch } from './notch.svelte';
   import { L } from './i18n';
@@ -10,7 +10,7 @@
   // dan pembesaran mengikuti kursor dengan penghalusan pendek.
   const ICONS: Record<string, typeof House> = {
     home: House, music: Music, timer: Timer, clock: AlarmClock, sky: CloudSun, water: Droplet, todo: ListChecks,
-    notes: NotebookPen, clipboard: ClipboardList, tray: Inbox, mirror: ScanFace, shortcuts: Zap,
+    notes: NotebookPen, clipboard: ClipboardList, tray: Inbox, mirror: ScanFace, shortcuts: Zap, cognify: BookOpen,
   };
   const BASE = 20, PEAK = 34, REACH = 64, GAP = 4;
   const PAGES = $derived(ui.pages);
