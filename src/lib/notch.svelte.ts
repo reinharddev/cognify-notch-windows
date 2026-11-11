@@ -72,7 +72,7 @@ class Notch {
     $effect.root(() => {
       $effect(() => {
         const busy = this.open || this.hoverState || !!news.current || !!news.level || !!news.alert || this.pinned;
-        const on = ui.autoHide;
+        const on = ui.autoHide && ui.style !== 'pill';
         untrack(() => {
           clearTimeout(this.hideTimer);
           if (!on || busy) { if (!on || this.open || news.current || news.level || news.alert) this.autoHidden = false; return; }

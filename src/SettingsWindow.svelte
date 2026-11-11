@@ -131,7 +131,7 @@
     clampPill();
     setUi();
   };
-  const setStyle = (st: 'notch' | 'pill') => { ui.style = st; clampPill(); setUi(); };
+  const setStyle = (st: 'notch' | 'pill') => { ui.style = st; if (st === 'pill') ui.autoHide = false; clampPill(); setUi(); }; // pill mengambang tidak bisa disembunyikan di tepi
   const pct = (v: number) => Math.round(v * 100);
   const setPct = (axis: 'x' | 'y', v: number) => { if (axis === 'x') ui.pillX = v / 100; else ui.pillY = v / 100; clampPill(); setUi(); };
 </script>
@@ -198,7 +198,9 @@
           <button class:sel={ui.style === 'notch'} onclick={() => setStyle('notch')}>{L('Notch (menempel di atas)', 'Notch (attached to the top)')}</button>
           <button class:sel={ui.style === 'pill'} onclick={() => setStyle('pill')}>{L('Pill (mengambang)', 'Pill (floating)')}</button>
         </div></div>
-      <label class="opt"><input type="checkbox" bind:checked={ui.autoHide} onchange={setUi} />
+      <label class="opt" class:off={ui.style === 'pill'}
+        title={ui.style === 'pill' ? L('Dinonaktifkan karena bentuk Pill (mengambang) tidak menempel di tepi layar, jadi tidak bisa bersembunyi di sana. Pilih Notch (menempel di atas) untuk memakainya.', 'Disabled because the Pill (floating) shape is not attached to a screen edge, so it cannot hide there. Choose Notch (attached to the top) to use it.') : undefined}>
+        <input type="checkbox" bind:checked={ui.autoHide} disabled={ui.style === 'pill'} onchange={setUi} />
         <span><b>{L('Sembunyikan otomatis di tepi layar', 'Auto-hide at the screen edge')}</b>
           <small class="dim">{L('Notch menghilang saat tidak dipakai dan muncul lagi saat kursor menyentuh tepi layar di dekat posisinya. Pengingat tetap muncul sendiri.', 'The notch disappears when idle and slides back when the cursor touches the screen edge near it. Reminders still appear on their own.')}</small></span></label>
       {#if ui.style === 'pill'}
@@ -471,6 +473,8 @@
   .val { font-variant-numeric: tabular-nums; font-weight: 700; }
   .opt { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
   .opt input { margin-top: 2px; }
+  .opt.off { opacity: 0.5; cursor: not-allowed; }
+  .opt.off input { cursor: not-allowed; }
   .opt span { display: flex; flex-direction: column; gap: 2px; }
   .opt small { font-size: 11.5px; }
   .opt.sel { justify-content: space-between; align-items: center; cursor: default; }

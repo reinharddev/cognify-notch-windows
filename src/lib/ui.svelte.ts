@@ -51,7 +51,7 @@ class Ui {
   /** Lebar pill saat tertutup (sama dengan lebar notch, dengan rentang yang sama). */
   pillWidth = $state(clampW(load('ui.pillWidth', CLOSED_DEFAULT)));
   /** Sembunyi otomatis: bentuk menghilang saat tidak dipakai dan muncul lagi saat kursor menyentuh tepi layar. */
-  autoHide = $state(load('ui.autoHide', false));
+  autoHide = $state(load('ui.autoHide', false) && load<string>('ui.style', 'notch') !== 'pill');
   /** Wajah teman kecil: cara memilih ekspresi, ekspresi tetap, berkedip, dan ekspresi pilihan per keadaan atau kejadian. */
   companionMode = $state<Mode>(mode(load('ui.companionMode', 'dynamic')));
   companionFixed = $state<Emotion>(emotion(load('ui.companionFixed', 'happy')));
@@ -96,7 +96,7 @@ class Ui {
     this.pillX = Number(load('ui.pillX', 0.5));
     this.pillY = Number(load('ui.pillY', 0.06));
     this.pillWidth = clampW(load('ui.pillWidth', CLOSED_DEFAULT));
-    this.autoHide = load('ui.autoHide', false);
+    this.autoHide = load('ui.autoHide', false) && this.style !== 'pill';
     this.companionMode = mode(load('ui.companionMode', 'dynamic'));
     this.companionFixed = emotion(load('ui.companionFixed', 'happy'));
     this.companionBlink = load('ui.companionBlink', true);
