@@ -691,6 +691,10 @@ fn watch_downloads(app: AppHandle) {
         // Unduhan yang sedang berjalan (file sementara browser): ukuran terakhir, kapan terakhir bertambah, dan
         // apakah sudah dilaporkan gagal. Dipakai untuk progres di sayap dan untuk membedakan selesai, gagal, dibatalkan.
         let mut running: HashMap<String, (u64, Instant, bool)> = HashMap::new();
+        // Unduhan yang file sementaranya hilang tapi belum jelas nasibnya: browser (Chrome/Edge) menamai file
+        // sementara "Unconfirmed 123.crdownload" lalu menggantinya dengan nama asli, jadi file akhir baru
+        // terlihat satu-dua putaran kemudian. "Dibatalkan" baru dilaporkan bila tidak ada file baru dalam jendela ini.
+        let mut maybe_canceled: Vec<(String, Instant)> = Vec::new();
         let clean = |name: &str| -> String {
             let l = name.to_lowercase();
             for x in [".crdownload", ".part", ".opdownload", ".download"] {
@@ -703,7 +707,7 @@ fn watch_downloads(app: AppHandle) {
         loop {
             std::thread::sleep(Duration::from_secs(if running.is_empty() { 2 } else { 1 }));
             let current = stamp(&dir);
-            if pending.is_empty() && running.is_empty() && current.is_some() && current == last_stamp {
+            if pending.is_empty() && running.is_empty() && maybe_canceled.is_empty() && current.is_some() && current == last_stamp {
                 continue;
             }
             last_stamp = current;
@@ -719,7 +723,8 @@ fn watch_downloads(app: AppHandle) {
                 if *size > entry.0 {
                     *entry = (*size, Instant::now(), false);
                 }
-                if latest.as_ref().map_or(true, |(_, _, t)| entry.1 >= *t) {
+                // Yang sudah dilaporkan gagal tidak lagi ditampilkan sebagai unduhan berjalan (status macet).
+                if !entry.2 && latest.as_ref().map_or(true, |(_, _, t)| entry.1 >= *t) {
                     latest = Some((name.clone(), *size, entry.1));
                 }
                 if !entry.2 && entry.1.elapsed() > Duration::from_secs(10) {
@@ -732,9 +737,16 @@ fn watch_downloads(app: AppHandle) {
                 let (_, _, failed) = running.remove(&name).unwrap();
                 // Selesai bila file akhir ada (peristiwa "download" dikirim di bawah); selain itu dibatalkan.
                 if !failed && !now.contains_key(&clean(&name)) {
-                    let _ = app.emit("download-result", serde_json::json!({ "kind": "canceled", "name": clean(&name) }));
+                    maybe_canceled.push((clean(&name), Instant::now()));
                 }
             }
+            maybe_canceled.retain(|(name, since)| {
+                if since.elapsed() < Duration::from_secs(6) {
+                    return true;
+                }
+                let _ = app.emit("download-result", serde_json::json!({ "kind": "canceled", "name": name }));
+                false
+            });
             let _ = app.emit(
                 "download-progress",
                 latest.map(|(n, bytes, _)| serde_json::json!({ "name": clean(&n), "bytes": bytes })),
@@ -746,6 +758,7 @@ fn watch_downloads(app: AppHandle) {
                 if pending.get(name) == Some(size) && *size > 0 {
                     known.insert(name.clone(), *size);
                     pending.remove(name);
+                    maybe_canceled.clear(); // file akhir muncul: itu pergantian nama, bukan pembatalan
                     let _ = app.emit("download", name);
                 } else {
                     pending.insert(name.clone(), *size);
