@@ -3,6 +3,7 @@ import { news } from './news.svelte';
 import { parseDue } from './due';
 import { features } from './system.svelte';
 import { L } from './i18n';
+import { windowKind } from './bridge';
 
 const day = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
@@ -144,7 +145,8 @@ class Water {
     const s = load('water', { goal: 2000, glass: 250, startHour: 8, endHour: 21, interval: 60, reminders: true, sips: [] as Sip[] });
     Object.assign(this, { goal: s.goal, glass: s.glass, startHour: s.startHour, endHour: s.endHour, interval: s.interval, reminders: s.reminders });
     this.sips = s.sips.filter((x) => x.t > Date.now() - 14 * 864e5);
-    setInterval(() => this.check(), 30_000);
+    // Jendela Pengaturan ikut memuat modul ini; pengingat hanya dicek di jendela notch.
+    if (windowKind === 'notch') setInterval(() => this.check(), 30_000);
   }
 
   persist() {
@@ -184,7 +186,7 @@ export interface Task { id: string; text: string; done: boolean; doneAt?: number
 class Todo {
   // Tugas selesai disimpan sampai awal hari kemarin, seperti di Mac.
   items = $state<Task[]>(load<Task[]>('todo', []).filter((t) => !t.done || (t.doneAt ?? 0) > new Date().setHours(0, 0, 0, 0) - 864e5));
-  constructor() { setInterval(() => this.checkDue(), 20_000); }
+  constructor() { if (windowKind === 'notch') setInterval(() => this.checkDue(), 20_000); }
 
   private persist() { save('todo', this.items); }
   get sorted() {
