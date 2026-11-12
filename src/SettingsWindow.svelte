@@ -10,18 +10,22 @@
   import { ui, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
   import { pillLimits } from './lib/geometry';
   import { EMOTIONS, MODES, SITUATIONS, emotionLabel, situationLabel } from './lib/companion';
+  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw } from '@lucide/svelte';
+  import Setting from './lib/settings/Setting.svelte';
+  import Group from './lib/settings/Group.svelte';
+  import Segmented from './lib/settings/Segmented.svelte';
 
   type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'weather' | 'tabs' | 'data';
   let pane = $state<PaneId>('general');
-  const panes: [PaneId, () => string][] = [
-    ['general', () => L('Umum', 'General')],
-    ['appearance', () => L('Tampilan', 'Appearance')],
-    ['behavior', () => L('Perilaku', 'Behavior')],
-    ['companion', () => L('Pendamping', 'Companion')],
-    ['features', () => L('Fitur', 'Features')],
-    ['weather', () => L('Cuaca & kalender', 'Weather & calendar')],
-    ['tabs', () => L('Tab', 'Tabs')],
-    ['data', () => L('Data', 'Data')],
+  const panes: { id: PaneId; label: () => string; desc: () => string; icon: typeof Settings }[] = [
+    { id: 'general', icon: Settings, label: () => L('Umum', 'General'), desc: () => L('Buka otomatis, bahasa, pintasan, dan pembaruan.', 'Launch at startup, language, shortcut, and updates.') },
+    { id: 'appearance', icon: Palette, label: () => L('Tampilan', 'Appearance'), desc: () => L('Bentuk, ukuran, dan warna notch.', 'Shape, size, and colors of the notch.') },
+    { id: 'behavior', icon: MousePointer2, label: () => L('Perilaku', 'Behavior'), desc: () => L('Cara notch terbuka dan tertutup, serta layar yang dipakai.', 'How the notch opens and closes, and which screen it uses.') },
+    { id: 'companion', icon: Smile, label: () => L('Teman kecil', 'Companion'), desc: () => L('Wajah di notch: ekspresi, kedipan, dan reaksi.', 'The face in the notch: expressions, blinking, and reactions.') },
+    { id: 'features', icon: ToggleRight, label: () => L('Fitur', 'Features'), desc: () => L('Pilih fitur notch yang ingin dipakai.', 'Choose which notch features to use.') },
+    { id: 'weather', icon: CloudSun, label: () => L('Cuaca & kalender', 'Weather & calendar'), desc: () => L('Kota untuk cuaca dan sumber agenda.', 'The city for weather and the agenda sources.') },
+    { id: 'tabs', icon: ListOrdered, label: () => L('Urutan tab', 'Tab order'), desc: () => L('Atur urutan halaman di notch.', 'Arrange the pages in the notch.') },
+    { id: 'data', icon: Archive, label: () => L('Data', 'Data'), desc: () => L('Cadangkan atau pulihkan catatan, tugas, dan pengaturan.', 'Back up or restore notes, tasks, and settings.') },
   ];
 
   let ics = $state(agenda.url);
@@ -46,7 +50,7 @@
     ['lyrics', L('Lirik lagu', 'Synced lyrics'), L('Butuh internet: judul, artis, dan durasi lagu dikirim ke LRCLIB (lrclib.net) saat halaman Musik dibuka.', 'Needs internet: the title, artist, and length are sent to LRCLIB (lrclib.net) when the Music page opens.')],
     ['water', L('Pengingat minum', 'Water reminder'), L('Target harian, grafik per jam, dan pengingat di jam aktif.', 'Daily goal, hourly chart and reminders during your hours.')],
     ['todo', L('Daftar tugas', 'To-do list'), L('Tugas dengan pengingat; tulis "jam 7" untuk mengatur waktunya.', 'Tasks with reminders; type "at 7pm" to set a time.')],
-    ['companion', L('Teman kecil di notch', 'Little companion in the notch'), L('Wajah yang berkedip, tertidur, dan ekspresinya menyesuaikan keadaan. Atur caranya di bagian Teman kecil.', 'A face that blinks, dozes off, and changes expression with what is going on. Set how in the Little companion section.')],
+    ['companion', L('Teman kecil di notch', 'Little companion in the notch'), L('Wajah yang berkedip, tertidur, dan ekspresinya menyesuaikan keadaan. Atur caranya di bawah.', 'A face that blinks, dozes off, and changes expression with what is going on. Set how below.')],
     ['keys', L('Caps Lock & bahasa keyboard', 'Caps Lock & keyboard language'), L('Kabar singkat saat Caps Lock nyala atau bahasa keyboard berganti.', 'A nudge when Caps Lock turns on or the keyboard language changes.')],
     ['network', L('Internet putus/tersambung', 'Connection changes'), L('Kabar saat koneksi internet hilang atau pulih.', 'A nudge when you go offline or come back online.')],
     ['hideFullscreen', L('Sembunyi saat layar penuh', 'Hide in full-screen apps'), L('Notch menyingkir saat video, game, atau presentasi memenuhi layar.', 'Steps aside for full-screen video, games and presentations.')],
@@ -134,371 +138,346 @@
   const setStyle = (st: 'notch' | 'pill') => { ui.style = st; if (st === 'pill') ui.autoHide = false; clampPill(); setUi(); }; // pill mengambang tidak bisa disembunyikan di tepi
   const pct = (v: number) => Math.round(v * 100);
   const setPct = (axis: 'x' | 'y', v: number) => { if (axis === 'x') ui.pillX = v / 100; else ui.pillY = v / 100; clampPill(); setUi(); };
+  const curPane = $derived(panes.find((p) => p.id === pane)!);
+  const reloadLang = (l: 'auto' | 'id' | 'en') => { ui.lang = l; setUi(); void emitPrefs('reload'); setTimeout(() => location.reload(), 150); };
+  const SWATCH = ['#8f87ff', '#0a84ff', '#30d158', '#ff375f', '#ff9f0a', '#ffd60a', '#bf5af2', '#ffffff'];
+  const LYRIC_SWATCH = ['#ffffff', '#ffd60a', '#30d158', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2', '#8e8e93'];
+  const EQ_SWATCH = ['#ffffff', '#30d158', '#0a84ff', '#bf5af2', '#ff375f', '#ff9f0a', '#ffd60a'];
+  const NEED_COMPANION = () => L('Nyalakan Teman kecil dulu.', 'Turn on Little companion first.');
 </script>
 
-
-{#snippet tog(key: (typeof toggles)[number][0])}
+{#snippet tog(key: (typeof toggles)[number][0], opts: { disabled?: boolean; why?: string } = {})}
   {@const t = toggles.find((x) => x[0] === key)!}
-  <label class="opt"><input type="checkbox" bind:checked={features[key]} onchange={() => changedFeature(key)} />
-    <span><b>{t[1]}</b>{#if t[2]}<small class="dim">{t[2]}</small>{/if}</span></label>
+  <Setting toggle title={t[1]} desc={t[2]} disabled={opts.disabled} why={opts.why} bind:checked={features[key]} onchange={() => changedFeature(key)} />
+{/snippet}
+
+{#snippet swatches(list: string[], current: string, set: (c: string) => void, fallback: string)}
+  <span class="swatches">
+    {#each list as c}
+      <button class="chip" class:sel={(current || fallback).toLowerCase() === c} style:background={c} aria-label={c} onclick={() => set(c)}></button>
+    {/each}
+    <input type="color" value={current || fallback} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => set(e.currentTarget.value)} />
+    <button class="btn ghost" disabled={!current} onclick={() => set('')}>{L('Bawaan', 'Default')}</button>
+  </span>
 {/snippet}
 
 <div class="shell">
-  <nav>
-    <h1>{L('Pengaturan', 'Settings')}</h1>
-    <span class="dim ver">Cognify Notch {update.current}</span>
+  <nav aria-label={L('Bagian pengaturan', 'Settings sections')}>
+    <div class="brand"><h1>{L('Pengaturan', 'Settings')}</h1><span class="ver">Cognify Notch {update.current}</span></div>
     {#each panes as p}
-      {#if p[0] !== 'data' || inTauri}
-        <button class="tab" class:sel={pane === p[0]} onclick={() => (pane = p[0])}>{p[1]()}</button>
+      {#if p.id !== 'data' || inTauri}
+        <button class="tab" class:sel={pane === p.id} aria-current={pane === p.id ? 'page' : undefined} title={p.label()} onclick={() => (pane = p.id)}>
+          <p.icon size={16} /><span>{p.label()}</span>
+        </button>
       {/if}
     {/each}
   </nav>
 
   <main class="pane">
+   <div class="inner">
+    <header class="head"><h2>{curPane.label()}</h2><p>{curPane.desc()}</p></header>
+
   {#if pane === 'general'}
-    <section>
-      <h2>{L('Umum', 'General')}</h2>
-      <div class="card list">
+    <Group title={L('Umum', 'General')}>
       {#if inTauri}
-        <label class="opt"><input type="checkbox" bind:checked={autostart} onchange={() => void cmd('autostart_set', { on: autostart })} />
-          <span><b>{L('Buka saat Windows dinyalakan', 'Open when Windows starts')}</b></span></label>
-        <label class="opt sel"><span><b>{L('Pintasan membuka notch', 'Shortcut to open the notch')}</b></span>
-          <select bind:value={hotkey.choice} onchange={() => { hotkey.apply(); void emitPrefs('hotkey'); }}>{#each HOTKEYS as [id, label]}<option value={id}>{label}</option>{/each}</select></label>
+        <Setting toggle title={L('Buka saat Windows dinyalakan', 'Open when Windows starts')} bind:checked={autostart} onchange={() => void cmd('autostart_set', { on: autostart })} />
       {/if}
-      <p class="dim note">{L('Sembunyikan atau tampilkan notch lewat ikon Cognify Notch di area ikon tersembunyi taskbar (klik kiri).', 'Hide or show the notch from the Cognify Notch icon in the taskbar\'s hidden icons (left click).')}</p>
-        {@render tog('hotkey')}
-      <div class="row between"><b>{L('Bahasa tampilan', 'Display language')}</b>
-        <div class="seg2" role="group">
-          <button class:sel={ui.lang === 'auto'} onclick={() => { ui.lang = 'auto'; setUi(); void emitPrefs('reload'); setTimeout(() => location.reload(), 150); }}>{L('Ikuti Windows', 'Follow Windows')}</button>
-          <button class:sel={ui.lang === 'id'} onclick={() => { ui.lang = 'id'; setUi(); void emitPrefs('reload'); setTimeout(() => location.reload(), 150); }}>Bahasa Indonesia</button>
-          <button class:sel={ui.lang === 'en'} onclick={() => { ui.lang = 'en'; setUi(); void emitPrefs('reload'); setTimeout(() => location.reload(), 150); }}>English</button>
-        </div></div>
-      </div>
-    </section>
-    <section>
-      <h2>{L('Pembaruan', 'Updates')}</h2>
-      <div class="card col">
-        {@render tog('updates')}
-        {@render tog('autoInstall')}
-      <div class="row">
+      <Setting title={L('Bahasa tampilan', 'Display language')}>
+        <Segmented label={L('Bahasa tampilan', 'Display language')} value={ui.lang} onchange={reloadLang}
+          options={[{ value: 'auto', label: L('Ikuti Windows', 'Follow Windows') }, { value: 'id', label: 'Indonesia' }, { value: 'en', label: 'English' }]} />
+      </Setting>
+    </Group>
+
+    <Group title={L('Pintasan keyboard', 'Keyboard shortcut')} hint={L('Esc atau klik di luar notch menutupnya. Notch juga bisa disembunyikan atau ditampilkan lewat ikon Cognify Notch di area ikon tersembunyi taskbar (klik kiri).', 'Esc or a click outside closes the notch. You can also hide or show it from the Cognify Notch icon in the taskbar\'s hidden icons (left click).')}>
+      <Setting toggle title={L('Buka dengan pintasan keyboard', 'Open with a keyboard shortcut')} bind:checked={features.hotkey} onchange={() => changedFeature('hotkey')} />
+      {#if inTauri}
+        <Setting title={L('Kombinasi tombol', 'Key combination')} disabled={!features.hotkey} why={L('Nyalakan pintasan di atas dulu.', 'Turn on the shortcut above first.')}>
+          <select bind:value={hotkey.choice} onchange={() => { hotkey.apply(); void emitPrefs('hotkey'); }} aria-label={L('Kombinasi tombol', 'Key combination')}>
+            {#each HOTKEYS.filter((h) => h[0] !== 'off') as [id, label]}<option value={id}>{label}</option>{/each}
+          </select>
+        </Setting>
+      {/if}
+    </Group>
+
+    <Group title={L('Pembaruan', 'Updates')}>
+      {@render tog('updates')}
+      {@render tog('autoInstall', { disabled: !features.updates, why: L('Nyalakan pemeriksaan versi dulu.', 'Turn on the version check first.') })}
+      <Setting title={L('Versi terpasang', 'Installed version')} desc={update.text || `Cognify Notch ${update.current}`}>
         <button class="btn" onclick={() => checkUpdate()}>{L('Cek pembaruan', 'Check for updates')}</button>
         {#if update.selfUpdate && (update.stage === 'found' || update.stage === 'ready')}<button class="btn on" onclick={installNow}>{L('Perbarui dan mulai ulang', 'Update and restart')}</button>{/if}
         {#if !update.selfUpdate && update.url}<button class="btn on" onclick={() => cmd('open_target', { target: update.url })}>{L('Buka halaman unduh', 'Open download page')}</button>{/if}
-      </div>
-      {#if update.text}<span class="dim">{update.text}</span>{/if}
-      </div>
-    </section>
+      </Setting>
+    </Group>
 
   {:else if pane === 'appearance'}
-    <section>
-      <h2>{L('Bentuk', 'Shape')}</h2>
-      <div class="card list">
-      <div class="row between"><b>{L('Bentuk', 'Shape')}</b>
-        <div class="seg2" role="group">
-          <button class:sel={ui.style === 'notch'} onclick={() => setStyle('notch')}>{L('Notch (menempel di atas)', 'Notch (attached to the top)')}</button>
-          <button class:sel={ui.style === 'pill'} onclick={() => setStyle('pill')}>{L('Pill (mengambang)', 'Pill (floating)')}</button>
-        </div></div>
-      <label class="opt" class:off={ui.style === 'pill'}
-        title={ui.style === 'pill' ? L('Dinonaktifkan karena bentuk Pill (mengambang) tidak menempel di tepi layar, jadi tidak bisa bersembunyi di sana. Pilih Notch (menempel di atas) untuk memakainya.', 'Disabled because the Pill (floating) shape is not attached to a screen edge, so it cannot hide there. Choose Notch (attached to the top) to use it.') : undefined}>
-        <input type="checkbox" bind:checked={ui.autoHide} disabled={ui.style === 'pill'} onchange={setUi} />
-        <span><b>{L('Sembunyikan otomatis di tepi layar', 'Auto-hide at the screen edge')}</b>
-          <small class="dim">{L('Notch menghilang saat tidak dipakai dan muncul lagi saat kursor menyentuh tepi layar di dekat posisinya. Pengingat tetap muncul sendiri.', 'The notch disappears when idle and slides back when the cursor touches the screen edge near it. Reminders still appear on their own.')}</small></span></label>
-      {#if ui.style === 'pill'}
-        <div class="row between"><b>{L('Lebar pill saat tertutup', 'Closed pill width')}</b><span class="val">{ui.pillWidth} px</span></div>
-        <input type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.pillWidth} oninput={() => { clampPill(); setUi(); }} aria-label={L('Lebar pill', 'Pill width')} />
-        <b>{L('Posisi pill', 'Pill position')}</b>
-        <div class="map" bind:this={mapEl} style:aspect-ratio="{sw} / {sh}" role="presentation"
-          onpointerdown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); dragPill(e); }} onpointermove={dragPill}>
-          <i class="zone" style:inset="{(EDGE_MARGIN / sh) * 100}% {(EDGE_MARGIN / sw) * 100}%"></i>
-          <i class="dot" style:left="{ui.pillX * 100}%" style:top="{ui.pillY * 100}%" style:width="{(ui.pillWidth / sw) * 100}%" style:height="{(PILL_H / sh) * 100}%"></i>
-        </div>
-        <div class="row">
-          <label class="row">X <input class="num" type="number" min={pct(lim.minX)} max={pct(lim.maxX)} value={pct(ui.pillX)} onchange={(e) => setPct('x', Number(e.currentTarget.value))} /> %</label>
-          <label class="row">Y <input class="num" type="number" min={pct(lim.minY)} max={pct(lim.maxY)} value={pct(ui.pillY)} onchange={(e) => setPct('y', Number(e.currentTarget.value))} /> %</label>
-        </div>
-        <span class="dim">{L('Tahan Alt lalu seret pill langsung di layar, atau geser titik di peta atau isi angka. Pill selalu tetap di dalam layar; bila dekat tepi, panelnya tumbuh ke sisi yang masih punya ruang.', 'Hold Alt and drag the pill right on screen, or drag the dot on the map or type numbers. The pill always stays on screen; near an edge, its panel grows toward the side with room.')}</span>
-      {/if}
-      </div>
-    </section>
-    <section>
-      <h2>{L('Ukuran', 'Size')}</h2>
-      <div class="card list">
+    <Group title={L('Bentuk', 'Shape')}>
+      <Setting title={L('Bentuk notch', 'Notch shape')}>
+        <Segmented label={L('Bentuk notch', 'Notch shape')} value={ui.style} onchange={setStyle}
+          options={[{ value: 'notch', label: L('Notch (menempel)', 'Notch (attached)') }, { value: 'pill', label: L('Pill (mengambang)', 'Pill (floating)') }]} />
+      </Setting>
+      <Setting toggle title={L('Sembunyikan otomatis di tepi layar', 'Auto-hide at the screen edge')}
+        desc={L('Notch menghilang saat tidak dipakai dan muncul lagi saat kursor menyentuh tepi layar di dekat posisinya. Pengingat tetap muncul sendiri.', 'The notch disappears when idle and slides back when the cursor touches the screen edge near it. Reminders still appear on their own.')}
+        disabled={ui.style === 'pill'} why={L('Tidak tersedia untuk Pill: ia mengambang, tidak menempel di tepi layar. Pilih Notch (menempel) untuk memakainya.', 'Not available for Pill: it floats and is not attached to a screen edge. Choose Notch (attached) to use it.')}
+        bind:checked={ui.autoHide} onchange={setUi} />
+    </Group>
+
+    {#if ui.style === 'pill'}
+      <Group title={L('Pill', 'Pill')} hint={L('Tahan Alt lalu seret pill langsung di layar, atau geser titik di peta atau isi angka. Pill selalu tetap di dalam layar; bila dekat tepi, panelnya tumbuh ke sisi yang masih punya ruang.', 'Hold Alt and drag the pill right on screen, or drag the dot on the map or type numbers. The pill always stays on screen; near an edge, its panel grows toward the side with room.')}>
+        <Setting stack title={L('Lebar pill saat tertutup', 'Closed pill width')}>
+          <div class="slider"><input type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.pillWidth} oninput={() => { clampPill(); setUi(); }} aria-label={L('Lebar pill', 'Pill width')} /><span class="val">{ui.pillWidth} px</span></div>
+        </Setting>
+        <Setting stack title={L('Posisi pill', 'Pill position')}>
+          <div class="map" bind:this={mapEl} style:aspect-ratio="{sw} / {sh}" role="presentation"
+            onpointerdown={(e) => { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); dragPill(e); }} onpointermove={dragPill}>
+            <i class="zone" style:inset="{(EDGE_MARGIN / sh) * 100}% {(EDGE_MARGIN / sw) * 100}%"></i>
+            <i class="dot" style:left="{ui.pillX * 100}%" style:top="{ui.pillY * 100}%" style:width="{(ui.pillWidth / sw) * 100}%" style:height="{(PILL_H / sh) * 100}%"></i>
+          </div>
+          <div class="nums">
+            <label>X <input class="num" type="number" min={pct(lim.minX)} max={pct(lim.maxX)} value={pct(ui.pillX)} onchange={(e) => setPct('x', Number(e.currentTarget.value))} /> %</label>
+            <label>Y <input class="num" type="number" min={pct(lim.minY)} max={pct(lim.maxY)} value={pct(ui.pillY)} onchange={(e) => setPct('y', Number(e.currentTarget.value))} /> %</label>
+          </div>
+        </Setting>
+      </Group>
+    {/if}
+
+    <Group title={L('Ukuran', 'Size')}>
       {#if ui.style === 'notch'}
-      <div class="row between">
-        <label for="w">{L('Lebar notch saat tertutup', 'Closed notch width')}</label>
-        <span class="val">{ui.closedWidth} px</span>
-      </div>
-      <input id="w" type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.closedWidth} oninput={setWidth} />
-      <div class="preview"><span class="pill" style:width="{ui.closedWidth}px"><i></i><i></i></span></div>
+        <Setting stack title={L('Lebar notch saat tertutup', 'Closed notch width')} desc={L('Lebih sempit tidak menutupi tab browser. Panel yang terbuka tidak berubah.', 'Narrower won\'t cover browser tabs. The open panel is unchanged.')}>
+          <div class="slider"><input id="w" type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.closedWidth} oninput={setWidth} aria-label={L('Lebar notch', 'Notch width')} /><span class="val">{ui.closedWidth} px</span>
+            <button class="btn ghost" onclick={resetWidth} disabled={ui.closedWidth === CLOSED_DEFAULT} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+          <div class="preview"><span class="pill" style:width="{ui.closedWidth}px"><i></i><i></i></span></div>
+        </Setting>
       {/if}
-      {#if ui.style === 'notch'}
-      <div class="row between">
-        <span class="dim">{L('Lebih sempit tidak menutupi tab browser. Panel yang terbuka tidak berubah.', 'Narrower won\'t cover browser tabs. The open panel is unchanged.')}</span>
-        <button class="btn" onclick={resetWidth} disabled={ui.closedWidth === CLOSED_DEFAULT}>{L('Atur ulang', 'Reset')}</button>
-      </div>
-      {/if}
-      <div class="row between"><b>{L('Ukuran panel', 'Panel size')}</b>
-        <div class="seg2" role="group">
-          <button class:sel={ui.scale === 1} onclick={() => { ui.scale = 1; setUi(); }}>{L('Normal', 'Normal')}</button>
-          <button class:sel={ui.scale === 1.12} onclick={() => { ui.scale = 1.12; setUi(); }}>{L('Besar', 'Large')}</button>
-        </div></div>
-      <div class="row between"><b>{L('Lengkung sudut bawah', 'Bottom corner roundness')}</b><span class="val">{ui.roundness} px</span></div>
-      <input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} />
-      </div>
-    </section>
-    <section>
-      <h2>{L('Warna', 'Colors')}</h2>
-      <div class="card list">
-      <div class="row between"><b>{L('Warna aksen', 'Accent color')}</b>
-        <span class="eqc">
-          {#each ['#8f87ff', '#0a84ff', '#30d158', '#ff375f', '#ff9f0a', '#ffd60a', '#bf5af2', '#ffffff'] as c}
-            <button class="chip" class:sel={(ui.accentColor || '#8f87ff').toLowerCase() === c} style:background={c} aria-label={c} onclick={() => { ui.accentColor = c === '#8f87ff' ? '' : c; setUi(); }}></button>
-          {/each}
-          <input type="color" value={ui.accentColor || '#8f87ff'} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => { ui.accentColor = e.currentTarget.value; setUi(); }} />
-          <button class="mini" disabled={!ui.accentColor} onclick={() => { ui.accentColor = ''; setUi(); }}>{L('Bawaan', 'Default')}</button>
-        </span></div>
-      <label class="row between"><b>{L('Warna lirik otomatis dari sampul', 'Lyric colors from the album cover')}</b>
-        <input type="checkbox" checked={ui.lyricAuto} onchange={(e) => { ui.lyricAuto = e.currentTarget.checked; setUi(); }} /></label>
-      {#if !ui.lyricAuto}
-      <div class="row between"><b>{L('Warna lirik aktif', 'Active lyric color')}</b>
-        <span class="eqc">
-          {#each ['#ffffff', '#ffd60a', '#30d158', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2', '#8e8e93'] as c}
-            <button class="chip" class:sel={ui.lyricActive.toLowerCase() === c} style:background={c} aria-label={c} onclick={() => { ui.lyricActive = c; setUi(); }}></button>
-          {/each}
-          <input type="color" value={ui.lyricActive || '#ffffff'} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => { ui.lyricActive = e.currentTarget.value; setUi(); }} />
-          <button class="mini" disabled={!ui.lyricActive} onclick={() => { ui.lyricActive = ''; setUi(); }}>{L('Bawaan', 'Default')}</button>
-        </span></div>
-      <div class="row between"><b>{L('Warna lirik lainnya', 'Other lyrics color')}</b>
-        <span class="eqc">
-          {#each ['#ffffff', '#ffd60a', '#30d158', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2', '#8e8e93'] as c}
-            <button class="chip" class:sel={ui.lyricIdle.toLowerCase() === c} style:background={c} aria-label={c} onclick={() => { ui.lyricIdle = c; setUi(); }}></button>
-          {/each}
-          <input type="color" value={ui.lyricIdle || '#ffffff'} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => { ui.lyricIdle = e.currentTarget.value; setUi(); }} />
-          <button class="mini" disabled={!ui.lyricIdle} onclick={() => { ui.lyricIdle = ''; setUi(); }}>{L('Bawaan', 'Default')}</button>
-        </span></div>
-      {/if}
-      <label class="row between"><b>{L('Warna equalizer otomatis dari sampul', 'Equalizer color from the album cover')}</b>
-        <input type="checkbox" checked={ui.equalizerAuto} onchange={(e) => { ui.equalizerAuto = e.currentTarget.checked; setUi(); }} /></label>
+      <Setting title={L('Ukuran panel', 'Panel size')}>
+        <Segmented label={L('Ukuran panel', 'Panel size')} value={ui.scale} onchange={(v) => { ui.scale = v; setUi(); }}
+          options={[{ value: 1, label: L('Normal', 'Normal') }, { value: 1.12, label: L('Besar', 'Large') }]} />
+      </Setting>
+      <Setting stack title={L('Lengkung sudut bawah', 'Bottom corner roundness')}>
+        <div class="slider"><input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} /><span class="val">{ui.roundness} px</span></div>
+      </Setting>
+    </Group>
+
+    <Group title={L('Warna', 'Colors')}>
+      <Setting title={L('Warna aksen', 'Accent color')}>
+        {@render swatches(SWATCH, ui.accentColor, (c) => { ui.accentColor = c === '#8f87ff' ? '' : c; setUi(); }, '#8f87ff')}
+      </Setting>
+      <Setting toggle title={L('Warna equalizer dari sampul', 'Equalizer color from the album cover')} bind:checked={ui.equalizerAuto} onchange={setUi} />
       {#if !ui.equalizerAuto}
-      <div class="row between"><b>{L('Warna equalizer', 'Equalizer color')}</b>
-        <span class="eqc">
-          {#each ['#ffffff', '#30d158', '#0a84ff', '#bf5af2', '#ff375f', '#ff9f0a', '#ffd60a'] as c}
-            <button class="chip" class:sel={ui.equalizerColor.toLowerCase() === c} style:background={c} aria-label={c} onclick={() => { ui.equalizerColor = c; setUi(); }}></button>
-          {/each}
-          <input type="color" value={ui.equalizerColor || '#8f87ff'} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => { ui.equalizerColor = e.currentTarget.value; setUi(); }} />
-          <button class="mini" disabled={!ui.equalizerColor} onclick={() => { ui.equalizerColor = ''; setUi(); }}>{L('Bawaan', 'Default')}</button>
-        </span></div>
+        <Setting title={L('Warna equalizer', 'Equalizer color')}>
+          {@render swatches(EQ_SWATCH, ui.equalizerColor, (c) => { ui.equalizerColor = c; setUi(); }, '#8f87ff')}
+        </Setting>
       {/if}
-      </div>
-    </section>
+      <Setting toggle title={L('Warna lirik dari sampul', 'Lyric colors from the album cover')} disabled={!features.lyrics}
+        why={L('Nyalakan Lirik lagu di Fitur dulu.', 'Turn on Synced lyrics in Features first.')} bind:checked={ui.lyricAuto} onchange={setUi} />
+      {#if !ui.lyricAuto && features.lyrics}
+        <Setting title={L('Warna lirik aktif', 'Active lyric color')}>
+          {@render swatches(LYRIC_SWATCH, ui.lyricActive, (c) => { ui.lyricActive = c; setUi(); }, '#ffffff')}
+        </Setting>
+        <Setting title={L('Warna lirik lainnya', 'Other lyrics color')}>
+          {@render swatches(LYRIC_SWATCH, ui.lyricIdle, (c) => { ui.lyricIdle = c; setUi(); }, '#ffffff')}
+        </Setting>
+      {/if}
+    </Group>
 
   {:else if pane === 'behavior'}
-    <section>
-      <h2>{L('Perilaku', 'Behavior')}</h2>
-      <div class="card list">
-      <div class="row between"><b>{L('Buka notch dengan', 'Open the notch by')}</b>
-        <div class="seg2" role="group">
-          <button class:sel={!ui.openOnClick} onclick={() => { ui.openOnClick = false; setUi(); }}>{L('Mengarahkan kursor', 'Hovering')}</button>
-          <button class:sel={ui.openOnClick} onclick={() => { ui.openOnClick = true; setUi(); }}>{L('Klik', 'Clicking')}</button>
-        </div></div>
-      {#if inTauri}
-        <div class="row between"><b>{L('Tampil di', 'Show on')}</b>
-          <div class="seg2" role="group">
-            <button class:sel={ui.display === 'main'} onclick={() => { ui.display = 'main'; setUi(); void cmd('set_display', { mode: 'main' }); }}>{L('Layar utama', 'Main screen')}</button>
-            <button class:sel={ui.display === 'active'} onclick={() => { ui.display = 'active'; setUi(); void cmd('set_display', { mode: 'active' }); }}>{L('Layar yang sedang dipakai', "Screen you're using")}</button>
-          </div></div>
-      {/if}
-      <div class="row between"><b>{L('Jeda sebelum terbuka', 'Delay before opening')}</b><span class="val">{ui.hoverDelay} ms</span></div>
-      <input type="range" min="0" max="600" step="50" bind:value={ui.hoverDelay} oninput={setUi} aria-label={L('Jeda sebelum terbuka', 'Delay before opening')} disabled={ui.openOnClick} />
-      <div class="row between"><b>{L('Jeda sebelum menutup', 'Delay before closing')}</b><span class="val">{ui.closeDelay} ms</span></div>
-      <input type="range" min="100" max="1500" step="50" bind:value={ui.closeDelay} oninput={setUi} aria-label={L('Jeda sebelum menutup', 'Delay before closing')} />
-      </div>
-    </section>
+    <Group title={L('Membuka dan menutup', 'Opening and closing')}>
+      <Setting title={L('Buka notch dengan', 'Open the notch by')}>
+        <Segmented label={L('Buka notch dengan', 'Open the notch by')} value={ui.openOnClick} onchange={(v) => { ui.openOnClick = v; setUi(); }}
+          options={[{ value: false, label: L('Mengarahkan kursor', 'Hovering') }, { value: true, label: L('Klik', 'Clicking') }]} />
+      </Setting>
+      <Setting stack title={L('Jeda sebelum terbuka', 'Delay before opening')} disabled={ui.openOnClick} why={L('Tidak dipakai saat notch dibuka dengan klik.', 'Not used when the notch opens by clicking.')}>
+        <div class="slider"><input type="range" min="0" max="600" step="50" bind:value={ui.hoverDelay} oninput={setUi} aria-label={L('Jeda sebelum terbuka', 'Delay before opening')} disabled={ui.openOnClick} /><span class="val">{ui.hoverDelay} ms</span></div>
+      </Setting>
+      <Setting stack title={L('Jeda sebelum menutup', 'Delay before closing')}>
+        <div class="slider"><input type="range" min="100" max="1500" step="50" bind:value={ui.closeDelay} oninput={setUi} aria-label={L('Jeda sebelum menutup', 'Delay before closing')} /><span class="val">{ui.closeDelay} ms</span></div>
+      </Setting>
+    </Group>
+    {#if inTauri}
+      <Group title={L('Layar', 'Screen')}>
+        <Setting title={L('Tampil di', 'Show on')}>
+          <Segmented label={L('Tampil di', 'Show on')} value={ui.display} onchange={(v) => { ui.display = v; setUi(); void cmd('set_display', { mode: v }); }}
+            options={[{ value: 'main', label: L('Layar utama', 'Main screen') }, { value: 'active', label: L('Layar yang dipakai', 'Screen in use') }]} />
+        </Setting>
+      </Group>
+    {/if}
 
   {:else if pane === 'companion'}
-    <section>
-      <h2>{L('Teman kecil', 'Little companion')}</h2>
-      <div class="card col">
-        {@render tog('companion')}
-      <div class="row between eyesrow">
-        <label for="em">{L('Gerak mata', 'Eye movement')}</label>
-        <div class="seg2" role="group" id="em">
-          <button class:sel={ui.eyesMode === 'blink'} onclick={() => setEyes('blink')} disabled={!features.companion}>{L('Berkedip', 'Blink')}</button>
-          <button class:sel={ui.eyesMode === 'follow'} onclick={() => setEyes('follow')} disabled={!features.companion}>{L('Ikuti kursor', 'Follow cursor')}</button>
-        </div>
-      </div>
-      <span class="dim">{L('Mengikuti kursor sedikit lebih boros daya karena arah pandang ikut dihitung.', 'Following the cursor uses slightly more power because the gaze is calculated too.')}</span>
-      <div class="row between">
-        <label for="cm">{L('Cara kerja', 'How it works')}</label>
-        <div class="seg2" role="group" id="cm">
-          {#each MODES as m}
-            <button class:sel={ui.companionMode === m.id} onclick={() => { ui.companionMode = m.id; setUi(); }} disabled={!features.companion}>{m.label()}</button>
-          {/each}
-        </div>
-      </div>
-      <span class="dim">{MODES.find((m) => m.id === ui.companionMode)?.hint()}</span>
+    <Group>
+      {@render tog('companion')}
+    </Group>
+    <Group title={L('Gerak', 'Movement')} hint={L('Mengikuti kursor sedikit lebih boros daya karena arah pandang ikut dihitung.', 'Following the cursor uses slightly more power because the gaze is calculated too.')}>
+      <Setting title={L('Arah pandang', 'Gaze')} disabled={!features.companion} why={NEED_COMPANION()}>
+        <Segmented label={L('Arah pandang', 'Gaze')} value={ui.eyesMode} onchange={setEyes} disabled={!features.companion}
+          options={[{ value: 'blink', label: L('Diam di tempat', 'Stay in place') }, { value: 'follow', label: L('Ikuti kursor', 'Follow cursor') }]} />
+      </Setting>
+      <Setting toggle title={L('Berkedip berkala', 'Blink now and then')} disabled={!features.companion} why={NEED_COMPANION()} bind:checked={ui.companionBlink} onchange={setUi} />
+    </Group>
+    <Group title={L('Ekspresi', 'Expression')} hint={MODES.find((m) => m.id === ui.companionMode)?.hint()}>
+      <Setting title={L('Cara kerja', 'How it works')} disabled={!features.companion} why={NEED_COMPANION()}>
+        <Segmented label={L('Cara kerja', 'How it works')} value={ui.companionMode} onchange={(v) => { ui.companionMode = v; setUi(); }} disabled={!features.companion}
+          options={MODES.map((m) => ({ value: m.id, label: m.label() }))} />
+      </Setting>
       {#if ui.companionMode === 'fixed'}
-        <label class="opt sel"><span><b>{L('Ekspresi', 'Expression')}</b></span>
-          <select bind:value={ui.companionFixed} onchange={setUi}>{#each EMOTIONS as e}<option value={e}>{emotionLabel(e)}</option>{/each}</select></label>
+        <Setting title={L('Ekspresi tetap', 'Fixed expression')} disabled={!features.companion} why={NEED_COMPANION()}>
+          <select bind:value={ui.companionFixed} onchange={setUi} disabled={!features.companion}>{#each EMOTIONS as e}<option value={e}>{emotionLabel(e)}</option>{/each}</select>
+        </Setting>
       {/if}
-      <label class="opt"><input type="checkbox" bind:checked={ui.companionBlink} onchange={setUi} />
-        <span><b>{L('Berkedip', 'Blink')}</b></span></label>
-      {#if ui.companionMode === 'custom'}
-        {#each [false, true] as ev}
-          <b class="grp">{ev ? L('Kejadian', 'Events') : L('Keadaan', 'Situations')}</b>
+    </Group>
+    {#if ui.companionMode === 'custom'}
+      {#each [false, true] as ev}
+        <Group title={ev ? L('Kejadian', 'Events') : L('Keadaan', 'Situations')}>
           {#each SITUATIONS.filter((x) => x.event === ev) as sit}
-            <label class="opt sel"><span>{situationLabel(sit)}</span>
-              <select value={ui.companionMap[sit.id] ?? 'auto'} onchange={(e) => setChoice(sit.id, e.currentTarget.value)}>
+            <Setting title={situationLabel(sit)} disabled={!features.companion} why={NEED_COMPANION()}>
+              <select value={ui.companionMap[sit.id] ?? 'auto'} onchange={(e) => setChoice(sit.id, e.currentTarget.value)} disabled={!features.companion}>
                 <option value="auto">{L('Bawaan', 'Default')} ({emotionLabel(sit.emotion)})</option>
                 {#if sit.event}<option value="none">{L('Tidak bereaksi', 'No reaction')}</option>{/if}
                 {#each EMOTIONS as e}<option value={e}>{emotionLabel(e)}</option>{/each}
-              </select></label>
+              </select>
+            </Setting>
           {/each}
-        {/each}
-        <div class="row between">
-          <span class="dim">{L('Perubahan langsung terlihat di notch.', 'Changes show up in the notch right away.')}</span>
-          <button class="btn" onclick={() => { ui.companionMap = {}; setUi(); }} disabled={Object.keys(ui.companionMap).length === 0}>{L('Kembalikan ke bawaan', 'Reset to default')}</button>
-        </div>
-      {/if}
-      </div>
-    </section>
+        </Group>
+      {/each}
+      <p class="foot">{L('Perubahan langsung terlihat di notch.', 'Changes show up in the notch right away.')}
+        <button class="btn ghost" onclick={() => { ui.companionMap = {}; setUi(); }} disabled={Object.keys(ui.companionMap).length === 0}>{L('Kembalikan ke bawaan', 'Reset to default')}</button></p>
+    {/if}
 
   {:else if pane === 'features'}
-    <section>
-    <h2>{L('Musik', 'Music')}</h2>
-    <div class="card list">{@render tog('media')}{@render tog('spectrum')}{@render tog('lyrics')}{@render tog('lyricsWing')}</div>
-    <h2>{L('Produktivitas', 'Productivity')}</h2>
-    <div class="card list">
+    <Group title={L('Musik', 'Music')}>
+      {@render tog('media')}
+      {@render tog('spectrum', { disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
+      {@render tog('lyrics', { disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
+      {@render tog('lyricsWing', { disabled: !features.media || !features.lyrics, why: !features.media ? L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') : L('Nyalakan Lirik lagu dulu.', 'Turn on Synced lyrics first.') })}
+    </Group>
+    <Group title={L('Produktivitas', 'Productivity')}>
       {@render tog('shortcuts')}
       {@render tog('clipboard')}
       {#if features.clipboard}
-        <label class="opt"><span><b>{L('Batas riwayat clipboard', 'Clipboard history limit')}</b><small class="dim">{L('Bawaan tanpa batas. Item tersemat tidak ikut dihitung; gambar hanya ada selama app berjalan.', 'Unlimited by default. Pinned items do not count; images stay only while the app is running.')}</small></span>
-          <select value={features.unlimitedClipboard ? 'unlimited' : 'custom'} onchange={(e) => setClipboardUnlimited(e.currentTarget.value === 'unlimited')} aria-label={L('Batas riwayat clipboard', 'Clipboard history limit')}><option value="unlimited">{L('Tanpa batas', 'Unlimited')}</option><option value="custom">{L('Kustom', 'Custom')}</option></select></label>
-        {#if !features.unlimitedClipboard}<label class="opt"><span><b>{L('Jumlah item', 'Item count')}</b><small class="dim">{L('Item tersemat tetap dipertahankan.', 'Pinned items are preserved.')}</small></span>
-          <input class="num" type="number" min="1" max="100000" step="1" value={features.clipboardLimit} onchange={(e) => setClipboardLimit(e.currentTarget.value)} aria-label={L('Jumlah item riwayat clipboard', 'Clipboard history item count')} /></label>{/if}
+        <Setting title={L('Batas riwayat clipboard', 'Clipboard history limit')} desc={L('Bawaan tanpa batas. Item tersemat tidak ikut dihitung; gambar hanya ada selama app berjalan.', 'Unlimited by default. Pinned items do not count; images stay only while the app is running.')}>
+          <select value={features.unlimitedClipboard ? 'unlimited' : 'custom'} onchange={(e) => setClipboardUnlimited(e.currentTarget.value === 'unlimited')} aria-label={L('Batas riwayat clipboard', 'Clipboard history limit')}><option value="unlimited">{L('Tanpa batas', 'Unlimited')}</option><option value="custom">{L('Kustom', 'Custom')}</option></select>
+        </Setting>
+        {#if !features.unlimitedClipboard}
+          <Setting title={L('Jumlah item', 'Item count')} desc={L('Item tersemat tetap dipertahankan.', 'Pinned items are preserved.')}>
+            <input class="num" type="number" min="1" max="100000" step="1" value={features.clipboardLimit} onchange={(e) => setClipboardLimit(e.currentTarget.value)} aria-label={L('Jumlah item riwayat clipboard', 'Clipboard history item count')} />
+          </Setting>
+        {/if}
       {/if}
       {@render tog('water')}{@render tog('todo')}{@render tog('clockTools')}{@render tog('calculator')}{@render tog('camera')}
-    </div>
-    <h2>{L('Sistem', 'System')}</h2>
-    <div class="card list">{@render tog('hud')}{@render tog('charger')}{@render tog('devices')}{@render tog('downloads')}{@render tog('keys')}{@render tog('network')}{@render tog('hideFullscreen')}{@render tog('hotkey')}</div>
-    </section>
+    </Group>
+    <Group title={L('Sistem', 'System')}>
+      {@render tog('hud')}{@render tog('charger')}{@render tog('devices')}{@render tog('downloads')}{@render tog('keys')}{@render tog('network')}{@render tog('hideFullscreen')}
+    </Group>
 
   {:else if pane === 'weather'}
-    <section>
-      <h2>{L('Cuaca', 'Weather')}</h2>
-      <div class="card col">
-        {@render tog('weather')}
-        {#if inTauri}
-        {#if features.weather}
-          <input type="text" bind:value={city} placeholder={L('Nama kota', 'City name')} onchange={() => { weather.setCity(city); locErr = ''; void emitPrefs('weather'); }} />
-          <span class="eqc">
-            <button class="mini" disabled={detecting} onclick={async () => { detecting = true; locErr = ''; try { await weather.detect(); city = weather.city; void emitPrefs('weather'); } catch (e) { locErr = (e as Error).message; } detecting = false; }}>{detecting ? L('Mendeteksi…', 'Detecting…') : L('Deteksi lokasi saat ini', 'Detect current location')}</button>
-            {#if weather.coords}<span class="dim">{L('Memakai lokasi terdeteksi', 'Using detected location')}</span>{/if}
-          </span>
-          {#if locErr}<span class="dim">{locErr}</span>{/if}
-          {#if weather.problem}<span class="dim">{weather.problem}</span>{/if}
-        {/if}
-        {/if}
-      </div>
-    </section>
+    <Group title={L('Cuaca', 'Weather')}>
+      {@render tog('weather')}
+      {#if inTauri}
+        <Setting stack title={L('Kota', 'City')} disabled={!features.weather} why={L('Nyalakan Cuaca di header dulu.', 'Turn on Weather in the header first.')}>
+          <input type="text" bind:value={city} disabled={!features.weather} placeholder={L('Nama kota', 'City name')} aria-label={L('Nama kota', 'City name')} onchange={() => { weather.setCity(city); locErr = ''; void emitPrefs('weather'); }} />
+          <button class="btn" disabled={!features.weather || detecting} onclick={async () => { detecting = true; locErr = ''; try { await weather.detect(); city = weather.city; void emitPrefs('weather'); } catch (e) { locErr = (e as Error).message; } detecting = false; }}>{detecting ? L('Mendeteksi…', 'Detecting…') : L('Deteksi lokasi saat ini', 'Detect current location')}</button>
+          {#if weather.coords}<span class="dim">{L('Memakai lokasi terdeteksi', 'Using detected location')}</span>{/if}
+        </Setting>
+        {#if locErr || weather.problem}<p class="inline-err">{locErr || weather.problem}</p>{/if}
+      {/if}
+    </Group>
     {#if inTauri}
-      <section>
-        <h2>{L('Kalender', 'Calendar')}</h2>
-        <div class="card col">
-        <input type="text" bind:value={ics} placeholder={L('Tautan kalender ICS (https)', 'Calendar ICS link (https)')} onchange={() => { agenda.setSource(ics); void emitPrefs('agenda'); }} />
-        <div class="row">
-          <button class="btn" onclick={async () => { const f = (await pickFiles())[0]; if (f) { ics = ''; agenda.setSource('', f); void emitPrefs('agenda'); } }}>{agenda.file ? L('File kalender: ganti', 'Calendar file: change') : L('Pilih file .ics', 'Choose .ics file')}</button>
-        </div>
-        <label class="row">
-          <input type="checkbox" checked={agenda.cognify} onchange={(e) => { agenda.setCognify(e.currentTarget.checked); void emitPrefs('agenda'); }} />
-          <span>{L('Pakai kalender Cognify (perlu Cognify terhubung ke Notch)', 'Use the Cognify calendar (Cognify must be connected to Notch)')}</span>
-        </label>
-        {#if agenda.problem}<span class="dim">{agenda.problem}</span>{/if}
-        </div>
-      </section>
+      <Group title={L('Kalender', 'Calendar')}>
+        <Setting stack title={L('Tautan kalender ICS', 'Calendar ICS link')} desc={L('Alamat https dari Google Calendar, iCloud, atau lainnya.', 'An https address from Google Calendar, iCloud, or similar.')}>
+          <input type="text" bind:value={ics} placeholder="https://…" aria-label={L('Tautan kalender ICS', 'Calendar ICS link')} onchange={() => { agenda.setSource(ics); void emitPrefs('agenda'); }} />
+        </Setting>
+        <Setting title={L('Berkas .ics', 'An .ics file')} desc={agenda.file ? L('Berkas dipakai.', 'A file is in use.') : ''}>
+          <button class="btn" onclick={async () => { const f = (await pickFiles())[0]; if (f) { ics = ''; agenda.setSource('', f); void emitPrefs('agenda'); } }}>{agenda.file ? L('Ganti berkas', 'Change file') : L('Pilih berkas', 'Choose file')}</button>
+        </Setting>
+        <Setting toggle title={L('Pakai kalender Cognify', 'Use the Cognify calendar')} desc={L('Perlu Cognify terhubung ke Notch.', 'Cognify must be connected to Notch.')} checked={agenda.cognify} onchange={(v) => { agenda.setCognify(v); void emitPrefs('agenda'); }} />
+        {#if agenda.problem}<p class="inline-err">{agenda.problem}</p>{/if}
+      </Group>
     {/if}
 
   {:else if pane === 'tabs'}
-  <section>
-    <h2>{L('Urutan tab', 'Tab order')}</h2>
-    <div class="card list">
+    <Group>
       {#each ui.allOrdered as p, i (p.id)}
-        <div class="row between">
-          <span>{p.title()}</span>
-          <span class="row">
-            <button class="btn" aria-label={L('Naik', 'Move up')} disabled={i === 0} onclick={() => { ui.move(p.id, -1); setUi(); }}>↑</button>
-            <button class="btn" aria-label={L('Turun', 'Move down')} disabled={i === ui.allOrdered.length - 1} onclick={() => { ui.move(p.id, 1); setUi(); }}>↓</button>
-          </span>
-        </div>
+        <Setting title={p.title()}>
+          <button class="btn ghost" aria-label={L('Naik', 'Move up')} disabled={i === 0} onclick={() => { ui.move(p.id, -1); setUi(); }}><ArrowUp size={14} /></button>
+          <button class="btn ghost" aria-label={L('Turun', 'Move down')} disabled={i === ui.allOrdered.length - 1} onclick={() => { ui.move(p.id, 1); setUi(); }}><ArrowDown size={14} /></button>
+        </Setting>
       {/each}
-    </div>
-  </section>
+    </Group>
 
   {:else if pane === 'data' && inTauri}
-    <section>
-      <h2>{L('Data', 'Data')}</h2>
-      <div class="card col">
-        <span class="dim">{L('Catatan, tugas, riwayat minum, clipboard, timer, dan pengaturan', 'Notes, tasks, water log, clipboard, timers and settings')}</span>
-        <div class="row">
-          <button class="btn" onclick={exportData}>{L('Ekspor…', 'Export…')}</button>
-          <button class="btn" onclick={pickImport}>{L('Impor…', 'Import…')}</button>
-        </div>
-        {#if confirmImport}
-          <span class="dim">{L('Ganti data di PC ini dengan isi cadangan? Catatan, tugas, riwayat minum, clipboard, timer, dan pengaturan sekarang akan diganti. Cognify Notch lalu dimuat ulang.', "Replace this PC's data with the backup? Current notes, tasks, water log, clipboard, timers and settings will be replaced. Cognify Notch will then reload.")}</span>
-          <div class="row"><button class="btn on" onclick={doImport}>{L('Ganti', 'Replace')}</button><button class="btn" onclick={() => (confirmImport = null)}>{L('Batal', 'Cancel')}</button></div>
-        {/if}
-        {#if backupMsg}<span class="dim">{backupMsg}</span>{/if}
+    <Group title={L('Cadangan', 'Backup')} hint={L('Catatan, tugas, riwayat minum, clipboard, timer, dan pengaturan.', 'Notes, tasks, water log, clipboard, timers and settings.')}>
+      <Setting title={L('Ekspor', 'Export')} desc={L('Simpan semuanya ke satu berkas JSON.', 'Save everything to one JSON file.')}><button class="btn" onclick={exportData}>{L('Ekspor…', 'Export…')}</button></Setting>
+      <Setting title={L('Impor', 'Import')} desc={L('Pulihkan dari berkas cadangan.', 'Restore from a backup file.')}><button class="btn" onclick={pickImport}>{L('Impor…', 'Import…')}</button></Setting>
+    </Group>
+    {#if confirmImport}
+      <div class="warn" role="alertdialog">
+        <p>{L('Ganti data di PC ini dengan isi cadangan? Catatan, tugas, riwayat minum, clipboard, timer, dan pengaturan sekarang akan diganti. Cognify Notch lalu dimuat ulang.', "Replace this PC's data with the backup? Current notes, tasks, water log, clipboard, timers and settings will be replaced. Cognify Notch will then reload.")}</p>
+        <div class="row"><button class="btn on" onclick={doImport}>{L('Ganti', 'Replace')}</button><button class="btn" onclick={() => (confirmImport = null)}>{L('Batal', 'Cancel')}</button></div>
       </div>
-    </section>
+    {/if}
+    {#if backupMsg}<p class="foot">{backupMsg}</p>{/if}
   {/if}
+   </div>
   </main>
 </div>
 
 <style>
-  .shell { display: flex; height: 100vh; background: #17171b; color: #f2f2f5; font-size: 13px; user-select: none; }
-  nav { width: 176px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 22px 12px; border-right: 1px solid rgba(255, 255, 255, .08); }
-  nav h1 { font-size: 20px; margin: 0 6px; }
-  .ver { margin: 2px 6px 14px; font-size: 11.5px; }
-  .tab { border: 0; background: none; color: rgba(255, 255, 255, .7); font: inherit; font-weight: 600; text-align: left; padding: 7px 10px; border-radius: 9px; cursor: pointer; }
+  .shell {
+    --bg: #1b1b20; --nav: #141418; --card: rgba(255, 255, 255, .045); --line: rgba(255, 255, 255, .08);
+    --dim: rgba(255, 255, 255, .58); --warn: #ffc666;
+    display: flex; height: 100vh; background: var(--bg); color: #f2f2f5; font-size: 13px; user-select: none;
+  }
+  nav { width: 224px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 20px 10px; background: var(--nav); border-right: 1px solid var(--line); overflow-y: auto; }
+  .brand { padding: 0 10px 16px; }
+  nav h1 { font-size: 18px; font-weight: 600; margin: 0; }
+  .ver { display: block; margin-top: 2px; font-size: 11.5px; color: var(--dim); }
+  .tab { position: relative; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: rgba(255, 255, 255, .78); font: inherit; text-align: left; padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+  .tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tab:hover { background: rgba(255, 255, 255, .06); }
-  .tab.sel { background: var(--accent); color: #fff; }
-  .pane { flex: 1; overflow-y: auto; padding: 4px 26px 30px; }
-  .pane::-webkit-scrollbar { width: 8px; }
-  .pane::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 8px; }
-  h2 { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: rgba(255, 255, 255, .45); margin: 22px 0 8px; }
-  .card { background: rgba(255, 255, 255, .06); border-radius: 14px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
-  .card.list { gap: 12px; }
-  .row { display: flex; align-items: center; gap: 8px; }
-  .between { justify-content: space-between; }
-  .val { font-variant-numeric: tabular-nums; font-weight: 700; }
-  .opt { display: flex; gap: 12px; align-items: flex-start; cursor: pointer; }
-  .opt input { margin-top: 2px; }
-  .opt.off { opacity: 0.5; cursor: not-allowed; }
-  .opt.off input { cursor: not-allowed; }
-  .opt span { display: flex; flex-direction: column; gap: 2px; }
-  .opt small { font-size: 11.5px; }
-  .opt.sel { justify-content: space-between; align-items: center; cursor: default; }
-  .note { margin: 2px 0 0; font-size: 12px; }
-  .grp { margin-top: 6px; }
-  select { font: inherit; color: inherit; background: rgba(255, 255, 255, .12); border: 0; border-radius: 8px; padding: 4px 8px; }
+  .tab.sel { background: rgba(255, 255, 255, .09); color: #fff; font-weight: 600; }
+  .tab.sel::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--accent); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .pane { flex: 1; min-width: 0; overflow-y: auto; }
+  .pane::-webkit-scrollbar { width: 10px; }
+  .pane::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 8px; border: 2px solid var(--bg); }
+  .inner { max-width: 640px; margin: 0 auto; padding: 24px 28px 40px; }
+  .head h2 { margin: 0; font-size: 22px; font-weight: 600; }
+  .head p { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+  .foot { margin: 14px 4px 0; font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .inline-err { margin: 0; padding: 10px 16px; font-size: 12px; color: var(--warn); border-top: 1px solid var(--line); }
+  .warn { margin-top: 14px; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(255, 198, 102, .4); background: rgba(255, 198, 102, .08); }
+  .warn p { margin: 0 0 12px; line-height: 1.45; }
+  .dim { color: var(--dim); font-size: 12px; }
+  .row { display: flex; gap: 8px; }
+
+  .slider { display: flex; align-items: center; gap: 12px; width: 100%; }
+  .slider input[type=range] { flex: 1; min-width: 0; }
+  .val { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  input[type=range] { accent-color: var(--accent); height: 20px; }
+  input[type=range]:disabled { opacity: .5; }
+  select { font: inherit; color: inherit; background: rgba(255, 255, 255, .1); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 130px; }
+  select:disabled { opacity: .5; }
   select option { color: #000; }
-  input[type=range] { width: 100%; accent-color: var(--accent); }
-  .eyesrow { margin-top: 4px; }
-  .seg2 { display: flex; padding: 2px; border-radius: 99px; background: rgba(255, 255, 255, .08); }
-  .seg2 button { border: 0; background: none; color: rgba(255, 255, 255, .6); font: inherit; font-weight: 600; font-size: 12px; padding: 4px 12px; border-radius: 99px; cursor: pointer; }
-  .seg2 button.sel { background: var(--accent); color: #fff; }
-  .seg2 button:disabled { opacity: .4; cursor: default; }
+  .num { width: 72px; font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  .nums { display: flex; gap: 16px; align-items: center; }
+  .nums label { display: flex; align-items: center; gap: 6px; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; display: inline-flex; align-items: center; }
+  .btn { border-radius: 6px; padding: 6px 14px; }
+  .btn.on { color: #0b0a1a; }
   .map { position: relative; width: 100%; max-width: 360px; border-radius: 8px; background: #2b2a33; border: 1px solid rgba(255, 255, 255, .12); cursor: crosshair; overflow: hidden; touch-action: none; }
   .map .zone { position: absolute; border: 1px dashed rgba(255, 255, 255, .22); border-radius: 4px; pointer-events: none; }
   .map .dot { position: absolute; transform: translate(-50%, -50%); min-width: 6px; min-height: 4px; border-radius: 99px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
-  .num { width: 64px; }
-  .preview { height: 54px; border-radius: 10px; background: #2b2a33; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
+  .preview { width: 100%; height: 54px; border-radius: 8px; background: #2b2a33; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
   .pill { height: 36px; background: #000; border-radius: 0 0 12px 12px; display: flex; align-items: center; justify-content: center; gap: 9px; }
   .pill i { width: 7px; height: 11px; background: #fff; border-radius: 50%; }
-  .eqc { display: inline-flex; align-items: center; gap: 7px; }
-  .chip { width: 18px; height: 18px; border-radius: 50%; border: 1px solid rgba(128, 128, 128, .35); padding: 0; cursor: pointer; }
-  .chip.sel { outline: 2px solid currentColor; outline-offset: 1px; }
-  .eqc input[type='color'] { width: 24px; height: 22px; padding: 0; border: 0; background: none; cursor: pointer; }
-  .mini { border: 0; border-radius: 99px; padding: 3px 9px; font-size: 11px; cursor: pointer; background: rgba(128, 128, 128, .2); }
-  .mini:disabled { opacity: .45; cursor: default; }
+  .swatches { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
+  .chip { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(128, 128, 128, .35); padding: 0; cursor: pointer; }
+  .chip.sel { outline: 2px solid #fff; outline-offset: 2px; }
+  .swatches input[type='color'] { width: 26px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; }
+
+  /* Jendela sempit: menu samping hanya ikon. */
+  @media (max-width: 700px) {
+    nav { width: 56px; padding: 16px 8px; }
+    .brand, .tab span { display: none; }
+    .tab { justify-content: center; padding: 10px 0; }
+    .inner { padding: 20px 16px 32px; }
+  }
 </style>
