@@ -179,6 +179,10 @@
   onpointerleave={() => { if (!inTauri) notch.leave(); }}
 >
   <div class="shell" class:open={notch.open} class:pillmode={notch.pill} class:ax-left={notch.geo.ax === 'left'} class:ax-right={notch.geo.ax === 'right'} bind:this={shellEl}>
+    {#if ui.bgCss && (notch.open || notch.pill)}
+      <div class="bglayer" aria-hidden="true" style:background={ui.bgCss.background} style:filter={ui.bgCss.image && ui.bgBlur > 0 ? `blur(${ui.bgBlur * 16}px)` : undefined} style:inset={ui.bgCss.image && ui.bgBlur > 0 ? '-24px' : '0'}></div>
+      <div class="bgdim" aria-hidden="true" style:opacity={ui.bgMode === 'color' ? 0 : ui.bgDim}></div>
+    {/if}
     {#if notch.open && page.id === 'sky'}<SkyBackground />{/if}
     {#if notch.open}
       <div class="layer openl" style:--lw="{SIZES.open.w}px" style:--lh="{SIZES.open.h}px" style:--sc={ui.scale} style:--ink={ink} style:color={ink} in:enter out:leave>
@@ -279,7 +283,10 @@
 
 <style>
   main { position: relative; height: 100vh; transition: opacity .2s; overflow: hidden; }
-  .shell { position: absolute; background: #000; overflow: hidden; will-change: left, top, width, height; box-sizing: border-box; }
+  .shell { position: absolute; background: #000; overflow: hidden; will-change: left, top, width, height; box-sizing: border-box; isolation: isolate; }
+  /* Latar kustom: di bawah semua isi (z-index negatif di dalam .shell), diredam supaya tulisan tetap terbaca. */
+  .bglayer { position: absolute; z-index: -2; pointer-events: none; }
+  .bgdim { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #000; }
   /* Mode pill tetap bersih tanpa garis atau bayangan di sekeliling lingkaran. */
   /* Pill di dekat tepi: isi menempel ke sisi pill, bukan ke tengah, supaya bentuk tumbuh ke sisi yang masih punya ruang. */
   .shell.ax-left .layer { left: 0; margin-left: 0; }

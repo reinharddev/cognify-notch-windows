@@ -4,6 +4,7 @@ import { parseDue } from './due';
 import { features } from './system.svelte';
 import { L } from './i18n';
 import { windowKind } from './bridge';
+import { isDue, dayKey, type Alarm } from './alarm';
 
 const day = () => new Date().toISOString().slice(0, 10);
 const uid = () => crypto.randomUUID();
@@ -86,13 +87,15 @@ export const pomodoro = new Pomodoro();
 interface Countdown { id: string; label: string; end: number; total: number }
 
 class ClockTools {
+  alarms = $state<Alarm[]>(load<Alarm[]>('alarms', []));
+  private alarmTimer = 0;
   started = $state(0);            // epoch ms saat mulai, 0 = berhenti
   accumulated = $state(0);        // detik sebelum jeda terakhir
   laps = $state<number[]>([]);
   countdowns = $state<Countdown[]>(load<Countdown[]>('countdowns', []).filter((c) => c.end > Date.now()));
 
   private fireTimer = 0;
-  constructor() { this.arm(); }
+  constructor() { this.arm(); this.armAlarms(); }
   /** Pasang satu pemicu menjelang hitung mundur terdekat selesai; tanpa hitung mundur tidak ada timer. */
   private arm() {
     clearTimeout(this.fireTimer);
@@ -118,6 +121,31 @@ class ClockTools {
     this.arm();
   }
   cancel(id: string) { this.countdowns = this.countdowns.filter((c) => c.id !== id); this.persist(); this.arm(); }
+  addAlarm(hour: number, minute: number, days: number[], label: string) {
+    this.alarms = [...this.alarms, { id: uid(), hour, minute, days, label: label.trim(), enabled: true, firedOn: '' }];
+    this.saveAlarms();
+  }
+  toggleAlarm(id: string) { this.alarms = this.alarms.map((a) => (a.id === id ? { ...a, enabled: !a.enabled, firedOn: '' } : a)); this.saveAlarms(); }
+  removeAlarm(id: string) { this.alarms = this.alarms.filter((a) => a.id !== id); this.saveAlarms(); }
+  private saveAlarms() { save('alarms', this.alarms); this.armAlarms(); }
+  /** Pemeriksa 20 detik hanya berjalan selama ada alarm aktif, supaya tidak memakai CPU tanpa perlu. */
+  private armAlarms() {
+    clearInterval(this.alarmTimer);
+    this.alarmTimer = 0;
+    if (!this.alarms.some((a) => a.enabled)) return;
+    this.alarmTimer = window.setInterval(() => this.checkAlarms(), 20_000);
+    this.checkAlarms();
+  }
+  private checkAlarms() {
+    const now = new Date();
+    const due = this.alarms.filter((a) => isDue(a, now));
+    if (!due.length) return;
+    const key = dayKey(now);
+    this.alarms = this.alarms.map((a) => (due.includes(a) ? { ...a, firedOn: key, enabled: a.days.length ? a.enabled : false } : a));
+    this.saveAlarms();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    for (const a of due) news.ring(a.label || L(`Alarm ${pad(a.hour)}:${pad(a.minute)}`, `Alarm ${pad(a.hour)}:${pad(a.minute)}`), L('Waktunya!', "Time's up!"), { icon: 'timer' });
+  }
   get nearest() { return [...this.countdowns].sort((a, b) => a.end - b.end)[0]; }
   private persist() { save('countdowns', this.countdowns); }
 

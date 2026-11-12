@@ -13,8 +13,8 @@
 </div>
 
 <style>
-  .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border-radius: 8px; background: rgba(255, 255, 255, .07); }
-  button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12px; font-weight: 600; padding: 5px 12px; border-radius: 6px; cursor: pointer; }
+  .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: 99px; background: rgba(255, 255, 255, .07); }
+  button { border: 0; background: none; color: var(--dim); font: inherit; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 99px; cursor: pointer; }
   button:hover:not(:disabled):not(.sel) { background: rgba(255, 255, 255, .08); color: #fff; }
   button.sel { background: var(--accent); color: #0b0a1a; }
   button:disabled { opacity: .4; cursor: not-allowed; }

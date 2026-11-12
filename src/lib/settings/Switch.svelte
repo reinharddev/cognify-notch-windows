@@ -12,14 +12,10 @@
   onclick={(e) => { e.preventDefault(); flip(); }}><i></i></button>
 
 <style>
-  .sw { flex: none; position: relative; width: 40px; height: 22px; padding: 0; border-radius: 99px; cursor: pointer;
-    border: 1px solid rgba(255, 255, 255, .5); background: transparent; transition: background .15s, border-color .15s; }
-  .sw i { position: absolute; top: 50%; left: 4px; width: 12px; height: 12px; border-radius: 50%; background: rgba(255, 255, 255, .85);
-    transform: translateY(-50%); transition: left .15s, width .15s, height .15s, background .15s; }
-  .sw:hover:not(:disabled) i { width: 14px; height: 14px; }
-  .sw.on { background: var(--accent); border-color: var(--accent); }
-  .sw.on i { left: 22px; background: #0b0a1a; }
-  .sw.on:hover:not(:disabled) i { left: 21px; }
+  .sw { flex: none; position: relative; width: 38px; height: 22px; padding: 0; border-radius: 99px; cursor: pointer; border: 0; background: rgba(255, 255, 255, .16); transition: background .15s; }
+  .sw i { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .3); transition: transform .15s; }
+  .sw.on { background: var(--accent); }
+  .sw.on i { transform: translateX(16px); }
   .sw:disabled { cursor: not-allowed; }
   .sw:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
   @media (prefers-reduced-motion: reduce) { .sw, .sw i { transition: none; } }

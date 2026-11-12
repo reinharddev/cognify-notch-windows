@@ -7,26 +7,67 @@
   import { L } from './lib/i18n';
   import { checkUpdate, initUpdate, installNow, update } from './lib/update.svelte';
   import { weather } from './lib/weather.svelte';
-  import { ui, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
+  import { ui, THEME_PRESETS, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
   import { pillLimits } from './lib/geometry';
   import { EMOTIONS, MODES, SITUATIONS, emotionLabel, situationLabel } from './lib/companion';
-  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw } from '@lucide/svelte';
+  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search } from '@lucide/svelte';
+  import PreviewStage from './lib/settings/PreviewStage.svelte';
+  import { tick, onMount } from 'svelte';
   import Setting from './lib/settings/Setting.svelte';
   import Group from './lib/settings/Group.svelte';
   import Segmented from './lib/settings/Segmented.svelte';
 
   type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'weather' | 'tabs' | 'data';
-  let pane = $state<PaneId>('general');
-  const panes: { id: PaneId; label: () => string; desc: () => string; icon: typeof Settings }[] = [
-    { id: 'general', icon: Settings, label: () => L('Umum', 'General'), desc: () => L('Buka otomatis, bahasa, pintasan, dan pembaruan.', 'Launch at startup, language, shortcut, and updates.') },
-    { id: 'appearance', icon: Palette, label: () => L('Tampilan', 'Appearance'), desc: () => L('Bentuk, ukuran, dan warna notch.', 'Shape, size, and colors of the notch.') },
-    { id: 'behavior', icon: MousePointer2, label: () => L('Perilaku', 'Behavior'), desc: () => L('Cara notch terbuka dan tertutup, serta layar yang dipakai.', 'How the notch opens and closes, and which screen it uses.') },
-    { id: 'companion', icon: Smile, label: () => L('Teman kecil', 'Companion'), desc: () => L('Wajah di notch: ekspresi, kedipan, dan reaksi.', 'The face in the notch: expressions, blinking, and reactions.') },
-    { id: 'features', icon: ToggleRight, label: () => L('Fitur', 'Features'), desc: () => L('Pilih fitur notch yang ingin dipakai.', 'Choose which notch features to use.') },
-    { id: 'weather', icon: CloudSun, label: () => L('Cuaca & kalender', 'Weather & calendar'), desc: () => L('Kota untuk cuaca dan sumber agenda.', 'The city for weather and the agenda sources.') },
-    { id: 'tabs', icon: ListOrdered, label: () => L('Urutan tab', 'Tab order'), desc: () => L('Atur urutan halaman di notch.', 'Arrange the pages in the notch.') },
-    { id: 'data', icon: Archive, label: () => L('Data', 'Data'), desc: () => L('Cadangkan atau pulihkan catatan, tugas, dan pengaturan.', 'Back up or restore notes, tasks, and settings.') },
+  const panes: { id: PaneId; group: 0 | 1 | 2; label: () => string; desc: () => string; icon: typeof Settings }[] = [
+    { id: 'general', group: 2, icon: Settings, label: () => L('Umum', 'General'), desc: () => L('Buka otomatis, bahasa, pintasan, dan pembaruan.', 'Launch at startup, language, shortcut, and updates.') },
+    { id: 'appearance', group: 0, icon: Palette, label: () => L('Tampilan', 'Appearance'), desc: () => L('Bentuk, ukuran, dan warna notch.', 'Shape, size, and colors of the notch.') },
+    { id: 'behavior', group: 0, icon: MousePointer2, label: () => L('Perilaku', 'Behavior'), desc: () => L('Cara notch terbuka dan tertutup, serta layar yang dipakai.', 'How the notch opens and closes, and which screen it uses.') },
+    { id: 'companion', group: 0, icon: Smile, label: () => L('Teman kecil', 'Companion'), desc: () => L('Wajah di notch: ekspresi, kedipan, dan reaksi.', 'The face in the notch: expressions, blinking, and reactions.') },
+    { id: 'features', group: 1, icon: ToggleRight, label: () => L('Fitur', 'Features'), desc: () => L('Pilih fitur notch yang ingin dipakai.', 'Choose which notch features to use.') },
+    { id: 'weather', group: 1, icon: CloudSun, label: () => L('Cuaca & kalender', 'Weather & calendar'), desc: () => L('Kota untuk cuaca dan sumber agenda.', 'The city for weather and the agenda sources.') },
+    { id: 'tabs', group: 1, icon: ListOrdered, label: () => L('Urutan tab', 'Tab order'), desc: () => L('Atur urutan halaman di notch.', 'Arrange the pages in the notch.') },
+    { id: 'data', group: 2, icon: Archive, label: () => L('Data', 'Data'), desc: () => L('Cadangkan atau pulihkan catatan, tugas, dan pengaturan.', 'Back up or restore notes, tasks, and settings.') },
   ];
+
+  const GROUPS = [() => 'Notch', () => L('Fitur', 'Features'), () => L('App', 'App')];
+  const order: PaneId[] = ['appearance', 'behavior', 'companion', 'features', 'weather', 'tabs', 'general', 'data'];
+  const sidebar = $derived(order.map((id) => panes.find((p) => p.id === id)!).filter((p) => p.id !== 'data' || inTauri));
+  let pane = $state<PaneId>('appearance');
+  let query = $state('');
+  let found = $state(0);
+  let innerEl: HTMLDivElement | undefined = $state();
+  const searching = $derived(query.trim().length > 0);
+  const show = (id: PaneId) => (searching ? id !== 'tabs' && (id !== 'data' || inTauri) : pane === id);
+
+  /** Pencarian menyaring baris yang sudah tampil: semua bagian dirender saat mencari, lalu baris dan kelompok yang tidak cocok disembunyikan. */
+  function applyFilter() {
+    if (!innerEl) return;
+    const q = query.trim().toLowerCase();
+    const rows = [...innerEl.querySelectorAll<HTMLElement>('.set')];
+    let n = 0;
+    for (const r of rows) {
+      const hit = !q || (r.textContent ?? '').toLowerCase().includes(q);
+      r.hidden = !hit;
+      if (hit) n++;
+    }
+    for (const g of innerEl.querySelectorAll<HTMLElement>('.grp')) {
+      const own = g.querySelectorAll('.set');
+      g.hidden = !!q && (own.length ? !g.querySelector('.set:not([hidden])') : !(g.textContent ?? '').toLowerCase().includes(q));
+    }
+    found = n;
+  }
+  /** Isi biru (aksen) di sisi kiri slider: variabel --p di tiap input. */
+  function paintRanges() {
+    for (const r of innerEl?.querySelectorAll<HTMLInputElement>('input[type=range]') ?? []) r.style.setProperty('--p', ((Number(r.value) - Number(r.min)) / (Number(r.max) - Number(r.min))) * 100 + '%');
+  }
+  $effect(() => {
+    void query; void pane; void ui.closedWidth; void ui.pillWidth; void ui.roundness; void ui.hoverDelay; void ui.closeDelay; void ui.bgAngle; void ui.bgBlur; void ui.bgDim; void ui.style; void ui.bgMode;
+    void tick().then(() => { applyFilter(); paintRanges(); });
+    if (!innerEl || !searching) return;
+    const mo = new MutationObserver(() => { applyFilter(); paintRanges(); });
+    mo.observe(innerEl, { childList: true, subtree: true });
+    return () => mo.disconnect();
+  });
 
   let ics = $state(agenda.url);
   let city = $state(weather.city);
@@ -139,16 +180,42 @@
   const pct = (v: number) => Math.round(v * 100);
   const setPct = (axis: 'x' | 'y', v: number) => { if (axis === 'x') ui.pillX = v / 100; else ui.pillY = v / 100; clampPill(); setUi(); };
   const curPane = $derived(panes.find((p) => p.id === pane)!);
+  const allOff = (keys: (keyof typeof features)[]) => { for (const k of keys) (features as unknown as Record<string, boolean>)[k] = false; features.persist(); void emitPrefs('features'); };
   const reloadLang = (l: 'auto' | 'id' | 'en') => { ui.lang = l; setUi(); void emitPrefs('reload'); setTimeout(() => location.reload(), 150); };
+  // Paket tema dan latar panel
+  let bgError = $state('');
+  const applyPreset = (p: (typeof THEME_PRESETS)[number]) => { ui.accentColor = p.accent; ui.bgMode = p.mode; ui.bgColor = p.c1; ui.bgColor2 = p.c2; ui.bgAngle = p.angle; setUi(); };
+  const presetCss = (p: (typeof THEME_PRESETS)[number]) => p.mode === 'none' ? '#000' : p.mode === 'color' ? p.c1 : `linear-gradient(${p.angle + 90}deg, ${p.c1}, ${p.c2})`;
+  /** Gambar dipilih lalu diperkecil (paling panjang 1280 px) dan disimpan sebagai JPEG di penyimpanan app; tidak dikirim ke mana pun. */
+  async function pickImage(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    bgError = '';
+    if (!file) return;
+    try {
+      const bmp = await createImageBitmap(file);
+      const scale = Math.min(1, 1280 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(bmp.width * scale)); c.height = Math.max(1, Math.round(bmp.height * scale));
+      c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+      ui.bgImage = c.toDataURL('image/jpeg', 0.82);
+      ui.bgMode = 'image';
+      setUi();
+      if (localStorage.getItem('cn.ui.bgImage') === null) bgError = L('Gambar terlalu besar untuk disimpan. Coba gambar yang lebih kecil.', 'The image is too large to store. Try a smaller one.');
+    } catch {
+      bgError = L('Gambar ini tidak bisa dibuka.', 'This image could not be opened.');
+    }
+  }
   const SWATCH = ['#8f87ff', '#0a84ff', '#30d158', '#ff375f', '#ff9f0a', '#ffd60a', '#bf5af2', '#ffffff'];
   const LYRIC_SWATCH = ['#ffffff', '#ffd60a', '#30d158', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2', '#8e8e93'];
   const EQ_SWATCH = ['#ffffff', '#30d158', '#0a84ff', '#bf5af2', '#ff375f', '#ff9f0a', '#ffd60a'];
   const NEED_COMPANION = () => L('Nyalakan Teman kecil dulu.', 'Turn on Little companion first.');
 </script>
 
-{#snippet tog(key: (typeof toggles)[number][0], opts: { disabled?: boolean; why?: string } = {})}
+{#snippet tog(key: (typeof toggles)[number][0], opts: { disabled?: boolean; why?: string; sub?: boolean } = {})}
   {@const t = toggles.find((x) => x[0] === key)!}
-  <Setting toggle title={t[1]} desc={t[2]} disabled={opts.disabled} why={opts.why} bind:checked={features[key]} onchange={() => changedFeature(key)} />
+  <Setting toggle title={t[1]} desc={t[2]} disabled={opts.disabled} why={opts.why} sub={opts.sub} bind:checked={features[key]} onchange={() => changedFeature(key)} />
 {/snippet}
 
 {#snippet swatches(list: string[], current: string, set: (c: string) => void, fallback: string)}
@@ -163,21 +230,27 @@
 
 <div class="shell">
   <nav aria-label={L('Bagian pengaturan', 'Settings sections')}>
-    <div class="brand"><h1>{L('Pengaturan', 'Settings')}</h1><span class="ver">Cognify Notch {update.current}</span></div>
-    {#each panes as p}
-      {#if p.id !== 'data' || inTauri}
-        <button class="tab" class:sel={pane === p.id} aria-current={pane === p.id ? 'page' : undefined} title={p.label()} onclick={() => (pane = p.id)}>
-          <p.icon size={16} /><span>{p.label()}</span>
+    <div class="brand"><i class="mark"></i><div><h1>{L('Pengaturan', 'Settings')}</h1><span class="ver">Cognify Notch {update.current}</span></div></div>
+    <label class="search"><Search size={14} /><input type="search" bind:value={query} placeholder={L('Cari pengaturan', 'Search settings')} aria-label={L('Cari pengaturan', 'Search settings')} autocomplete="off" /></label>
+    {#each GROUPS as g, gi}
+      <div class="grpname">{g()}</div>
+      {#each sidebar.filter((p) => p.group === gi) as p}
+        <button class="tab" class:sel={!searching && pane === p.id} aria-current={!searching && pane === p.id ? 'page' : undefined} title={p.label()} onclick={() => { query = ''; pane = p.id; innerEl?.parentElement?.scrollTo(0, 0); }}>
+          <p.icon size={17} /><span>{p.label()}</span>
         </button>
-      {/if}
+      {/each}
     {/each}
   </nav>
 
   <main class="pane">
-   <div class="inner">
-    <header class="head"><h2>{curPane.label()}</h2><p>{curPane.desc()}</p></header>
+   <div class="inner" bind:this={innerEl} oninput={paintRanges} role="presentation">
+    <header class="head">
+      <h2>{searching ? L('Hasil pencarian', 'Search results') : curPane.label()}</h2>
+      <p>{searching ? L(`${found} pengaturan`, `${found} settings`) : curPane.desc()}</p>
+    </header>
+    {#if searching && found === 0}<p class="empty">{L('Tidak ada pengaturan yang cocok.', 'No settings match.')}</p>{/if}
 
-  {#if pane === 'general'}
+  {#if show('general')}
     <Group title={L('Umum', 'General')}>
       {#if inTauri}
         <Setting toggle title={L('Buka saat Windows dinyalakan', 'Open when Windows starts')} bind:checked={autostart} onchange={() => void cmd('autostart_set', { on: autostart })} />
@@ -191,7 +264,7 @@
     <Group title={L('Pintasan keyboard', 'Keyboard shortcut')} hint={L('Esc atau klik di luar notch menutupnya. Notch juga bisa disembunyikan atau ditampilkan lewat ikon Cognify Notch di area ikon tersembunyi taskbar (klik kiri).', 'Esc or a click outside closes the notch. You can also hide or show it from the Cognify Notch icon in the taskbar\'s hidden icons (left click).')}>
       <Setting toggle title={L('Buka dengan pintasan keyboard', 'Open with a keyboard shortcut')} bind:checked={features.hotkey} onchange={() => changedFeature('hotkey')} />
       {#if inTauri}
-        <Setting title={L('Kombinasi tombol', 'Key combination')} disabled={!features.hotkey} why={L('Nyalakan pintasan di atas dulu.', 'Turn on the shortcut above first.')}>
+        <Setting sub title={L('Kombinasi tombol', 'Key combination')} disabled={!features.hotkey} why={L('Nyalakan pintasan di atas dulu.', 'Turn on the shortcut above first.')}>
           <select bind:value={hotkey.choice} onchange={() => { hotkey.apply(); void emitPrefs('hotkey'); }} aria-label={L('Kombinasi tombol', 'Key combination')}>
             {#each HOTKEYS.filter((h) => h[0] !== 'off') as [id, label]}<option value={id}>{label}</option>{/each}
           </select>
@@ -201,7 +274,7 @@
 
     <Group title={L('Pembaruan', 'Updates')}>
       {@render tog('updates')}
-      {@render tog('autoInstall', { disabled: !features.updates, why: L('Nyalakan pemeriksaan versi dulu.', 'Turn on the version check first.') })}
+      {@render tog('autoInstall', { sub: true, disabled: !features.updates, why: L('Nyalakan pemeriksaan versi dulu.', 'Turn on the version check first.') })}
       <Setting title={L('Versi terpasang', 'Installed version')} desc={update.text || `Cognify Notch ${update.current}`}>
         <button class="btn" onclick={() => checkUpdate()}>{L('Cek pembaruan', 'Check for updates')}</button>
         {#if update.selfUpdate && (update.stage === 'found' || update.stage === 'ready')}<button class="btn on" onclick={installNow}>{L('Perbarui dan mulai ulang', 'Update and restart')}</button>{/if}
@@ -209,7 +282,9 @@
       </Setting>
     </Group>
 
-  {:else if pane === 'appearance'}
+  {/if}
+  {#if show('appearance')}
+    {#if !searching}<PreviewStage />{/if}
     <Group title={L('Bentuk', 'Shape')}>
       <Setting title={L('Bentuk notch', 'Notch shape')}>
         <Segmented label={L('Bentuk notch', 'Notch shape')} value={ui.style} onchange={setStyle}
@@ -245,7 +320,6 @@
         <Setting stack title={L('Lebar notch saat tertutup', 'Closed notch width')} desc={L('Lebih sempit tidak menutupi tab browser. Panel yang terbuka tidak berubah.', 'Narrower won\'t cover browser tabs. The open panel is unchanged.')}>
           <div class="slider"><input id="w" type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.closedWidth} oninput={setWidth} aria-label={L('Lebar notch', 'Notch width')} /><span class="val">{ui.closedWidth} px</span>
             <button class="btn ghost" onclick={resetWidth} disabled={ui.closedWidth === CLOSED_DEFAULT} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
-          <div class="preview"><span class="pill" style:width="{ui.closedWidth}px"><i></i><i></i></span></div>
         </Setting>
       {/if}
       <Setting title={L('Ukuran panel', 'Panel size')}>
@@ -255,6 +329,52 @@
       <Setting stack title={L('Lengkung sudut bawah', 'Bottom corner roundness')}>
         <div class="slider"><input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} /><span class="val">{ui.roundness} px</span></div>
       </Setting>
+    </Group>
+
+    <Group title={L('Paket tema', 'Theme packs')} hint={L('Satu klik mengatur warna aksen dan latar sekaligus.', 'One click sets the accent color and the background together.')}>
+      <div class="presets">
+        {#each THEME_PRESETS as p (p.id)}
+          <button type="button" class="preset" onclick={() => applyPreset(p)} aria-label={p.name()}>
+            <span class="sample" style:background={presetCss(p)}><i style:background={p.accent || '#8f87ff'}></i></span>
+            <span>{p.name()}</span>
+          </button>
+        {/each}
+      </div>
+    </Group>
+
+    <Group title={L('Latar panel', 'Panel background')} hint={L('Notch tertutup yang menempel di atas tetap hitam; latar tampil di panel terbuka dan pill melayang. Gambar diperkecil dan disimpan di app ini saja.', 'The attached closed notch stays black; the background shows in the open panel and the floating pill. The image is downsized and stored in this app only.')}>
+      <Setting title={L('Latar', 'Background')}>
+        <Segmented label={L('Latar', 'Background')} value={ui.bgMode} onchange={(v) => { ui.bgMode = v; setUi(); }}
+          options={[{ value: 'none', label: L('Hitam', 'Black') }, { value: 'color', label: L('Warna', 'Color') }, { value: 'gradient', label: L('Gradien', 'Gradient') }, { value: 'image', label: L('Gambar', 'Image') }]} />
+      </Setting>
+      {#if ui.bgMode === 'color' || ui.bgMode === 'gradient'}
+        <Setting title={ui.bgMode === 'gradient' ? L('Warna awal', 'Start color') : L('Warna', 'Color')}>
+          <input type="color" value={ui.bgColor} aria-label={L('Warna', 'Color')} oninput={(e) => { ui.bgColor = e.currentTarget.value; setUi(); }} />
+        </Setting>
+      {/if}
+      {#if ui.bgMode === 'gradient'}
+        <Setting title={L('Warna akhir', 'End color')}>
+          <input type="color" value={ui.bgColor2} aria-label={L('Warna akhir', 'End color')} oninput={(e) => { ui.bgColor2 = e.currentTarget.value; setUi(); }} />
+        </Setting>
+        <Setting stack title={L('Arah', 'Direction')}>
+          <div class="slider"><input type="range" min="0" max="360" step="5" bind:value={ui.bgAngle} oninput={setUi} aria-label={L('Arah gradien', 'Gradient direction')} /><span class="val">{ui.bgAngle}°</span></div>
+        </Setting>
+      {/if}
+      {#if ui.bgMode === 'image'}
+        <Setting title={L('Gambar', 'Image')} desc={bgError || undefined}>
+          {#if ui.bgImage}<img class="thumb" src={ui.bgImage} alt="" />{/if}
+          <label class="btn pick">{ui.bgImage ? L('Ganti gambar…', 'Change image…') : L('Pilih gambar…', 'Choose image…')}<input type="file" accept="image/*" hidden onchange={pickImage} /></label>
+          {#if ui.bgImage}<button class="btn ghost" onclick={() => { ui.bgImage = ''; ui.bgMode = 'none'; setUi(); }}>{L('Hapus', 'Remove')}</button>{/if}
+        </Setting>
+        <Setting stack title={L('Buram', 'Blur')}>
+          <div class="slider"><input type="range" min="0" max="1" step="0.05" bind:value={ui.bgBlur} oninput={setUi} aria-label={L('Buram', 'Blur')} /><span class="val">{Math.round(ui.bgBlur * 100)}%</span></div>
+        </Setting>
+      {/if}
+      {#if ui.bgMode === 'image' || ui.bgMode === 'gradient'}
+        <Setting stack title={L('Peredam gelap', 'Dim')} desc={L('Supaya tulisan tetap terbaca di atas gambar atau warna terang.', 'Keeps the text readable over a bright image or color.')}>
+          <div class="slider"><input type="range" min="0" max="0.8" step="0.05" bind:value={ui.bgDim} oninput={setUi} aria-label={L('Peredam gelap', 'Dim')} /><span class="val">{Math.round(ui.bgDim * 100)}%</span></div>
+        </Setting>
+      {/if}
     </Group>
 
     <Group title={L('Warna', 'Colors')}>
@@ -279,7 +399,8 @@
       {/if}
     </Group>
 
-  {:else if pane === 'behavior'}
+  {/if}
+  {#if show('behavior')}
     <Group title={L('Membuka dan menutup', 'Opening and closing')}>
       <Setting title={L('Buka notch dengan', 'Open the notch by')}>
         <Segmented label={L('Buka notch dengan', 'Open the notch by')} value={ui.openOnClick} onchange={(v) => { ui.openOnClick = v; setUi(); }}
@@ -301,7 +422,9 @@
       </Group>
     {/if}
 
-  {:else if pane === 'companion'}
+  {/if}
+  {#if show('companion')}
+    {#if !searching}<PreviewStage height={110} />{/if}
     <Group>
       {@render tog('companion')}
     </Group>
@@ -341,14 +464,15 @@
         <button class="btn ghost" onclick={() => { ui.companionMap = {}; setUi(); }} disabled={Object.keys(ui.companionMap).length === 0}>{L('Kembalikan ke bawaan', 'Reset to default')}</button></p>
     {/if}
 
-  {:else if pane === 'features'}
-    <Group title={L('Musik', 'Music')}>
+  {/if}
+  {#if show('features')}
+    <Group title={L('Musik', 'Music')} action={L('Matikan semua', 'Turn all off')} onaction={() => allOff(['media', 'spectrum', 'lyrics', 'lyricsWing'])}>
       {@render tog('media')}
-      {@render tog('spectrum', { disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
-      {@render tog('lyrics', { disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
-      {@render tog('lyricsWing', { disabled: !features.media || !features.lyrics, why: !features.media ? L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') : L('Nyalakan Lirik lagu dulu.', 'Turn on Synced lyrics first.') })}
+      {@render tog('spectrum', { sub: true, disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
+      {@render tog('lyrics', { sub: true, disabled: !features.media, why: L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') })}
+      {@render tog('lyricsWing', { sub: true, disabled: !features.media || !features.lyrics, why: !features.media ? L('Nyalakan Lagu & video yang diputar dulu.', 'Turn on Now playing first.') : L('Nyalakan Lirik lagu dulu.', 'Turn on Synced lyrics first.') })}
     </Group>
-    <Group title={L('Produktivitas', 'Productivity')}>
+    <Group title={L('Produktivitas', 'Productivity')} action={L('Matikan semua', 'Turn all off')} onaction={() => allOff(['shortcuts', 'clipboard', 'water', 'todo', 'clockTools', 'calculator', 'camera'])}>
       {@render tog('shortcuts')}
       {@render tog('clipboard')}
       {#if features.clipboard}
@@ -363,11 +487,12 @@
       {/if}
       {@render tog('water')}{@render tog('todo')}{@render tog('clockTools')}{@render tog('calculator')}{@render tog('camera')}
     </Group>
-    <Group title={L('Sistem', 'System')}>
+    <Group title={L('Sistem', 'System')} action={L('Matikan semua', 'Turn all off')} onaction={() => allOff(['hud', 'charger', 'devices', 'downloads', 'keys', 'network', 'hideFullscreen'])}>
       {@render tog('hud')}{@render tog('charger')}{@render tog('devices')}{@render tog('downloads')}{@render tog('keys')}{@render tog('network')}{@render tog('hideFullscreen')}
     </Group>
 
-  {:else if pane === 'weather'}
+  {/if}
+  {#if show('weather')}
     <Group title={L('Cuaca', 'Weather')}>
       {@render tog('weather')}
       {#if inTauri}
@@ -392,7 +517,8 @@
       </Group>
     {/if}
 
-  {:else if pane === 'tabs'}
+  {/if}
+  {#if pane === 'tabs' && !searching}
     <Group>
       {#each ui.allOrdered as p, i (p.id)}
         <Setting title={p.title()}>
@@ -402,7 +528,8 @@
       {/each}
     </Group>
 
-  {:else if pane === 'data' && inTauri}
+  {/if}
+  {#if show('data') && inTauri}
     <Group title={L('Cadangan', 'Backup')} hint={L('Catatan, tugas, riwayat minum, clipboard, timer, dan pengaturan.', 'Notes, tasks, water log, clipboard, timers and settings.')}>
       <Setting title={L('Ekspor', 'Export')} desc={L('Simpan semuanya ke satu berkas JSON.', 'Save everything to one JSON file.')}><button class="btn" onclick={exportData}>{L('Ekspor…', 'Export…')}</button></Setting>
       <Setting title={L('Impor', 'Import')} desc={L('Pulihkan dari berkas cadangan.', 'Restore from a backup file.')}><button class="btn" onclick={pickImport}>{L('Impor…', 'Import…')}</button></Setting>
@@ -421,29 +548,40 @@
 
 <style>
   .shell {
-    --bg: #1b1b20; --nav: #141418; --card: rgba(255, 255, 255, .045); --line: rgba(255, 255, 255, .08);
-    --dim: rgba(255, 255, 255, .58); --warn: #ffc666;
-    display: flex; height: 100vh; background: var(--bg); color: #f2f2f5; font-size: 13px; user-select: none;
+    --card: rgba(255, 255, 255, .05); --line: rgba(255, 255, 255, .08); --dim: rgba(243, 242, 248, .58); --faint: rgba(243, 242, 248, .42); --warn: #ffc666;
+    --accent: #8f87ff;
+    display: flex; height: 100vh; color: #f3f2f8; font-size: 13px; user-select: none; color-scheme: dark;
+    background: radial-gradient(900px 500px at 15% -10%, #3b2a86 0%, transparent 60%), radial-gradient(700px 420px at 100% 110%, #a8478e 0%, transparent 55%), #14121f;
   }
-  nav { width: 224px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 20px 10px; background: var(--nav); border-right: 1px solid var(--line); overflow-y: auto; }
-  .brand { padding: 0 10px 16px; }
-  nav h1 { font-size: 18px; font-weight: 600; margin: 0; }
-  .ver { display: block; margin-top: 2px; font-size: 11.5px; color: var(--dim); }
-  .tab { position: relative; display: flex; align-items: center; gap: 10px; border: 0; background: none; color: rgba(255, 255, 255, .78); font: inherit; text-align: left; padding: 9px 12px; border-radius: 8px; cursor: pointer; }
+  nav { width: 232px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 18px 10px; background: rgba(0, 0, 0, .34); border-right: 1px solid rgba(255, 255, 255, .07); overflow-y: auto; scrollbar-width: none; }
+  nav::-webkit-scrollbar, .pane::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 14px; }
+  .mark { position: relative; width: 22px; height: 15px; flex: none; background: #000; border-radius: 0 0 8px 8px; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2); }
+  .mark::after { content: ''; position: absolute; left: 6px; top: 3px; width: 3px; height: 6px; border-radius: 50%; background: var(--accent); box-shadow: 7px 0 0 var(--accent); }
+  nav h1 { font-size: 15px; font-weight: 600; margin: 0; }
+  .ver { display: block; font-size: 11px; color: var(--dim); }
+  .search { position: relative; display: block; margin: 0 4px 6px; color: var(--dim); }
+  .search :global(svg) { position: absolute; left: 11px; top: 8px; opacity: .6; pointer-events: none; }
+  .search input { width: 100%; box-sizing: border-box; border: 0; border-radius: 99px; padding: 7px 12px 7px 32px; background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); color: inherit; font: inherit; outline: none; user-select: text; }
+  .search input:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
+  .search input::-webkit-search-cancel-button { display: none; }
+  .grpname { color: var(--faint); text-transform: uppercase; letter-spacing: .09em; font-size: 10px; font-weight: 600; padding: 14px 10px 4px; }
+  .tab { position: relative; display: flex; align-items: center; gap: 9px; border: 0; background: none; color: var(--dim); font: inherit; text-align: left; padding: 7px 10px; border-radius: 12px; cursor: pointer; transition: background .15s, color .15s; }
   .tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tab:hover { background: rgba(255, 255, 255, .06); }
-  .tab.sel { background: rgba(255, 255, 255, .09); color: #fff; font-weight: 600; }
-  .tab.sel::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 3px; background: var(--accent); }
+  .tab:hover { background: rgba(255, 255, 255, .06); color: #fff; }
+  .tab.sel { background: color-mix(in srgb, var(--accent) 20%, transparent); color: #fff; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent); }
+  .tab.sel :global(svg) { color: var(--accent); }
   .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  .pane { flex: 1; min-width: 0; overflow-y: auto; }
-  .pane::-webkit-scrollbar { width: 10px; }
-  .pane::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 8px; border: 2px solid var(--bg); }
-  .inner { max-width: 640px; margin: 0 auto; padding: 24px 28px 40px; }
-  .head h2 { margin: 0; font-size: 22px; font-weight: 600; }
-  .head p { margin: 4px 0 0; color: var(--dim); font-size: 13px; }
+  .pane { flex: 1; min-width: 0; overflow-y: auto; scrollbar-width: none; }
+  .inner { max-width: 660px; margin: 0 auto; padding: 24px 28px 40px; }
+  .head h2 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.01em; }
+  .head p { margin: 4px 0 14px; color: var(--dim); font-size: 13px; }
+  .empty { padding: 40px 10px; text-align: center; color: var(--dim); }
+  :global(.set[hidden]), :global(.grp[hidden]) { display: none !important; }
+  .inner > :global(.stage) + :global(.grp) { margin-top: 18px; }
   .foot { margin: 14px 4px 0; font-size: 12px; color: var(--dim); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .inline-err { margin: 0; padding: 10px 16px; font-size: 12px; color: var(--warn); border-top: 1px solid var(--line); }
-  .warn { margin-top: 14px; padding: 14px 16px; border-radius: 10px; border: 1px solid rgba(255, 198, 102, .4); background: rgba(255, 198, 102, .08); }
+  .warn { margin-top: 14px; padding: 14px 16px; border-radius: 12px; border: 1px solid rgba(255, 198, 102, .3); background: rgba(255, 198, 102, .08); }
   .warn p { margin: 0 0 12px; line-height: 1.45; }
   .dim { color: var(--dim); font-size: 12px; }
   .row { display: flex; gap: 8px; }
@@ -451,33 +589,50 @@
   .slider { display: flex; align-items: center; gap: 12px; width: 100%; }
   .slider input[type=range] { flex: 1; min-width: 0; }
   .val { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
-  input[type=range] { accent-color: var(--accent); height: 20px; }
+  input[type=range] { -webkit-appearance: none; appearance: none; height: 20px; background: transparent; cursor: pointer; --p: 50%; }
+  input[type=range]::-webkit-slider-runnable-track { height: 4px; border-radius: 99px; background: linear-gradient(to right, var(--accent) var(--p), rgba(255, 255, 255, .16) var(--p)); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #f3f2f8; border: 0; box-shadow: 0 0 0 1px rgba(0, 0, 0, .35), 0 1px 2px rgba(0, 0, 0, .4); }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.12); }
+  input[type=range]:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 4px; }
   input[type=range]:disabled { opacity: .5; }
-  select { font: inherit; color: inherit; background: rgba(255, 255, 255, .1); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 130px; }
+  select { font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 0; border-radius: 99px; padding: 5px 12px; min-width: 130px; color-scheme: dark; }
   select:disabled { opacity: .5; }
   select option { color: #000; }
-  .num { width: 72px; font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; }
+  .num { width: 72px; font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 0; border-radius: 10px; padding: 5px 10px; user-select: text; }
   .nums { display: flex; gap: 16px; align-items: center; }
   .nums label { display: flex; align-items: center; gap: 6px; }
-  .btn.ghost { background: transparent; border: 1px solid var(--line); border-radius: 6px; padding: 5px 9px; display: inline-flex; align-items: center; }
-  .btn { border-radius: 6px; padding: 6px 14px; }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); border-radius: 99px; padding: 5px 9px; display: inline-flex; align-items: center; }
+  .btn { border-radius: 99px; padding: 5px 14px; }
   .btn.on { color: #0b0a1a; }
   .map { position: relative; width: 100%; max-width: 360px; border-radius: 8px; background: #2b2a33; border: 1px solid rgba(255, 255, 255, .12); cursor: crosshair; overflow: hidden; touch-action: none; }
   .map .zone { position: absolute; border: 1px dashed rgba(255, 255, 255, .22); border-radius: 4px; pointer-events: none; }
   .map .dot { position: absolute; transform: translate(-50%, -50%); min-width: 6px; min-height: 4px; border-radius: 99px; background: var(--accent); pointer-events: none; box-shadow: 0 0 0 1px rgba(0, 0, 0, .4); }
-  .preview { width: 100%; height: 54px; border-radius: 8px; background: #2b2a33; display: flex; justify-content: center; align-items: flex-start; overflow: hidden; }
-  .pill { height: 36px; background: #000; border-radius: 0 0 12px 12px; display: flex; align-items: center; justify-content: center; gap: 9px; }
-  .pill i { width: 7px; height: 11px; background: #fff; border-radius: 50%; }
+  .presets { display: flex; flex-wrap: wrap; gap: 12px; padding: 14px 16px; }
+  .preset { display: grid; gap: 6px; justify-items: center; border: 0; background: none; color: var(--dim); font: inherit; font-size: 11.5px; cursor: pointer; }
+  .preset:hover { color: #fff; }
+  .sample { position: relative; width: 64px; height: 40px; border-radius: 10px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+  .sample i { position: absolute; right: 5px; bottom: 5px; width: 12px; height: 12px; border-radius: 50%; }
+  .thumb { width: 52px; height: 32px; object-fit: cover; border-radius: 6px; }
+  .pick { cursor: pointer; }
   .swatches { display: inline-flex; align-items: center; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
   .chip { width: 20px; height: 20px; border-radius: 50%; border: 1px solid rgba(128, 128, 128, .35); padding: 0; cursor: pointer; }
   .chip.sel { outline: 2px solid #fff; outline-offset: 2px; }
   .swatches input[type='color'] { width: 26px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer; }
 
-  /* Jendela sempit: menu samping hanya ikon. */
+  /* Jendela sempit: menu samping hanya ikon; judul grup jadi garis tipis dan pencarian jadi ikon. */
   @media (max-width: 700px) {
-    nav { width: 56px; padding: 16px 8px; }
-    .brand, .tab span { display: none; }
-    .tab { justify-content: center; padding: 10px 0; }
+    nav { width: 60px; padding: 14px 8px; align-items: stretch; }
+    .brand { justify-content: center; padding: 2px 0 10px; }
+    .brand div, .tab span { display: none; }
+    .search { margin: 0 0 4px; }
+    .search input { padding: 0; height: 34px; color: transparent; cursor: pointer; }
+    .search input::placeholder { color: transparent; }
+    .search input:focus { position: fixed; left: 8px; top: 8px; width: 200px; height: auto; padding: 7px 12px 7px 32px; color: inherit; z-index: 5; background: #24212f; cursor: text; }
+    .search input:focus::placeholder { color: var(--dim); }
+    .search :global(svg) { left: 50%; margin-left: -7px; z-index: 6; }
+    .search:focus-within :global(svg) { left: 20px; margin-left: 0; top: 16px; }
+    .grpname { font-size: 0; height: 1px; padding: 0; margin: 10px 8px 6px; background: var(--line); }
+    .tab { justify-content: center; padding: 9px 0; }
     .inner { padding: 20px 16px 32px; }
   }
 </style>

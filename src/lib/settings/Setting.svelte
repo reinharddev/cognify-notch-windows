@@ -5,27 +5,28 @@
   import type { Snippet } from 'svelte';
   import Switch from './Switch.svelte';
 
-  let { title, desc = '', why = '', disabled = false, toggle = false, checked = $bindable(false), onchange, stack = false, children }: {
+  let { title, desc = '', why = '', disabled = false, toggle = false, checked = $bindable(false), onchange, stack = false, sub = false, children }: {
     title: string; desc?: string; why?: string; disabled?: boolean; toggle?: boolean; checked?: boolean;
-    onchange?: (v: boolean) => void; stack?: boolean; children?: Snippet;
+    onchange?: (v: boolean) => void; stack?: boolean; sub?: boolean; children?: Snippet;
   } = $props();
 </script>
 
 {#if toggle}
-  <label class="set" class:disabled>
+  <label class="set" class:disabled class:sub>
     <span class="txt"><b>{title}</b>{#if desc}<small>{desc}</small>{/if}{#if disabled && why}<small class="why">{why}</small>{/if}</span>
     <Switch bind:checked {disabled} label={title} {onchange} />
   </label>
 {:else}
-  <div class="set" class:disabled class:stack>
+  <div class="set" class:disabled class:stack class:sub>
     <span class="txt"><b>{title}</b>{#if desc}<small>{desc}</small>{/if}{#if disabled && why}<small class="why">{why}</small>{/if}</span>
     {#if children}<div class="ctl">{@render children()}</div>{/if}
   </div>
 {/if}
 
 <style>
-  .set { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; min-height: 48px; border-top: 1px solid var(--line); }
+  .set { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; min-height: 48px; border-top: 1px solid rgba(255, 255, 255, .06); }
   .set:first-child { border-top: 0; }
+  .set.sub { padding-left: 34px; background: rgba(255, 255, 255, .025); }
   label.set { cursor: pointer; }
   label.set:hover { background: rgba(255, 255, 255, .03); }
   label.set.disabled { cursor: not-allowed; }
