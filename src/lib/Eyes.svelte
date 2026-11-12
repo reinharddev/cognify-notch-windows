@@ -49,19 +49,20 @@
   {@const gy = p.gy * 0.5 + face.glance.y + (follow ? face.look.y : 0)}
   <g class="eye" style:transform="translate({gx}px, {gy}px) scale({scale})">
     <g class="shape" style:transform="scale({p.sx}, {p.sy * size})" style:opacity={hidden ? 0 : 1 - closed} style:transition={lt}>
-      <clipPath id="c{uid}{right ? 'r' : 'l'}"><rect x="-4.2" y="-6.2" width="8.4" height="12.4" rx="3.7" /></clipPath>
-      <g clip-path="url(#c{uid}{right ? 'r' : 'l'})">
-        <defs>
-          <linearGradient id="eyeFill{uid}{right ? 'r' : 'l'}" x1="0" y1="-6" x2="0" y2="6" gradientUnits="userSpaceOnUse">
-            <stop offset="0" stop-color="#fff" />
-            <stop offset="0.58" stop-color="#f7f8fa" />
-            <stop offset="1" stop-color="#d8dbe2" />
-          </linearGradient>
-        </defs>
-        <rect class="body" x="-4" y="-6" width="8" height="12" rx="3.5" fill="url(#eyeFill{uid}{right ? 'r' : 'l'})" />
-        <rect class="lid" x="-14" y="-32" width="28" height="32" style:transform="rotate({tilt}deg) translate(0px, {-6 + 13 * top}px)" style:transition={lt} />
-        <circle class="lid" r="8.4" style:transform="rotate({tilt}deg) translate(0px, {14.4 - 12 * p.bot}px)" style:transition={lt} />
-      </g>
+      <defs>
+        <linearGradient id="eyeFill{uid}{right ? 'r' : 'l'}" x1="0" y1="-6" x2="0" y2="6" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stop-color="#fff" />
+          <stop offset="0.58" stop-color="#f7f8fa" />
+          <stop offset="1" stop-color="#d8dbe2" />
+        </linearGradient>
+        <!-- Kelopak memotong bentuk mata (hitam di topeng = transparan), bukan menimpanya dengan warna hitam: tetap benar di latar gradasi atau gambar. -->
+        <mask id="m{uid}{right ? 'r' : 'l'}" maskUnits="userSpaceOnUse" x="-9" y="-9" width="18" height="18">
+          <rect x="-4" y="-6" width="8" height="12" rx="3.5" fill="#fff" />
+          <rect class="lid" x="-14" y="-32" width="28" height="32" style:transform="rotate({tilt}deg) translate(0px, {-6 + 13 * top}px)" style:transition={lt} />
+          <circle class="lid" r="8.4" style:transform="rotate({tilt}deg) translate(0px, {14.4 - 12 * p.bot}px)" style:transition={lt} />
+        </mask>
+      </defs>
+      <rect class="body" x="-4" y="-6" width="8" height="12" rx="3.5" fill="url(#eyeFill{uid}{right ? 'r' : 'l'})" mask="url(#m{uid}{right ? 'r' : 'l'})" />
     </g>
     <!-- Mata tertutup: garis tipis. -->
     <rect class="shut" x="-4.5" y="1" width="9" height="2" rx="1" style:opacity={hidden ? 0 : 0.75 * closed} style:transition={lt} />
@@ -103,7 +104,7 @@
   .mouth, .mouth-o { transition: opacity .18s ease; }
   .eye, .shape, .lid { transform-origin: 0 0; transform-box: view-box; }
   .body { fill: #fff; }
-  .lid { fill: #000; stroke: #000; stroke-width: .5px; }
+  .lid { fill: #000; stroke: none; }
   .shut { fill: #fff; }
   .heart { fill: #ff6b8b; }
   .spiral { font: 800 11px system-ui, sans-serif; fill: #fff; transform-origin: 0 0; animation: spin .7s linear infinite; }
