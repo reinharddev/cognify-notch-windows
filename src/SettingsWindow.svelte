@@ -7,10 +7,11 @@
   import { L } from './lib/i18n';
   import { checkUpdate, initUpdate, installNow, update } from './lib/update.svelte';
   import { weather } from './lib/weather.svelte';
-  import { ui, THEME_PRESETS, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
+  import { ui, THEME_PRESETS, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, CLOSED_H_MIN, CLOSED_H_MAX, CLOSED_H_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
   import { pillLimits } from './lib/geometry';
   import { EMOTIONS, MODES, SITUATIONS, emotionLabel, situationLabel } from './lib/companion';
   import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search } from '@lucide/svelte';
+  import CropPicker from './lib/settings/CropPicker.svelte';
   import PreviewStage from './lib/settings/PreviewStage.svelte';
   import { tick, onMount } from 'svelte';
   import Setting from './lib/settings/Setting.svelte';
@@ -61,7 +62,7 @@
     for (const r of innerEl?.querySelectorAll<HTMLInputElement>('input[type=range]') ?? []) r.style.setProperty('--p', ((Number(r.value) - Number(r.min)) / (Number(r.max) - Number(r.min))) * 100 + '%');
   }
   $effect(() => {
-    void query; void pane; void ui.closedWidth; void ui.pillWidth; void ui.roundness; void ui.hoverDelay; void ui.closeDelay; void ui.bgAngle; void ui.bgBlur; void ui.bgDim; void ui.style; void ui.bgMode;
+    void query; void pane; void ui.closedWidth; void ui.closedHeight; void ui.bgPosX; void ui.bgPosY; void ui.bgZoom; void ui.pillWidth; void ui.roundness; void ui.hoverDelay; void ui.closeDelay; void ui.bgAngle; void ui.bgBlur; void ui.bgDim; void ui.style; void ui.bgMode;
     void tick().then(() => { applyFilter(); paintRanges(); });
     if (!innerEl || !searching) return;
     const mo = new MutationObserver(() => { applyFilter(); paintRanges(); });
@@ -158,6 +159,7 @@
     setUi();
   };
   const resetWidth = () => { ui.closedWidth = CLOSED_DEFAULT; setWidth(); };
+  const resetHeight = () => { ui.closedHeight = CLOSED_H_DEFAULT; setWidth(); };
 
   // Peta posisi pill: layar kecil dengan titik pill. Titik hanya bisa digeser di sini, dalam batas aman dari tepi layar.
   const sw = screen.width || 1920, sh = screen.height || 1080;
@@ -200,6 +202,7 @@
       c.width = Math.max(1, Math.round(bmp.width * scale)); c.height = Math.max(1, Math.round(bmp.height * scale));
       c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
       ui.bgImage = c.toDataURL('image/jpeg', 0.82);
+      ui.bgAspect = c.width / c.height; ui.bgPosX = 50; ui.bgPosY = 50; ui.bgZoom = 1;
       ui.bgMode = 'image';
       setUi();
       if (localStorage.getItem('cn.ui.bgImage') === null) bgError = L('Gambar terlalu besar untuk disimpan. Coba gambar yang lebih kecil.', 'The image is too large to store. Try a smaller one.');
@@ -207,6 +210,9 @@
       bgError = L('Gambar ini tidak bisa dibuka.', 'This image could not be opened.');
     }
   }
+  // Latar jendela Pengaturan mengikuti tema yang dipilih (warna, gradien, atau gambar); hitam bawaan memakai latar ungu lama.
+  const themed = $derived(ui.bgMode !== 'none' && !!ui.bgCss && (ui.bgMode !== 'image' || ui.bgSettings));
+  const themedBg = $derived(ui.bgMode === 'image' ? ui.imageCss(window.innerWidth / Math.max(1, window.innerHeight)) : (ui.bgCss?.background ?? ''));
   const SWATCH = ['#8f87ff', '#0a84ff', '#30d158', '#ff375f', '#ff9f0a', '#ffd60a', '#bf5af2', '#ffffff'];
   const LYRIC_SWATCH = ['#ffffff', '#ffd60a', '#30d158', '#0a84ff', '#ff375f', '#ff9f0a', '#bf5af2', '#8e8e93'];
   const EQ_SWATCH = ['#ffffff', '#30d158', '#0a84ff', '#bf5af2', '#ff375f', '#ff9f0a', '#ffd60a'];
@@ -228,7 +234,11 @@
   </span>
 {/snippet}
 
-<div class="shell">
+<div class="shell" style:--accent={ui.accentColor || undefined}>
+  {#if themed}
+    <div class="tbg" aria-hidden="true" style:background={themedBg} style:filter={ui.bgMode === 'image' && ui.bgBlur > 0 ? `blur(${ui.bgBlur * 16}px)` : undefined} style:inset={ui.bgMode === 'image' && ui.bgBlur > 0 ? '-24px' : '0'}></div>
+    <div class="tdim" aria-hidden="true" style:opacity={ui.bgMode === 'color' ? 0 : Math.max(ui.bgDim, 0.45)}></div>
+  {/if}
   <nav aria-label={L('Bagian pengaturan', 'Settings sections')}>
     <div class="brand"><i class="mark"></i><div><h1>{L('Pengaturan', 'Settings')}</h1><span class="ver">Cognify Notch {update.current}</span></div></div>
     <label class="search"><Search size={14} /><input type="search" bind:value={query} placeholder={L('Cari pengaturan', 'Search settings')} aria-label={L('Cari pengaturan', 'Search settings')} autocomplete="off" /></label>
@@ -321,6 +331,10 @@
           <div class="slider"><input id="w" type="range" min={CLOSED_MIN} max={CLOSED_MAX} step="2" bind:value={ui.closedWidth} oninput={setWidth} aria-label={L('Lebar notch', 'Notch width')} /><span class="val">{ui.closedWidth} px</span>
             <button class="btn ghost" onclick={resetWidth} disabled={ui.closedWidth === CLOSED_DEFAULT} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
         </Setting>
+        <Setting stack title={L('Tinggi notch saat tertutup', 'Closed notch height')} desc={L('Lebar dan tinggi diatur terpisah, seperti ukuran notch di Mac.', 'Width and height are set separately, like the notch size on Mac.')}>
+          <div class="slider"><input type="range" min={CLOSED_H_MIN} max={CLOSED_H_MAX} step="1" bind:value={ui.closedHeight} oninput={setWidth} aria-label={L('Tinggi notch', 'Notch height')} /><span class="val">{ui.closedHeight} px</span>
+            <button class="btn ghost" onclick={resetHeight} disabled={ui.closedHeight === CLOSED_H_DEFAULT} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+        </Setting>
       {/if}
       <Setting title={L('Ukuran panel', 'Panel size')}>
         <Segmented label={L('Ukuran panel', 'Panel size')} value={ui.scale} onchange={(v) => { ui.scale = v; setUi(); }}
@@ -366,6 +380,12 @@
           <label class="btn pick">{ui.bgImage ? L('Ganti gambar…', 'Change image…') : L('Pilih gambar…', 'Choose image…')}<input type="file" accept="image/*" hidden onchange={pickImage} /></label>
           {#if ui.bgImage}<button class="btn ghost" onclick={() => { ui.bgImage = ''; ui.bgMode = 'none'; setUi(); }}>{L('Hapus', 'Remove')}</button>{/if}
         </Setting>
+        {#if ui.bgImage}
+          <Setting stack title={L('Potong gambar', 'Crop image')}>
+            <CropPicker onchange={setUi} />
+          </Setting>
+        {/if}
+        <Setting toggle title={L('Pakai juga di Pengaturan', 'Also use in Settings')} desc={L('Gambar ini jadi latar jendela Pengaturan ini juga.', 'This image also becomes the background of this Settings window.')} bind:checked={ui.bgSettings} onchange={setUi} />
         <Setting stack title={L('Buram', 'Blur')}>
           <div class="slider"><input type="range" min="0" max="1" step="0.05" bind:value={ui.bgBlur} oninput={setUi} aria-label={L('Buram', 'Blur')} /><span class="val">{Math.round(ui.bgBlur * 100)}%</span></div>
         </Setting>
@@ -550,9 +570,11 @@
   .shell {
     --card: rgba(255, 255, 255, .05); --line: rgba(255, 255, 255, .08); --dim: rgba(243, 242, 248, .58); --faint: rgba(243, 242, 248, .42); --warn: #ffc666;
     --accent: #8f87ff;
-    display: flex; height: 100vh; color: #f3f2f8; font-size: 13px; user-select: none; color-scheme: dark;
+    position: relative; isolation: isolate; overflow: hidden; display: flex; height: 100vh; color: #f3f2f8; font-size: 13px; user-select: none; color-scheme: dark;
     background: radial-gradient(900px 500px at 15% -10%, #3b2a86 0%, transparent 60%), radial-gradient(700px 420px at 100% 110%, #a8478e 0%, transparent 55%), #14121f;
   }
+  .tbg { position: absolute; z-index: -2; pointer-events: none; }
+  .tdim { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #000; }
   nav { width: 232px; flex: none; display: flex; flex-direction: column; gap: 2px; padding: 18px 10px; background: rgba(0, 0, 0, .34); border-right: 1px solid rgba(255, 255, 255, .07); overflow-y: auto; scrollbar-width: none; }
   nav::-webkit-scrollbar, .pane::-webkit-scrollbar { display: none; width: 0; height: 0; }
   .brand { display: flex; align-items: center; gap: 10px; padding: 2px 8px 14px; }

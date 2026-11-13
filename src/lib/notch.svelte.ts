@@ -125,13 +125,16 @@ class Notch {
   /** Ukuran saat tertutup: lebar mengikuti pilihan di Pengaturan, sayap musik selalu 80 lebih lebar. Pill: sudut bulat penuh. */
   get closed() {
     const w = this.pill ? ui.pillWidth : ui.closedWidth;
-    const full = (h: number, r: number) => (this.pill ? h / 2 : r);
+    // Tinggi hanya bisa diatur di gaya notch; pill tetap 36. Kartu dan sayap ikut bergeser sebesar selisihnya.
+    const h = this.pill ? SIZES.idle.h : ui.closedHeight;
+    const d = h - SIZES.idle.h;
+    const full = (hh: number, r: number) => (this.pill ? hh / 2 : r);
     return {
-      idle: { w, h: SIZES.idle.h, r: full(SIZES.idle.h, SIZES.idle.r) },
-      media: { w: w + 80, h: SIZES.media.h, r: full(SIZES.media.h, SIZES.media.r) },
+      idle: { w, h, r: full(h, SIZES.idle.r) },
+      media: { w: w + 80, h: SIZES.media.h + d, r: full(h, SIZES.media.r) },
       // Sama dengan Mac: HUD = notch + sayap 76 di kiri dan kanan; kartu = 56 tinggi (Windows tanpa poni, jadi tanpa pita kosong di atas), lebar minimal 380.
-      hud: { w: w + 152, h: SIZES.idle.h, r: full(SIZES.idle.h, SIZES.idle.r) },
-      card: { w: Math.max(w + 220, 380), h: 56, r: full(56, 22) },
+      hud: { w: w + 152, h, r: full(h, SIZES.idle.r) },
+      card: { w: Math.max(w + 220, 380), h: 56 + d, r: full(56, 22) },
     };
   }
 

@@ -13,7 +13,7 @@
 
 <div class="stage" style:height="{height}px" class:open>
   <div class="bar"></div>
-  <div class="notch" class:pill style:width={open ? '' : `${closedW}px`} style:border-radius={pill ? '99px' : `0 0 ${ui.roundness}px ${ui.roundness}px`}>
+  <div class="notch" class:pill style:--nh={pill ? undefined : `${Math.round(ui.closedHeight * 0.9)}px`} style:width={open ? '' : `${closedW}px`} style:border-radius={pill ? '99px' : `0 0 ${ui.roundness}px ${ui.roundness}px`}>
     {#if open && bg}<span class="bg" style:background={bg.background}></span>{/if}
     {#if face && features.companion}<i class="eye"></i><i class="eye"></i>{/if}
   </div>
@@ -23,7 +23,7 @@
 <style>
   .stage { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(160deg, #1a1830, #3d2a63 55%, #6f3a7e); }
   .bar { position: absolute; top: 0; left: 0; right: 0; height: 22px; background: rgba(0, 0, 0, .28); }
-  .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #000; height: 32px; display: flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden; transition: width .15s, border-radius .15s, top .15s; max-width: 94%; }
+  .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #000; height: var(--nh, 32px); display: flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden; transition: width .15s, border-radius .15s, top .15s; max-width: 94%; }
   .notch.pill { top: 34px; }
   .bg { position: absolute; inset: 0; opacity: .95; }
   .eye { position: relative; width: 8px; height: 13px; background: var(--accent); border-radius: 50%; animation: blink 4s infinite; }

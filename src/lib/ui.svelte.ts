@@ -8,6 +8,10 @@ import { EMOTIONS, type Emotion, type Mode } from './companion';
 // Pilihan tampilan dan perilaku, sama dengan Pengaturan di Mac. Di Windows tidak ada poni, jadi lebar notch saat
 // tertutup bisa diatur supaya tidak menutupi tab browser atau judul jendela. Panel terbuka tidak ikut berubah.
 export const CLOSED_MIN = 70, CLOSED_MAX = 200, CLOSED_DEFAULT = 130;
+/** Tinggi notch saat tertutup (px). Bawaan 36, sama dengan sebelum ada pilihan ini. */
+export const CLOSED_H_MIN = 24, CLOSED_H_MAX = 56, CLOSED_H_DEFAULT = 36;
+/** Perbandingan lebar:tinggi panel terbuka; dipakai untuk memotong gambar latar. */
+export const PANEL_RATIO = 680 / 260;
 
 const mode = (v: unknown): Mode => (v === 'custom' || v === 'fixed' ? v : 'dynamic');
 const emotion = (v: unknown): Emotion => ((EMOTIONS as readonly string[]).includes(v as string) ? (v as Emotion) : 'happy');
@@ -36,6 +40,8 @@ export const THEME_PRESETS: { id: string; name: () => string; accent: string; mo
 
 class Ui {
   closedWidth = $state(clampW(load('ui.closedWidth', CLOSED_DEFAULT)));
+  /** Tinggi notch tertutup (hanya gaya notch; pill tetap 36). */
+  closedHeight = $state(clampH(load('ui.closedHeight', CLOSED_H_DEFAULT)));
   /** 'follow': mata mengikuti arah kursor (bawaan). 'blink': hanya berkedip. */
   eyesMode = $state<EyesMode>(load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink');
   /** Notch dibuka dengan klik, bukan saat kursor diarahkan. */
@@ -57,14 +63,29 @@ class Ui {
   /** Gambar latar (data URL JPEG, diperkecil) yang disimpan di penyimpanan app ini saja. */
   bgImage = $state(String(load('ui.bgImage', '')));
   bgDim = $state(Number(load('ui.bgDim', 0.35)));
+  /** Potongan gambar: titik fokus (0 sampai 100, seperti background-position), zoom (1 sampai 3), dan rasio lebar:tinggi gambar (0 = belum diketahui). */
+  bgPosX = $state(Number(load('ui.bgPosX', 50)));
+  bgPosY = $state(Number(load('ui.bgPosY', 50)));
+  bgZoom = $state(Number(load('ui.bgZoom', 1)));
+  bgAspect = $state(Number(load('ui.bgAspect', 0)));
+  /** Gambar latar juga dipakai sebagai latar jendela Pengaturan (hanya mode gambar; warna dan gradien selalu ikut). */
+  bgSettings = $state(Boolean(load('ui.bgSettings', true)));
   bgBlur = $state(Number(load('ui.bgBlur', 0)));
   /** CSS latar untuk panel terbuka dan pill; null = hitam bawaan. */
   get bgCss(): { background: string; image: boolean } | null {
     const a = this.bgAngle + 90; // 0 derajat = ke kanan, seperti di Mac
     if (this.bgMode === 'color') return { background: this.bgColor, image: false };
     if (this.bgMode === 'gradient') return { background: `linear-gradient(${a}deg, ${this.bgColor}, ${this.bgColor2})`, image: false };
-    if (this.bgMode === 'image' && this.bgImage) return { background: `url(${this.bgImage}) center / cover no-repeat`, image: true };
+    if (this.bgMode === 'image' && this.bgImage) return { background: this.imageCss(PANEL_RATIO), image: true };
     return null;
+  }
+  /** CSS gambar latar untuk kotak berbanding `ratio` (lebar:tinggi), dipotong sesuai titik fokus dan zoom. */
+  imageCss(ratio: number): string {
+    const pos = `${this.bgPosX}% ${this.bgPosY}%`;
+    const z = Math.min(3, Math.max(1, this.bgZoom));
+    if (!(this.bgAspect > 0)) return `url(${this.bgImage}) ${pos} / ${z === 1 ? 'cover' : `${z * 100}% auto`} no-repeat`;
+    const size = this.bgAspect >= ratio ? `auto ${z * 100}%` : `${z * 100}% auto`;
+    return `url(${this.bgImage}) ${pos} / ${size} no-repeat`;
   }
   /** Warna lirik (#rrggbb): baris yang sedang dinyanyikan dan baris lainnya; kosong = putih bawaan. */
   lyricAuto = $state(Boolean(load('ui.lyricAuto', false)));
@@ -99,10 +120,10 @@ class Ui {
   }
 
   persist() {
-    save('ui.closedWidth', this.closedWidth); save('ui.eyesMode', this.eyesMode); save('ui.openOnClick', this.openOnClick);
+    save('ui.closedWidth', this.closedWidth); save('ui.closedHeight', this.closedHeight); save('ui.eyesMode', this.eyesMode); save('ui.openOnClick', this.openOnClick);
     save('ui.hoverDelay', this.hoverDelay); save('ui.closeDelay', this.closeDelay); save('ui.scale', this.scale); save('ui.roundness', this.roundness); save('ui.equalizerColor', this.equalizerColor); save('ui.accentColor', this.accentColor); save('ui.lyricAuto', this.lyricAuto); save('ui.equalizerAuto', this.equalizerAuto); save('ui.lyricActive', this.lyricActive); save('ui.lyricIdle', this.lyricIdle);
     save('ui.display', this.display); save('ui.tabOrder', this.tabOrder);
-    save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur);
+    save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur); save('ui.bgPosX', this.bgPosX); save('ui.bgPosY', this.bgPosY); save('ui.bgZoom', this.bgZoom); save('ui.bgAspect', this.bgAspect); save('ui.bgSettings', this.bgSettings);
     save('ui.style', this.style); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
     save('ui.companionMode', this.companionMode); save('ui.companionFixed', this.companionFixed);
     save('ui.companionBlink', this.companionBlink); save('ui.companionMap', $state.snapshot(this.companionMap));
@@ -110,6 +131,7 @@ class Ui {
   }
   reload() {
     this.closedWidth = clampW(load('ui.closedWidth', CLOSED_DEFAULT));
+    this.closedHeight = clampH(load('ui.closedHeight', CLOSED_H_DEFAULT));
     this.eyesMode = load<string>('ui.eyesMode', 'follow') === 'follow' ? 'follow' : 'blink';
     this.openOnClick = load('ui.openOnClick', true);
     this.hoverDelay = load('ui.hoverDelay', 90);
@@ -129,6 +151,11 @@ class Ui {
     this.bgImage = String(load('ui.bgImage', ''));
     this.bgDim = Number(load('ui.bgDim', 0.35));
     this.bgBlur = Number(load('ui.bgBlur', 0));
+    this.bgPosX = Number(load('ui.bgPosX', 50));
+    this.bgPosY = Number(load('ui.bgPosY', 50));
+    this.bgZoom = Number(load('ui.bgZoom', 1));
+    this.bgAspect = Number(load('ui.bgAspect', 0));
+    this.bgSettings = Boolean(load('ui.bgSettings', true));
     this.applyAccent();
     this.display = load<string>('ui.display', 'main') === 'active' ? 'active' : 'main';
     this.tabOrder = load('ui.tabOrder', PAGES.map((p) => p.id as string));
@@ -182,5 +209,6 @@ class Ui {
     this.tabOrder = order;
   }
 }
+function clampH(h: number) { return Math.min(CLOSED_H_MAX, Math.max(CLOSED_H_MIN, Math.round(Number(h) || CLOSED_H_DEFAULT))); }
 function clampW(w: number) { return Math.min(CLOSED_MAX, Math.max(CLOSED_MIN, Math.round(Number(w) || CLOSED_DEFAULT))); }
 export const ui = new Ui();
