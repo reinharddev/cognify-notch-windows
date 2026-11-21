@@ -7,10 +7,14 @@
   import { L } from './lib/i18n';
   import { checkUpdate, initUpdate, installNow, update } from './lib/update.svelte';
   import { weather } from './lib/weather.svelte';
+  import { dock, ICON_MIN, ICON_MAX, MARGIN_MAX, MAX_LINKS, MAX_PRESETS } from './lib/dock.svelte';
+  import { MODULE_IDS, MIN_APP_SLOTS, type DockMode, type ModuleId } from './lib/dockLayout';
+  import { MODULE_INFO } from './lib/dockModules';
+  import { GLASS_OPACITY_MAX, GLASS_OPACITY_MIN, isHex, type DockBg } from './lib/dockStyle';
   import { ui, THEME_PRESETS, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, CLOSED_H_MIN, CLOSED_H_MAX, CLOSED_H_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
   import { pillLimits } from './lib/geometry';
   import { EMOTIONS, MODES, SITUATIONS, emotionLabel, situationLabel } from './lib/companion';
-  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search } from '@lucide/svelte';
+  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search, PanelBottom, X } from '@lucide/svelte';
   import CropPicker from './lib/settings/CropPicker.svelte';
   import PreviewStage from './lib/settings/PreviewStage.svelte';
   import { tick, onMount } from 'svelte';
@@ -18,20 +22,21 @@
   import Group from './lib/settings/Group.svelte';
   import Segmented from './lib/settings/Segmented.svelte';
 
-  type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'weather' | 'tabs' | 'data';
+  type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'dock' | 'weather' | 'tabs' | 'data';
   const panes: { id: PaneId; group: 0 | 1 | 2; label: () => string; desc: () => string; icon: typeof Settings }[] = [
     { id: 'general', group: 2, icon: Settings, label: () => L('Umum', 'General'), desc: () => L('Buka otomatis, bahasa, pintasan, dan pembaruan.', 'Launch at startup, language, shortcut, and updates.') },
     { id: 'appearance', group: 0, icon: Palette, label: () => L('Tampilan', 'Appearance'), desc: () => L('Bentuk, ukuran, dan warna notch.', 'Shape, size, and colors of the notch.') },
     { id: 'behavior', group: 0, icon: MousePointer2, label: () => L('Perilaku', 'Behavior'), desc: () => L('Cara notch terbuka dan tertutup, serta layar yang dipakai.', 'How the notch opens and closes, and which screen it uses.') },
     { id: 'companion', group: 0, icon: Smile, label: () => L('Teman kecil', 'Companion'), desc: () => L('Wajah di notch: ekspresi, kedipan, dan reaksi.', 'The face in the notch: expressions, blinking, and reactions.') },
     { id: 'features', group: 1, icon: ToggleRight, label: () => L('Fitur', 'Features'), desc: () => L('Pilih fitur notch yang ingin dipakai.', 'Choose which notch features to use.') },
+    { id: 'dock', group: 1, icon: PanelBottom, label: () => L('Dock & taskbar', 'Dock & taskbar'), desc: () => L('Beta. Taskbar kustom di tepi bawah: aplikasi, jam, dan tombol cepat.', 'Beta. A custom taskbar along the bottom: apps, clock, and quick buttons.') },
     { id: 'weather', group: 1, icon: CloudSun, label: () => L('Cuaca & kalender', 'Weather & calendar'), desc: () => L('Kota untuk cuaca dan sumber agenda.', 'The city for weather and the agenda sources.') },
     { id: 'tabs', group: 1, icon: ListOrdered, label: () => L('Urutan tab', 'Tab order'), desc: () => L('Atur urutan halaman di notch.', 'Arrange the pages in the notch.') },
     { id: 'data', group: 2, icon: Archive, label: () => L('Data', 'Data'), desc: () => L('Cadangkan atau pulihkan catatan, tugas, dan pengaturan.', 'Back up or restore notes, tasks, and settings.') },
   ];
 
   const GROUPS = [() => 'Notch', () => L('Fitur', 'Features'), () => L('App', 'App')];
-  const order: PaneId[] = ['appearance', 'behavior', 'companion', 'features', 'weather', 'tabs', 'general', 'data'];
+  const order: PaneId[] = ['appearance', 'behavior', 'companion', 'features', 'dock', 'weather', 'tabs', 'general', 'data'];
   const sidebar = $derived(order.map((id) => panes.find((p) => p.id === id)!).filter((p) => p.id !== 'data' || inTauri));
   let pane = $state<PaneId>('appearance');
   let query = $state('');
@@ -106,6 +111,43 @@
   ] as const;
 
   const setUi = () => { ui.persist(); ui.applyAccent(); void emitPrefs('ui'); };
+  const setDock = () => { dock.persist(); void emitPrefs('dock'); };
+  const restoreTaskbar = async () => { await cmd('taskbar_hide', { hidden: false }); dock.hideTaskbar = false; setDock(); };
+  // Lebar layar tempat dock tampil (piksel CSS). Dock hanya satu baris dan tidak boleh melewatinya.
+  const screenW = window.screen.availWidth;
+  const dockUse = $derived(dock.usage(screenW));
+  const addable = $derived(MODULE_IDS.filter((id) => !dock.layout.includes(id)));
+  /** Fitur lain yang dibutuhkan modul dock, bila belum menyala; null bila siap dipakai. */
+  function dockNeed(id: string): string | null {
+    if (id === 'media' && !features.media) return L('Nyalakan "Lagu & video yang diputar" di Fitur dulu.', 'Turn on "Now playing" in Features first.');
+    if (id === 'lyrics' && !features.lyrics) return L('Nyalakan Lirik di Fitur dulu.', 'Turn on Lyrics in Features first.');
+    if (id === 'weather' && !features.weather) return L('Nyalakan Cuaca di Fitur dan isi kota di Cuaca & kalender dulu.', 'Turn on Weather in Features and set a city in Weather & calendar first.');
+    if (id === 'clipboard' && !features.clipboard) return L('Nyalakan Clipboard di Fitur dulu.', 'Turn on Clipboard in Features first.');
+    return null;
+  }
+  // Modul yang sudah tersimpan tetapi tidak muat di layar ini (layar lebih kecil, ikon dibesarkan): tidak digambar, tapi tidak dihapus.
+  const overflowing = $derived(new Set(dock.layout.filter((id) => !dock.shown(screenW).includes(id))));
+  let newPreset = $state('');
+  let presetError = $state('');
+  let linkLabel = $state('');
+  let linkUrl = $state('');
+  let linkError = $state('');
+  const addPreset = () => {
+    const m = Number(newPreset);
+    if (!dock.addPreset(m)) presetError = dock.presets.length >= MAX_PRESETS ? L(`Paling banyak ${MAX_PRESETS} tombol.`, `At most ${MAX_PRESETS} buttons.`) : L('Isi menit antara 1 dan 180 yang belum ada.', 'Enter a minute count from 1 to 180 that is not there yet.');
+    else { presetError = ''; newPreset = ''; changeDockShape(); }
+  };
+  const addLink = () => {
+    const r = dock.addLink(linkLabel, linkUrl);
+    if (r === 'invalid') linkError = L('Alamat tidak valid. Pakai alamat situs, mis. youtube.com.', 'Invalid address. Use a site address, e.g. youtube.com.');
+    else if (r === 'full') linkError = L(`Paling banyak ${MAX_LINKS} tautan.`, `At most ${MAX_LINKS} links.`);
+    else { linkError = ''; linkLabel = ''; linkUrl = ''; changeDockShape(); }
+  };
+  /** Setelah ukuran atau jumlah tombol berubah: pastikan susunan masih muat di layar, lalu simpan dan beri tahu dock. */
+  const changeDockShape = () => { dock.refit(screenW); setDock(); };
+  const needs = (id: ModuleId) => dock.layout.includes(id);
+  const BG_SWATCH = ['#000000', '#1b1b26', '#14213d', '#2d1b3d', '#1b3b2f', '#3a1c71', '#7c2d3f', '#f5f5f7'];
+  const setBgColor = (key: 'bgColor' | 'bgColor2', v: string) => { if (isHex(v)) { dock.style[key] = v; setDock(); } };
   ui.applyAccent();
   let backupMsg = $state('');
   let confirmImport = $state<string | null>(null);
@@ -341,7 +383,8 @@
           options={[{ value: 1, label: L('Normal', 'Normal') }, { value: 1.12, label: L('Besar', 'Large') }]} />
       </Setting>
       <Setting stack title={L('Lengkung sudut bawah', 'Bottom corner roundness')}>
-        <div class="slider"><input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} /><span class="val">{ui.roundness} px</span></div>
+        <div class="slider"><input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} /><span class="val">{ui.roundness} px</span>
+          <button class="btn ghost" onclick={() => { ui.roundness = 30; setUi(); }} disabled={ui.roundness === 30} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
       </Setting>
     </Group>
 
@@ -356,11 +399,16 @@
       </div>
     </Group>
 
-    <Group title={L('Latar panel', 'Panel background')} hint={L('Notch tertutup yang menempel di atas tetap hitam; latar tampil di panel terbuka dan pill melayang. Gambar diperkecil dan disimpan di app ini saja.', 'The attached closed notch stays black; the background shows in the open panel and the floating pill. The image is downsized and stored in this app only.')}>
+    <Group title={L('Latar panel', 'Panel background')} hint={ui.idleThemed
+      ? L('Latar tampil di notch diam, panel terbuka, dan pill melayang. Mode Gambar memakai gambarnya di notch diam. Gambar diperkecil dan disimpan di app ini saja.', 'The background shows in the idle notch, the open panel, and the floating pill. Image mode uses the picture in the idle notch. The image is downsized and stored in this app only.')
+      : L('Notch tertutup yang menempel di atas tetap hitam; latar tampil di panel terbuka dan pill melayang. Gambar diperkecil dan disimpan di app ini saja.', 'The attached closed notch stays black; the background shows in the open panel and the floating pill. The image is downsized and stored in this app only.')}>
       <Setting title={L('Latar', 'Background')}>
         <Segmented label={L('Latar', 'Background')} value={ui.bgMode} onchange={(v) => { ui.bgMode = v; setUi(); }}
           options={[{ value: 'none', label: L('Hitam', 'Black') }, { value: 'color', label: L('Warna', 'Color') }, { value: 'gradient', label: L('Gradien', 'Gradient') }, { value: 'image', label: L('Gambar', 'Image') }]} />
       </Setting>
+      {#if ui.bgMode !== 'none'}
+        <Setting toggle title={L('Notch diam ikut latar', 'Idle notch follows the background')} desc={L('Notch tertutup memakai warna, gradien, atau gambar yang sama. Mati: notch tertutup tetap hitam.', 'The closed notch uses the same color, gradient, or image. Off: the closed notch stays black.')} bind:checked={ui.idleThemed} onchange={setUi} />
+      {/if}
       {#if ui.bgMode === 'color' || ui.bgMode === 'gradient'}
         <Setting title={ui.bgMode === 'gradient' ? L('Warna awal', 'Start color') : L('Warna', 'Color')}>
           <input type="color" value={ui.bgColor} aria-label={L('Warna', 'Color')} oninput={(e) => { ui.bgColor = e.currentTarget.value; setUi(); }} />
@@ -512,6 +560,164 @@
     </Group>
 
   {/if}
+  {#if show('dock')}
+    <Group title={L('Dock', 'Dock')}>
+      <Setting toggle title={L('Dock di tepi bawah layar', 'Dock along the bottom')} desc={L('Bilah yang menggabungkan aplikasi dan widget, dengan gaya notch. Isinya diatur di bawah.', 'A bar that combines apps and widgets, in the notch style. What it holds is set below.')} bind:checked={dock.enabled} onchange={setDock} />
+      <Setting toggle sub title={L('Sembunyikan taskbar Windows', 'Hide the Windows taskbar')} desc={L('Jendela lain memakai tinggi layar penuh. Taskbar kembali saat dock dimatikan atau Cognify Notch ditutup. Ikon tray lewat modul Ikon tersembunyi.', 'Other windows use the full screen height. The taskbar returns when the dock is turned off or Cognify Notch quits. Tray icons are behind the Hidden icons module.')}
+        disabled={!dock.enabled} why={L('Nyalakan dock dulu.', 'Turn on the dock first.')} bind:checked={dock.hideTaskbar} onchange={changeDockShape} />
+      {#if dock.taskbarError}<p class="empty">{dock.taskbarError}</p>{/if}
+      <Setting title={L('Posisi dock', 'Dock position')} desc={L('Berjarak dari tepi: bulat penuh dengan celah di atas tepi bawah layar. Rata dengan tepi: menempel di tepi bawah, hanya sudut atas yang bulat. (Terpisah dari bentuk notch di Tampilan.)', 'Gap from edge: fully rounded with a gap above the bottom of the screen. Flush: sits on the bottom edge, only the top corners rounded. (Separate from the notch shape in Appearance.)')}>
+        <Segmented label={L('Posisi dock', 'Dock position')} value={dock.mode} onchange={(v: DockMode) => { dock.mode = v; setDock(); }}
+          options={[{ value: 'floating', label: L('Berjarak dari tepi', 'Gap from edge') }, { value: 'attached', label: L('Rata dengan tepi', 'Flush') }]} />
+      </Setting>
+    </Group>
+
+    <Group title={L('Latar dock', 'Dock background')}>
+      <Setting title={L('Latar', 'Background')} desc={L('Ikut notch memakai latar dari Tampilan. Kaca tembus pandang. Warna dan gradien memakai warna sendiri; tulisan otomatis gelap atau terang mengikuti kecerahannya.', 'Follow the notch uses the background from Appearance. Glass is see-through. Color and gradient use your own colors; the text turns dark or light automatically to stay readable.')}>
+        <Segmented label={L('Latar dock', 'Dock background')} value={dock.style.bgMode} onchange={(v: DockBg) => { dock.style.bgMode = v; setDock(); }}
+          options={[{ value: 'notch', label: L('Ikut notch', 'Follow notch') }, { value: 'glass', label: L('Kaca', 'Glass') }, { value: 'color', label: L('Warna', 'Color') }, { value: 'gradient', label: L('Gradien', 'Gradient') }]} />
+      </Setting>
+      {#if dock.style.bgMode === 'notch'}
+        <!-- Memakai latar dari Tampilan > Latar panel; penjelasannya sudah ada di deskripsi di atas. -->
+      {:else if dock.style.bgMode === 'glass'}
+        <Setting stack title={L('Kepekatan kaca', 'Glass opacity')} desc={L('Makin kecil makin tembus pandang. Desktop di baliknya terlihat apa adanya (belum diburamkan).', 'Lower is more see-through. The desktop behind shows as it is (not blurred).')}>
+          <div class="slider"><input type="range" min={Math.round(GLASS_OPACITY_MIN * 100)} max={Math.round(GLASS_OPACITY_MAX * 100)} step="1" value={Math.round(dock.style.glassOpacity * 100)}
+            oninput={(e) => { dock.style.glassOpacity = Number(e.currentTarget.value) / 100; setDock(); }} aria-label={L('Kepekatan kaca', 'Glass opacity')} /><span class="val">{Math.round(dock.style.glassOpacity * 100)}%</span></div>
+        </Setting>
+      {:else}
+        <Setting title={dock.style.bgMode === 'gradient' ? L('Warna awal', 'Start color') : L('Warna', 'Color')}>
+          <span class="swatches">
+            {#each BG_SWATCH as c}<button class="chip" class:sel={dock.style.bgColor.toLowerCase() === c} style:background={c} aria-label={c} onclick={() => setBgColor('bgColor', c)}></button>{/each}
+            <input type="color" value={dock.style.bgColor} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => setBgColor('bgColor', e.currentTarget.value)} />
+          </span>
+        </Setting>
+        {#if dock.style.bgMode === 'gradient'}
+          <Setting title={L('Warna akhir', 'End color')}>
+            <span class="swatches">
+              {#each BG_SWATCH as c}<button class="chip" class:sel={dock.style.bgColor2.toLowerCase() === c} style:background={c} aria-label={c} onclick={() => setBgColor('bgColor2', c)}></button>{/each}
+              <input type="color" value={dock.style.bgColor2} aria-label={L('Warna sendiri', 'Custom color')} oninput={(e) => setBgColor('bgColor2', e.currentTarget.value)} />
+            </span>
+          </Setting>
+          <Setting stack title={L('Arah gradien', 'Gradient direction')}>
+            <div class="slider"><input type="range" min="0" max="360" step="5" bind:value={dock.style.bgAngle} oninput={setDock} aria-label={L('Arah gradien', 'Gradient direction')} /><span class="val">{dock.style.bgAngle}°</span></div>
+          </Setting>
+        {/if}
+      {/if}
+    </Group>
+
+    <Group title={L('Susunan dock', 'Dock layout')}>
+      <Setting stack title={L('Lebar terpakai', 'Width used')} desc={L(`Dock selalu satu baris dan tidak pernah melewati layar. Aplikasi disisakan tempat untuk paling sedikit ${MIN_APP_SLOTS} ikon.`, `The dock is always one row and never goes past the screen. Apps keep room for at least ${MIN_APP_SLOTS} icons.`)}>
+        <div class="meter" class:full={dockUse.ratio > 0.9} role="img" aria-label={L(`Terpakai ${dockUse.used} dari ${dockUse.max} piksel`, `${dockUse.used} of ${dockUse.max} pixels used`)}>
+          <i style:width="{Math.round(dockUse.ratio * 100)}%"></i><span>{dockUse.used} / {dockUse.max} px</span>
+        </div>
+      </Setting>
+      {#each dock.layout as id, i (id)}
+        {@const info = MODULE_INFO[id]}
+        <Setting title={info.label() + (overflowing.has(id) ? ' · ' + L('tidak muat, tidak ditampilkan', 'does not fit, not shown') : '')} desc={info.desc() + (dockNeed(id) ? ' ' + dockNeed(id) : '')}>
+          <button class="btn ghost" aria-label={L('Geser ke kiri', 'Move left')} disabled={i === 0} onclick={() => { dock.move(id, -1); setDock(); }}><ArrowUp size={14} /></button>
+          <button class="btn ghost" aria-label={L('Geser ke kanan', 'Move right')} disabled={i === dock.layout.length - 1} onclick={() => { dock.move(id, 1); setDock(); }}><ArrowDown size={14} /></button>
+          <button class="btn ghost" aria-label={L('Hapus dari dock', 'Remove from the dock')} onclick={() => { dock.remove(id); setDock(); }}><X size={14} /></button>
+        </Setting>
+      {/each}
+      {#if dock.layout.length === 0}<p class="empty">{L('Dock kosong. Tambahkan modul di bawah.', 'The dock is empty. Add a module below.')}</p>{/if}
+    </Group>
+
+    {#if addable.length > 0}
+      <Group title={L('Tambah modul', 'Add a module')}>
+        {#each addable as id (id)}
+          {@const info = MODULE_INFO[id]}
+          {@const check = dock.check(id, screenW)}
+          {@const need = dockNeed(id)}
+          <Setting title={info.label()} desc={info.desc()} disabled={!check.ok || !!need} why={!check.ok ? L('Dock sudah penuh selebar layar. Hapus modul lain atau kecilkan ikon dulu.', 'The dock is as wide as the screen. Remove another module or shrink the icons first.') : (need ?? '')}>
+            <button class="btn" disabled={!check.ok || !!need} onclick={() => { dock.add(id, screenW); setDock(); }}>{L('Tambah', 'Add')}</button>
+          </Setting>
+        {/each}
+      </Group>
+    {/if}
+
+    <Group title={L('Ukuran', 'Size')}>
+      <Setting stack title={L('Ukuran ikon', 'Icon size')}>
+        <div class="slider"><input type="range" min={ICON_MIN} max={ICON_MAX} step="2" bind:value={dock.iconSize} oninput={changeDockShape} aria-label={L('Ukuran ikon', 'Icon size')} /><span class="val">{dock.iconSize} px</span>
+          <button class="btn ghost" onclick={() => { dock.iconSize = 40; changeDockShape(); }} disabled={dock.iconSize === 40} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+      </Setting>
+      <Setting stack title={L('Pembesaran', 'Magnification')} desc={L('Ikon yang dilewati kursor membesar seperti di Dock macOS: tumbuh ke atas, tetangganya ikut membesar, dan dock melebar. Atur ukuran ikon kecil dan pembesaran besar untuk tampilan itu.', 'Icons under the pointer grow like the macOS Dock: they rise, neighbours grow too, and the dock widens. Pick a small icon size and a large magnification for that look.')}>
+        <div class="slider"><input type="range" min="0" max="100" step="5" bind:value={dock.magnify} oninput={setDock} aria-label={L('Pembesaran', 'Magnification')} /><span class="val">{dock.magnify < 1 ? L('Mati', 'Off') : dock.magnify}</span>
+          <button class="btn ghost" onclick={() => { dock.magnify = 65; setDock(); }} disabled={dock.magnify === 65} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+      </Setting>
+      <Setting stack title={L('Kebulatan dock', 'Dock roundness')} desc={L('100 = kapsul penuh. Sel, ikon, dan tombol di dalamnya ikut membulat dengan rumus yang sama (radius dock dikurangi jaraknya ke tepi).', '100 = a full capsule. Cells, icons and buttons inside follow with the same rule (dock radius minus their distance to the edge).')}>
+        <div class="slider"><input type="range" min="0" max="100" step="5" bind:value={dock.round} oninput={setDock} aria-label={L('Kebulatan dock', 'Dock roundness')} /><span class="val">{dock.round}%</span>
+          <button class="btn ghost" onclick={() => { dock.round = 100; setDock(); }} disabled={dock.round === 100} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+      </Setting>
+      <Setting stack title={L('Jarak dari tepi bawah', 'Distance from the bottom')} disabled={dock.mode === 'attached'} why={L('Tidak dipakai saat dock menempel.', 'Not used while the dock is attached.')}>
+        <div class="slider"><input type="range" min="0" max={MARGIN_MAX} step="2" bind:value={dock.margin} oninput={setDock} aria-label={L('Jarak dari tepi bawah', 'Distance from the bottom')} disabled={dock.mode === 'attached'} /><span class="val">{dock.margin} px</span>
+          <button class="btn ghost" onclick={() => { dock.margin = 10; setDock(); }} disabled={dock.margin === 10} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
+      </Setting>
+    </Group>
+
+    {#if needs('timer')}
+      <Group title={L('Timer cepat', 'Quick timer')}>
+        {#each dock.presets as m (m)}
+          <Setting title={L(`${m} menit`, `${m} minutes`)}>
+            <button class="btn ghost" aria-label={L('Hapus preset', 'Remove preset')} disabled={dock.presets.length <= 1} onclick={() => { dock.removePreset(m); changeDockShape(); }}><X size={14} /></button>
+          </Setting>
+        {/each}
+        {#if dock.presets.length < MAX_PRESETS}
+          <Setting title={L('Tambah preset', 'Add a preset')} desc={L('Menit, 1 sampai 180.', 'Minutes, 1 to 180.')}>
+            <input class="num" type="number" min="1" max="180" bind:value={newPreset} aria-label={L('Menit', 'Minutes')} onkeydown={(e) => e.key === 'Enter' && addPreset()} />
+            <button class="btn" onclick={addPreset}>{L('Tambah', 'Add')}</button>
+          </Setting>
+        {/if}
+        {#if presetError}<p class="empty">{presetError}</p>{/if}
+      </Group>
+    {/if}
+
+    {#if needs('links')}
+      <Group title={L('Pintasan tautan', 'Link shortcuts')}>
+        {#each dock.links as l (l.id)}
+          <Setting title={l.label} desc={l.url}>
+            <button class="btn ghost" aria-label={L('Hapus tautan', 'Remove link')} onclick={() => { dock.removeLink(l.id); changeDockShape(); }}><X size={14} /></button>
+          </Setting>
+        {/each}
+        {#if dock.links.length < MAX_LINKS}
+          <Setting stack title={L('Tambah tautan', 'Add a link')} desc={L('Hanya alamat web (http atau https). Tidak ada ikon situs yang diunduh.', 'Web addresses only (http or https). No site icons are downloaded.')}>
+            <div class="linkform">
+              <input type="text" placeholder={L('Nama (boleh kosong)', 'Name (optional)')} bind:value={linkLabel} maxlength="24" aria-label={L('Nama tautan', 'Link name')} />
+              <input type="text" placeholder="youtube.com" bind:value={linkUrl} aria-label={L('Alamat tautan', 'Link address')} onkeydown={(e) => e.key === 'Enter' && addLink()} />
+              <button class="btn" onclick={addLink}>{L('Tambah', 'Add')}</button>
+            </div>
+          </Setting>
+        {/if}
+        {#if linkError}<p class="empty">{linkError}</p>{/if}
+      </Group>
+    {/if}
+
+    {#if (needs('weather') && !features.weather) || (needs('lyrics') && !features.lyrics) || (needs('clipboard') && !features.clipboard)}
+      <Group title={L('Perlu dinyalakan', 'Needs turning on')}>
+        {#if needs('weather') && !features.weather}<p class="empty">{L('Cuaca mati. Nyalakan di Fitur, lalu isi kota di Cuaca & kalender.', 'Weather is off. Turn it on in Features, then set a city in Weather & calendar.')}</p>{/if}
+        {#if needs('lyrics') && !features.lyrics}<p class="empty">{L('Lirik mati. Nyalakan di Fitur > Musik.', 'Lyrics is off. Turn it on in Features > Music.')}</p>{/if}
+        {#if needs('clipboard') && !features.clipboard}<p class="empty">{L('Riwayat clipboard mati. Nyalakan di Fitur > Produktivitas.', 'Clipboard history is off. Turn it on in Features > Productivity.')}</p>{/if}
+      </Group>
+    {/if}
+
+    <Group title={L('Aplikasi yang disematkan', 'Pinned apps')}>
+      {#each dock.pins as p, i (p.exe)}
+        <Setting title={p.name} desc={p.exe}>
+          <button class="btn ghost" aria-label={L('Naik (lebih ke kiri di dock)', 'Move up (further left in the dock)')} disabled={i === 0} onclick={() => dock.nudgePin(p.exe, -1)}><ArrowUp size={14} /></button>
+          <button class="btn ghost" aria-label={L('Turun (lebih ke kanan di dock)', 'Move down (further right in the dock)')} disabled={i === dock.pins.length - 1} onclick={() => dock.nudgePin(p.exe, 1)}><ArrowDown size={14} /></button>
+          <button class="btn ghost" aria-label={L('Lepas sematan', 'Unpin')} onclick={() => dock.togglePin(p.exe, p.name)}><X size={14} /></button>
+        </Setting>
+      {/each}
+      {#if dock.pins.length === 0}<p class="empty">{L('Belum ada. Klik kanan ikon aplikasi di dock, lalu pilih Sematkan.', 'None yet. Right-click an app icon in the dock, then choose Pin.')}</p>{/if}
+    </Group>
+    {#if inTauri}
+      <Group title={L('Jika taskbar hilang', 'If the taskbar is missing')}>
+        <Setting title={L('Pulihkan taskbar Windows', 'Restore the Windows taskbar')} desc={L('Menampilkan taskbar Windows seperti semula. Juga ada di menu ikon tray Cognify Notch.', 'Shows the Windows taskbar as it was. Also in the Cognify Notch tray menu.')}>
+          <button class="btn" onclick={restoreTaskbar}>{L('Pulihkan', 'Restore')}</button>
+        </Setting>
+      </Group>
+    {/if}
+
+  {/if}
   {#if show('weather')}
     <Group title={L('Cuaca', 'Weather')}>
       {@render tog('weather')}
@@ -571,7 +777,7 @@
     --card: rgba(255, 255, 255, .05); --line: rgba(255, 255, 255, .08); --dim: rgba(243, 242, 248, .58); --faint: rgba(243, 242, 248, .42); --warn: #ffc666;
     --accent: #8f87ff;
     position: relative; isolation: isolate; overflow: hidden; display: flex; height: 100vh; color: #f3f2f8; font-size: 13px; user-select: none; color-scheme: dark;
-    background: radial-gradient(900px 500px at 15% -10%, #3b2a86 0%, transparent 60%), radial-gradient(700px 420px at 100% 110%, #a8478e 0%, transparent 55%), #14121f;
+    background: radial-gradient(900px 420px at 15% -10%, rgba(59, 42, 134, .32) 0%, transparent 60%), #14121f;
   }
   .tbg { position: absolute; z-index: -2; pointer-events: none; }
   .tdim { position: absolute; inset: 0; z-index: -1; pointer-events: none; background: #000; }
@@ -587,7 +793,7 @@
   .search input { width: 100%; box-sizing: border-box; border: 0; border-radius: 99px; padding: 7px 12px 7px 32px; background: rgba(255, 255, 255, .07); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08); color: inherit; font: inherit; outline: none; user-select: text; }
   .search input:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
   .search input::-webkit-search-cancel-button { display: none; }
-  .grpname { color: var(--faint); text-transform: uppercase; letter-spacing: .09em; font-size: 10px; font-weight: 600; padding: 14px 10px 4px; }
+  .grpname { color: var(--faint); font-size: 11px; font-weight: 600; padding: 14px 10px 4px; }
   .tab { position: relative; display: flex; align-items: center; gap: 9px; border: 0; background: none; color: var(--dim); font: inherit; text-align: left; padding: 7px 10px; border-radius: 12px; cursor: pointer; transition: background .15s, color .15s; }
   .tab span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .tab:hover { background: rgba(255, 255, 255, .06); color: #fff; }
@@ -657,4 +863,10 @@
     .tab { justify-content: center; padding: 9px 0; }
     .inner { padding: 20px 16px 32px; }
   }
+.meter { position: relative; height: 22px; border-radius: 99px; background: rgba(255, 255, 255, .08); overflow: hidden; width: 100%; }
+  .meter i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: color-mix(in srgb, var(--accent) 55%, transparent); transition: width .2s; }
+  .meter.full i { background: color-mix(in srgb, #ff9f0a 65%, transparent); }
+  .meter span { position: relative; display: block; text-align: center; font-size: 11px; font-weight: 650; line-height: 22px; font-variant-numeric: tabular-nums; }
+  .linkform { display: flex; flex-wrap: wrap; gap: 8px; width: 100%; }
+  .linkform input { flex: 1 1 120px; }
 </style>

@@ -70,6 +70,8 @@ class Ui {
   bgAspect = $state(Number(load('ui.bgAspect', 0)));
   /** Gambar latar juga dipakai sebagai latar jendela Pengaturan (hanya mode gambar; warna dan gradien selalu ikut). */
   bgSettings = $state(Boolean(load('ui.bgSettings', true)));
+  /** Notch diam (tertutup) ikut latar: warna, gradien, atau gambar dipakai juga di notch diam, bukan hanya panel terbuka. */
+  idleThemed = $state(Boolean(load('ui.idleThemed', true)));
   bgBlur = $state(Number(load('ui.bgBlur', 0)));
   /** CSS latar untuk panel terbuka dan pill; null = hitam bawaan. */
   get bgCss(): { background: string; image: boolean } | null {
@@ -123,7 +125,7 @@ class Ui {
     save('ui.closedWidth', this.closedWidth); save('ui.closedHeight', this.closedHeight); save('ui.eyesMode', this.eyesMode); save('ui.openOnClick', this.openOnClick);
     save('ui.hoverDelay', this.hoverDelay); save('ui.closeDelay', this.closeDelay); save('ui.scale', this.scale); save('ui.roundness', this.roundness); save('ui.equalizerColor', this.equalizerColor); save('ui.accentColor', this.accentColor); save('ui.lyricAuto', this.lyricAuto); save('ui.equalizerAuto', this.equalizerAuto); save('ui.lyricActive', this.lyricActive); save('ui.lyricIdle', this.lyricIdle);
     save('ui.display', this.display); save('ui.tabOrder', this.tabOrder);
-    save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur); save('ui.bgPosX', this.bgPosX); save('ui.bgPosY', this.bgPosY); save('ui.bgZoom', this.bgZoom); save('ui.bgAspect', this.bgAspect); save('ui.bgSettings', this.bgSettings);
+    save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur); save('ui.bgPosX', this.bgPosX); save('ui.bgPosY', this.bgPosY); save('ui.bgZoom', this.bgZoom); save('ui.bgAspect', this.bgAspect); save('ui.bgSettings', this.bgSettings); save('ui.idleThemed', this.idleThemed);
     save('ui.style', this.style); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
     save('ui.companionMode', this.companionMode); save('ui.companionFixed', this.companionFixed);
     save('ui.companionBlink', this.companionBlink); save('ui.companionMap', $state.snapshot(this.companionMap));
@@ -156,6 +158,7 @@ class Ui {
     this.bgZoom = Number(load('ui.bgZoom', 1));
     this.bgAspect = Number(load('ui.bgAspect', 0));
     this.bgSettings = Boolean(load('ui.bgSettings', true));
+    this.idleThemed = Boolean(load('ui.idleThemed', true));
     this.applyAccent();
     this.display = load<string>('ui.display', 'main') === 'active' ? 'active' : 'main';
     this.tabOrder = load('ui.tabOrder', PAGES.map((p) => p.id as string));

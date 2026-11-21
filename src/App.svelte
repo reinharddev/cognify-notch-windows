@@ -10,8 +10,10 @@
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
   import { news } from './lib/news.svelte';
+  import { TINT } from './lib/icons';
   import { device, features } from './lib/system.svelte';
   import { ticker } from './lib/store.svelte';
+  import { dock } from './lib/dock.svelte';
   import { notchLink } from './lib/link.svelte';
   import Home from './lib/pages/Home.svelte';
   import Music from './lib/pages/Music.svelte';
@@ -51,12 +53,15 @@
   syncEyes();
   $effect.root(() => { $effect(() => { void cmd('set_layout', { mode: ui.style }); }); });
   void cmd('set_display', { mode: ui.display });
+  // Timer cepat di dock selesai: kartu di notch (bunyinya sudah dimainkan oleh dock).
+  on<number>('dock-timer-done', (minutes) => news.device(L('Timer selesai', 'Timer done'), L(`${minutes} menit berlalu`, `${minutes} minutes are up`), 'timer', TINT.accent));
   on<string>('prefs-changed', (scope) => {
     if (scope === 'features') { features.reload(); weather.reload(); syncEyes(); hotkey.apply(); }
     else if (scope === 'weather') weather.reload();
     else if (scope === 'agenda') agenda.reload();
     else if (scope === 'hotkey') hotkey.reload();
     else if (scope === 'ui') { const r = ui.roundness; ui.reload(); syncEyes(); if (ui.roundness !== r) notch.previewShape(); }
+    else if (scope === 'dock') { dock.reload(); void dock.apply(); }
     else if (scope === 'reload') location.reload();
   });
 
@@ -119,6 +124,7 @@
     ui.applyAccent();
     void notchLink.start();
     hub.start();
+    void dock.apply();
     const p0 = notch.pos;
     spring = new Spring({ x: p0.x, y: p0.y, w: p0.w, h: p0.h, r: p0.r }, (v) => {
       shellEl.style.left = `${v.x}px`;
@@ -179,7 +185,7 @@
   onpointerleave={() => { if (!inTauri) notch.leave(); }}
 >
   <div class="shell" class:open={notch.open} class:pillmode={notch.pill} class:ax-left={notch.geo.ax === 'left'} class:ax-right={notch.geo.ax === 'right'} bind:this={shellEl}>
-    {#if ui.bgCss && (notch.open || notch.pill)}
+    {#if ui.bgCss && (notch.open || notch.pill || ui.idleThemed)}
       <div class="bglayer" aria-hidden="true" style:background={ui.bgCss.background} style:filter={ui.bgCss.image && ui.bgBlur > 0 ? `blur(${ui.bgBlur * 16}px)` : undefined} style:inset={ui.bgCss.image && ui.bgBlur > 0 ? '-24px' : '0'}></div>
       <div class="bgdim" aria-hidden="true" style:opacity={ui.bgMode === 'color' ? 0 : ui.bgDim}></div>
     {/if}
@@ -196,7 +202,8 @@
                 title={L(`Baterai ${device.power.percent}%`, `Battery ${device.power.percent}%`)}>{device.power.charging ? '⚡' : ''}{device.power.percent}%</span>
               {#if device.power.power_saver_available}
                 <button class="power-saver" class:on={device.power.power_saver} aria-label={L('Mode hemat daya', 'Power saver mode')}
-                  title={device.power.power_saver ? L('Efisiensi daya aktif · klik untuk mematikan', 'Power efficiency on · click to turn off') : L('Nyalakan efisiensi daya', 'Turn on power efficiency')}
+                  title={(device.power.power_saver ? L('Efisiensi daya aktif · klik untuk mematikan', 'Power efficiency on · click to turn off') : L('Nyalakan efisiensi daya', 'Turn on power efficiency')) + (device.power.plugged ? L(' (saat tersambung charger)', ' (while plugged in)') : L(' (saat memakai baterai)', ' (on battery)'))}
+                  aria-pressed={device.power.power_saver}
                   onclick={(event) => { event.stopPropagation(); void togglePowerSaver(); }}><Leaf size={12} /></button>
               {/if}
             {/if}
@@ -320,7 +327,7 @@
   .batt { font-size: 11px; font-weight: 600; }
   .batt.chg { color: #5fd38d; }
   .batt.low { color: #ff6b63; }
-  .power-saver { display: grid; place-items: center; width: 20px; height: 20px; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; }
+  .power-saver { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; line-height: 0; flex: none; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; }
   .power-saver:hover { background: rgba(255,255,255,.1); }
   .power-saver.on { border-color: rgba(76,217,100,.55); background: rgba(76,217,100,.17); color: #4cd964; }
   .gear { border: 0; background: none; cursor: pointer; opacity: .5; font-size: 14px; padding: 0 2px; }

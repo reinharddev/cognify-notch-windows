@@ -11,7 +11,7 @@
 
 <style>
   .grp { margin-top: 22px; }
-  h3 { margin: 0 0 7px 4px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); display: flex; justify-content: space-between; align-items: center; }
+  h3 { margin: 0 0 7px 4px; font-size: 12px; font-weight: 600; color: var(--faint); display: flex; justify-content: space-between; align-items: center; }
   h3 button { border: 0; background: none; color: var(--accent); font: inherit; font-size: 12px; text-transform: none; letter-spacing: 0; cursor: pointer; padding: 0 2px; }
   h3 button:hover { text-decoration: underline; }
   .card { background: var(--card); border: 1px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); border-radius: 12px; overflow: hidden; }

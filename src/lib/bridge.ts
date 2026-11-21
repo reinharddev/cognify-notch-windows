@@ -5,9 +5,12 @@ import { emit, listen } from '@tauri-apps/api/event';
 
 export const inTauri = '__TAURI_INTERNALS__' in window;
 
-/** Jendela yang menjalankan kode ini: 'notch' (jendela utama) atau 'settings'. Di browser: ?w=settings. */
-export const windowKind: 'notch' | 'settings' =
-  ((window as unknown as { __CN_WINDOW__?: string }).__CN_WINDOW__ ?? new URLSearchParams(location.search).get('w')) === 'settings' ? 'settings' : 'notch';
+/** Jendela yang menjalankan kode ini: 'notch' (jendela utama), 'settings', atau 'taskdock' (dock). Di browser: ?w=settings atau ?w=taskdock. */
+export type WindowKind = 'notch' | 'settings' | 'taskdock';
+export const windowKind: WindowKind = (() => {
+  const raw = (window as unknown as { __CN_WINDOW__?: string }).__CN_WINDOW__ ?? new URLSearchParams(location.search).get('w');
+  return raw === 'settings' || raw === 'taskdock' ? raw : 'notch';
+})();
 
 /** Jendela Pengaturan terpisah. Di browser biasa dibuka sebagai tab baru. */
 export function openSettings() {
@@ -16,7 +19,7 @@ export function openSettings() {
 }
 
 /** Bagian pengaturan yang berubah; jendela notch memuat ulang bagian itu dari penyimpanan bersama. */
-export type PrefScope = 'features' | 'weather' | 'agenda' | 'hotkey' | 'ui' | 'reload';
+export type PrefScope = 'features' | 'weather' | 'agenda' | 'hotkey' | 'ui' | 'dock' | 'reload';
 export async function emitPrefs(scope: PrefScope) {
   if (!inTauri) return;
   void emit('prefs-changed', scope);

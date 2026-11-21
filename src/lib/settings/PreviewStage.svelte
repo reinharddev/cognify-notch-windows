@@ -14,7 +14,7 @@
 <div class="stage" style:height="{height}px" class:open>
   <div class="bar"></div>
   <div class="notch" class:pill style:--nh={pill ? undefined : `${Math.round(ui.closedHeight * 0.9)}px`} style:width={open ? '' : `${closedW}px`} style:border-radius={pill ? '99px' : `0 0 ${ui.roundness}px ${ui.roundness}px`}>
-    {#if open && bg}<span class="bg" style:background={bg.background}></span>{/if}
+    {#if (open || ui.idleThemed) && bg}<span class="bg" style:background={bg.background}></span>{/if}
     {#if face && features.companion}<i class="eye"></i><i class="eye"></i>{/if}
   </div>
   <div class="hint">{L('Pratinjau langsung', 'Live preview')} <button type="button" onclick={() => (open = !open)}>{L('Buka / tutup', 'Open / close')}</button></div>

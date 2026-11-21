@@ -12,6 +12,9 @@ mod imp;
 
 pub use imp::*;
 
+mod dock;
+pub use dock::*;
+
 #[derive(Clone, PartialEq, Serialize)]
 pub struct Power {
     pub percent: u8,
@@ -58,4 +61,18 @@ pub struct ClipEvent {
     pub text: String,
     pub image: Option<String>,
     pub app: Option<String>,
+}
+
+/// Jendela yang tampil di taskbar, untuk dock.
+#[derive(Clone, PartialEq, Serialize)]
+pub struct DockWindow {
+    /// Pegangan jendela (HWND) sebagai bilangan bulat.
+    pub id: i64,
+    pub title: String,
+    /// Jalur program, mis. `C:\\Program Files\\App\\app.exe`.
+    pub exe: String,
+    /// Nama tampilan dari nama berkas program.
+    pub name: String,
+    /// Jendela ini sedang di depan.
+    pub active: bool,
 }

@@ -51,7 +51,7 @@ pub fn power() -> Option<Power> {
     if s.BatteryFlag & 128 != 0 || s.BatteryLifePercent > 100 {
         return None;
     }
-    let saver = power_saver_status();
+    let saver = power_saver_status(s.ACLineStatus == 1);
     Some(Power {
         percent: s.BatteryLifePercent,
         charging: s.BatteryFlag & 8 != 0,
@@ -64,11 +64,14 @@ pub fn power() -> Option<Power> {
 const POWER_MODE_BEST_EFFICIENCY: GUID = GUID::from_u128(0x961cc777_2547_4f9d_8174_7d86181b8a7a);
 const POWER_MODE_BALANCED: GUID = GUID::from_u128(0x00000000_0000_0000_0000_000000000000);
 
-/// Mode daya DC di Windows 11. API dimuat dinamis agar Windows 10 tetap bisa menjalankan app.
-fn power_saver_status() -> Option<bool> {
+/// Mode daya Windows 11 untuk sumber daya yang sedang dipakai: saat tersambung charger (AC) atau memakai baterai (DC).
+/// Windows menyimpan keduanya terpisah, jadi tombol harus mengubah yang sedang aktif supaya langsung terasa.
+/// API dimuat dinamis agar Windows 10 tetap bisa menjalankan app.
+fn power_saver_status(ac: bool) -> Option<bool> {
     unsafe {
         let module = LoadLibraryW(w!("PowrProf.dll")).ok()?;
-        let address = GetProcAddress(module, windows::core::s!("PowerGetUserConfiguredDCPowerMode"));
+        let name = if ac { windows::core::s!("PowerGetUserConfiguredACPowerMode") } else { windows::core::s!("PowerGetUserConfiguredDCPowerMode") };
+        let address = GetProcAddress(module, name);
         let result = address.map(|address| {
             let get: unsafe extern "system" fn(*mut GUID) -> u32 = std::mem::transmute(address);
             let mut mode = GUID::zeroed();
@@ -79,10 +82,17 @@ fn power_saver_status() -> Option<bool> {
     }
 }
 
+fn on_ac() -> bool {
+    let mut s = SYSTEM_POWER_STATUS::default();
+    unsafe { GetSystemPowerStatus(&mut s).is_ok() && s.ACLineStatus == 1 }
+}
+
 pub fn set_power_saver(enabled: bool) -> Result<bool, String> {
+    let ac = on_ac();
     unsafe {
         let module = LoadLibraryW(w!("PowrProf.dll")).map_err(|_| "Mode hemat daya cepat perlu Windows 11".to_string())?;
-        let address = GetProcAddress(module, windows::core::s!("PowerSetUserConfiguredDCPowerMode"));
+        let name = if ac { windows::core::s!("PowerSetUserConfiguredACPowerMode") } else { windows::core::s!("PowerSetUserConfiguredDCPowerMode") };
+        let address = GetProcAddress(module, name);
         let Some(address) = address else {
             let _ = FreeLibrary(module);
             return Err("Mode hemat daya cepat perlu Windows 11".into());
@@ -92,7 +102,7 @@ pub fn set_power_saver(enabled: bool) -> Result<bool, String> {
         let status = set(mode);
         let _ = FreeLibrary(module);
         if status != 0 { return Err(format!("Windows gagal mengubah mode daya ({status})")); }
-        Ok(power_saver_status().unwrap_or(enabled))
+        Ok(power_saver_status(ac).unwrap_or(enabled))
     }
 }
 

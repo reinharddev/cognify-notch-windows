@@ -7,6 +7,7 @@
 //! ke antarmuka lewat perintah dan peristiwa.
 
 mod link;
+mod taskdock;
 mod updater;
 mod winsys;
 
@@ -776,6 +777,7 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
         .manage(Shared::default())
+        .manage(taskdock::TaskDock::default())
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
             set_hit_rect,
@@ -818,7 +820,18 @@ pub fn run() {
             update_download,
             update_apply,
             autostart_get,
-            autostart_set
+            autostart_set,
+            taskdock::taskdock_open,
+            taskdock::taskdock_close,
+            taskdock::taskdock_resize,
+            taskdock::taskdock_snapshot,
+            taskdock::taskdock_activate,
+            taskdock::taskdock_toggle,
+            taskdock::taskdock_close_window,
+            taskdock::taskdock_icon,
+            taskdock::taskdock_keys,
+            taskdock::taskbar_hide,
+            taskdock::taskbar_peek
         ])
         .on_window_event(|window, event| {
             // File yang dijatuhkan ke notch masuk Tray (bukan yang dijatuhkan ke jendela lain).
@@ -831,6 +844,8 @@ pub fn run() {
             }
         })
         .setup(|app| {
+            // Taskbar Windows yang tertinggal tersembunyi oleh app yang macet dikembalikan sebelum apa pun.
+            taskdock::recover(app.handle());
             let window = app.get_webview_window("notch").expect("jendela notch tidak ada");
             dock(&window)?;
             window.set_ignore_cursor_events(true)?;
@@ -840,8 +855,9 @@ pub fn run() {
             // klik kanan membuka menu.
             let toggle = MenuItem::with_id(app, "toggle", "Sembunyikan notch", true, None::<&str>)?;
             let settings = MenuItem::with_id(app, "settings", "Pengaturan…", true, None::<&str>)?;
+            let taskbar = MenuItem::with_id(app, "taskbar", "Pulihkan taskbar Windows", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "Keluar", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&toggle, &settings, &PredefinedMenuItem::separator(app)?, &quit])?;
+            let menu = Menu::with_items(app, &[&toggle, &settings, &taskbar, &PredefinedMenuItem::separator(app)?, &quit])?;
             let toggle_label = toggle.clone();
             let flip = move |app: &AppHandle| {
                 let s = app.state::<Shared>();
@@ -864,6 +880,11 @@ pub fn run() {
                         let app = app.clone();
                         tauri::async_runtime::spawn(async move { open_settings(app).await });
                     }
+                    // Jalan keluar bila dock bermasalah: taskbar Windows kembali apa pun keadaannya.
+                    "taskbar" => {
+                        let _ = taskdock::taskbar_hide(app.clone(), false);
+                        let _ = app.emit("taskdock-restored", ());
+                    }
                     "quit" => app.exit(0),
                     _ => {}
                 })
@@ -879,8 +900,15 @@ pub fn run() {
             watch_clipboard(app.handle().clone());
             watch_downloads(app.handle().clone());
             watch_cursor(app.handle().clone(), window);
+            taskdock::watch(app.handle().clone());
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("Cognify Notch gagal dijalankan");
+        .build(tauri::generate_context!())
+        .expect("Cognify Notch gagal dibangun")
+        .run(|app, event| {
+            // Keluar dengan cara apa pun: taskbar Windows yang kita sembunyikan dikembalikan.
+            if let tauri::RunEvent::Exit = event {
+                taskdock::restore(app);
+            }
+        });
 }
