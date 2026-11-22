@@ -11,6 +11,7 @@ export const CLOSED_MIN = 70, CLOSED_MAX = 200, CLOSED_DEFAULT = 130;
 /** Tinggi notch saat tertutup (px). Bawaan 36, sama dengan sebelum ada pilihan ini. */
 export const CLOSED_H_MIN = 24, CLOSED_H_MAX = 56, CLOSED_H_DEFAULT = 36;
 /** Perbandingan lebar:tinggi panel terbuka; dipakai untuk memotong gambar latar. */
+export const clampScale = (v: unknown) => Math.min(1.5, Math.max(0.7, Number(v) || 1));
 export const PANEL_RATIO = 680 / 260;
 
 const mode = (v: unknown): Mode => (v === 'custom' || v === 'fixed' ? v : 'dynamic');
@@ -49,8 +50,8 @@ class Ui {
   /** Jeda sebelum terbuka dan sebelum menutup (milidetik). */
   hoverDelay = $state(load('ui.hoverDelay', 90));
   closeDelay = $state(load('ui.closeDelay', 350));
-  /** Ukuran panel terbuka: 1 = normal, 1.12 = besar. */
-  scale = $state(load('ui.scale', 1));
+  /** Ukuran panel terbuka: 0,7 sampai 1,5 (1 = normal). Nilai lama 1,12 = "Besar" tetap sah. */
+  scale = $state(clampScale(load('ui.scale', 1)));
   /** Kelengkungan sudut bawah panel terbuka (px, sebelum diskalakan). */
   roundness = $state(Number(load('ui.roundness', 30)));
   /** Warna aksen (#rrggbb): tab terpilih, tombol, progres, equalizer bawaan; kosong = ungu bawaan. */
@@ -138,7 +139,7 @@ class Ui {
     this.openOnClick = load('ui.openOnClick', true);
     this.hoverDelay = load('ui.hoverDelay', 90);
     this.closeDelay = load('ui.closeDelay', 350);
-    this.scale = load('ui.scale', 1);
+    this.scale = clampScale(load('ui.scale', 1));
     this.roundness = Number(load('ui.roundness', 30));
     this.equalizerColor = String(load('ui.equalizerColor', ''));
     this.accentColor = String(load('ui.accentColor', ''));

@@ -378,9 +378,9 @@
             <button class="btn ghost" onclick={resetHeight} disabled={ui.closedHeight === CLOSED_H_DEFAULT} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
         </Setting>
       {/if}
-      <Setting title={L('Ukuran panel', 'Panel size')}>
-        <Segmented label={L('Ukuran panel', 'Panel size')} value={ui.scale} onchange={(v) => { ui.scale = v; setUi(); }}
-          options={[{ value: 1, label: L('Normal', 'Normal') }, { value: 1.12, label: L('Besar', 'Large') }]} />
+      <Setting stack title={L('Ukuran panel', 'Panel size')} desc={L('Geser untuk memperkecil atau memperbesar panel yang terbuka.', 'Drag to shrink or enlarge the open panel.')}>
+        <div class="slider"><input type="range" min="70" max="150" step="5" value={Math.round(ui.scale * 100)} oninput={(e) => { ui.scale = Number(e.currentTarget.value) / 100; setUi(); }} aria-label={L('Ukuran panel', 'Panel size')} /><span class="val">{Math.round(ui.scale * 100)}%</span>
+          <button class="btn ghost" onclick={() => { ui.scale = 1; setUi(); }} disabled={Math.round(ui.scale * 100) === 100} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button></div>
       </Setting>
       <Setting stack title={L('Lengkung sudut bawah', 'Bottom corner roundness')}>
         <div class="slider"><input type="range" min="0" max="48" step="1" bind:value={ui.roundness} oninput={setUi} aria-label={L('Lengkung sudut bawah', 'Bottom corner roundness')} /><span class="val">{ui.roundness} px</span>

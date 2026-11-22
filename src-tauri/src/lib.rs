@@ -54,6 +54,8 @@ struct Shared {
     inside: AtomicBool,
     /// Gaya pill: jendela menutupi seluruh layar (tembus klik di luar bentuk), supaya pill bisa di mana saja.
     pill: AtomicBool,
+    /// Skala panel terbuka dalam persen (pengaturan "Ukuran panel"); 0 = belum diatur, dianggap 100.
+    panel_scale: std::sync::atomic::AtomicU32,
 }
 
 /// Gaya tampilan: "notch" (jendela kecil di tengah atas) atau "pill" (jendela seluas layar, bentuk bebas di dalamnya).
@@ -61,6 +63,13 @@ struct Shared {
 fn set_layout(state: State<Shared>, window: WebviewWindow, mode: String) {
     state.pill.store(mode == "pill", Ordering::Relaxed);
     let _ = window.set_ignore_cursor_events(true);
+    let _ = dock(&window);
+}
+
+/// Pengaturan "Ukuran panel" (persen, 70 sampai 150): jendela ikut membesar supaya panel tidak terpotong.
+#[tauri::command]
+fn set_panel_scale(state: State<Shared>, window: WebviewWindow, percent: u32) {
+    state.panel_scale.store(percent.clamp(50, 200), Ordering::Relaxed);
     let _ = dock(&window);
 }
 
@@ -376,7 +385,11 @@ fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, Physica
         return Some((*monitor.position(), PhysicalSize::new(size.width.saturating_sub(2), size.height.saturating_sub(2))));
     }
     let scale = monitor.scale_factor();
-    let size = PhysicalSize::new((WIN_W * scale).round() as u32, (WIN_H * scale).round() as u32);
+    // Panel terbuka 680 x 260 dikalikan skala pilihan; jendela minimal 800 x 330 dan tidak lebih lebar dari layar.
+    let pct = window.app_handle().state::<Shared>().panel_scale.load(Ordering::Relaxed).max(1) as f64 / 100.0;
+    let win_w = WIN_W.max(680.0 * pct + 40.0);
+    let win_h = WIN_H.max(260.0 * pct + 70.0);
+    let size = PhysicalSize::new(((win_w * scale).round() as u32).min(monitor.size().width), (win_h * scale).round() as u32);
     let origin = monitor.position();
     let x = origin.x + (monitor.size().width as i32 - size.width as i32) / 2;
     Some((PhysicalPosition::new(x, origin.y), size))
@@ -786,6 +799,7 @@ pub fn run() {
             uptime_days,
             set_pinned,
             set_display,
+            set_panel_scale,
             set_layout,
             write_text_file,
             read_text_file,

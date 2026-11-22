@@ -53,6 +53,7 @@
   syncEyes();
   $effect.root(() => { $effect(() => { void cmd('set_layout', { mode: ui.style }); }); });
   void cmd('set_display', { mode: ui.display });
+  $effect.root(() => { $effect(() => { void cmd('set_panel_scale', { percent: Math.round(ui.scale * 100) }); }); });
   // Timer cepat di dock selesai: kartu di notch (bunyinya sudah dimainkan oleh dock).
   on<number>('dock-timer-done', (minutes) => news.device(L('Timer selesai', 'Timer done'), L(`${minutes} menit berlalu`, `${minutes} minutes are up`), 'timer', TINT.accent));
   on<string>('prefs-changed', (scope) => {
