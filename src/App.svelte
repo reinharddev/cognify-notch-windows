@@ -225,7 +225,7 @@
             {/if}
           </section>
         {:else}
-        <section class="page">
+        <section class="page" class:bleed={page.id === 'music'}>
           {#key page.id}
             <div class="pg" in:pageIn={{ dir: notch.forward ? 1 : -1 }} out:pageOut>
               {#if page.id === 'home'}<Home />
@@ -341,5 +341,7 @@
   .bact { border: 0; border-radius: 99px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 90%, transparent); cursor: pointer; flex: none; transition: transform .12s; }
   .bact:active { transform: scale(.95); }
   .pg { position: absolute; left: 0; right: 0; top: 4px; bottom: 0; }
+  /* Musik: glow sampul boleh melewati tepi area konten (dipotong bentuk notch), supaya tidak ada sisi persegi yang tajam. */
+  .page.bleed { overflow: visible; }
   .page { flex: 1; min-height: 0; padding-top: 4px; position: relative; overflow: hidden; }
 </style>
