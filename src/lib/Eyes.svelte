@@ -4,6 +4,7 @@
   import { notch } from './notch.svelte';
   import { device } from './system.svelte';
   import Head from './Head.svelte';
+  import { gaze } from './gaze.svelte';
 
   // Wajah teman kecil (lihat face.svelte.ts). Mode notch: dua mata persegi panjang bulat 8x12 dengan pendar aksen.
   // Mode kepala (pill mengambang): kepala bulat dengan mata dan mulut. Kelopak, kemiringan, ukuran, dan mulut
@@ -26,7 +27,6 @@
   });
 
   const gap = $derived(Math.round(notch.closed.idle.w * 0.42));
-  const follow = $derived(ui.eyesMode === 'follow');
   // Bergoyang mengikuti musik: seluruh wajah mengangguk pelan, mata mendenyut dan mulut membuka mengikuti kerasnya suara.
   const pulse = $derived(face.groove ? Math.min(1, device.level * 1.8) : 0);
   const p = $derived.by(() => {
@@ -48,9 +48,10 @@
   {@const hidden = p.deco === 'heart' || p.deco === 'spiral'}
   {@const closed = clamp((top - 0.78) / 0.22)}
   {@const lt = face.blinkPhase === 'close' ? 'transform .11s ease-in, opacity .11s ease-in' : face.blinkPhase === 'open' ? 'transform .26s ease-out, opacity .26s ease-out' : undefined}
-  {@const gx = p.gx * 0.5 + face.glance.x + (follow ? face.look.x * 1.2 : 0)}
-  {@const gy = p.gy * 0.5 + face.glance.y + (follow ? face.look.y : 0)}
-  <g class="eye" style:transform="translate({gx}px, {gy}px) scale({scale})">
+  {@const gx = p.gx * 0.5 + face.glance.x + gaze.x * 4.5}
+  {@const gy = p.gy * 0.5 + face.glance.y + gaze.y * 2.6}
+  {@const turnAway = (right ? 1 : -1) * gaze.x > 0 ? 1 - 0.28 * Math.min(1, Math.abs(gaze.x)) : 1}
+  <g class="eye" style:transform="translate({gx}px, {gy}px) scale({scale * turnAway}, {scale})">
     <g class="shape" style:transform="scale({p.sx}, {p.sy * size})" style:opacity={hidden ? 0 : 1 - closed} style:transition={lt}>
       <defs>
         <linearGradient id="eyeFill{uid}{right ? 'r' : 'l'}" x1="0" y1="-6" x2="0" y2="6" gradientUnits="userSpaceOnUse">

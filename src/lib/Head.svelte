@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { untrack } from 'svelte';
   import { face } from './face.svelte';
-  import { ui } from './ui.svelte';
+  import { gaze } from './gaze.svelte';
 
   // Kepala bulat untuk mode pill (mengambang), bergaya Mimik/bbot: kepala bulat sempurna dengan cincin tipis, mata bulat
   // besar, dan mulut. Mata dan mulut menempel pada permukaan kepala yang berbentuk bola, dan bola itu diputar mengikuti
@@ -9,38 +8,6 @@
   // notch/Skins/mimik/face.js dan FaceHead.swift di Mac. Ekspresi tetap dari `face.pose` (face.svelte.ts).
   const R = 46, TURN = 0.36, EYE_R = 12, EYE_X = 19, EYE_Y = 4, MOUTH_Y = 24;
   const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
-
-  // Arah kursor (dari Rust, relatif terhadap pill) → vektor menoleh -1..1 dengan kurva ease-out bbot: dekat = menoleh
-  // sedikit, jauh = penuh. Lalu dihaluskan dengan pegas (k 150, d 19) yang hanya berjalan selama belum diam.
-  const target = $derived.by(() => {
-    if (ui.eyesMode !== 'follow') return { x: 0, y: 0 };
-    const dx = face.look.x * 90, dy = face.look.y * 70;
-    const d = Math.hypot(dx, dy);
-    if (d < 0.5) return { x: 0, y: 0 };
-    const g0 = Math.min(1, d / 260), f = g0 * (2 - g0);
-    return { x: (dx / d) * f, y: (dy / d) * f };
-  });
-  let gaze = $state({ x: 0, y: 0 });
-  $effect(() => {
-    const t = target;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { gaze = { ...t }; return; }
-    let { x, y } = untrack(() => gaze);
-    let vx = 0, vy = 0, prev = 0, frame = 0;
-    const step = (now: number) => {
-      const dt = prev ? Math.min((now - prev) / 1000, 0.05) : 1 / 60;
-      prev = now;
-      const n = Math.ceil(dt / (1 / 60)), h = dt / n;
-      for (let i = 0; i < n; i++) {
-        vx += ((t.x - x) * 150 - vx * 19) * h; x += vx * h;
-        vy += ((t.y - y) * 150 - vy * 19) * h; y += vy * h;
-      }
-      gaze = { x, y };
-      if (Math.abs(t.x - x) + Math.abs(t.y - y) + Math.abs(vx) + Math.abs(vy) > 0.004) frame = requestAnimationFrame(step);
-      else gaze = { ...t };
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  });
 
   const look = $derived({ x: gaze.x + face.glance.x * 0.25, y: gaze.y + face.glance.y * 0.25 });
   const yaw = $derived(look.x * TURN);

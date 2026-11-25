@@ -27,6 +27,16 @@ class Pomodoro {
     this.focusMin = s.focus; this.restMin = s.rest;
     this.sessions = s.day === day() ? s.sessions : 0;
     this.remainingAtPause = this.total;
+    this.restoreRun();
+  }
+
+  /** Pomodoro yang berjalan disimpan sebagai jam selesai (jam dinding): tetap benar setelah tidur atau app dibuka ulang.
+   *  Yang jam selesainya sudah lewat saat app dibuka tidak dilanjutkan. */
+  private saveRun() { save('timerRun', { mode: this.mode, endAt: this.running ? this.endAt : 0 }); }
+  private restoreRun() {
+    const r = load<{ mode?: string; endAt?: number }>('timerRun', {});
+    if (r.mode === 'focus' || r.mode === 'rest') { this.mode = r.mode; this.remainingAtPause = this.total; }
+    if (typeof r.endAt === 'number' && r.endAt > Date.now()) { this.endAt = r.endAt; this.running = true; this.arm(); }
   }
 
   private timer = 0;
@@ -53,13 +63,14 @@ class Pomodoro {
     this.persist();
   }
   adjust(delta: number) { this.mode === 'focus' ? this.setMinutes(this.focusMin + delta) : this.setMinutes(undefined, this.restMin + delta); }
-  select(mode: 'focus' | 'rest') { this.running = false; this.arm(); this.mode = mode; this.remainingAtPause = this.total; }
+  select(mode: 'focus' | 'rest') { this.running = false; this.arm(); this.mode = mode; this.remainingAtPause = this.total; this.saveRun(); }
   toggle() {
     if (this.running) { this.remainingAtPause = Math.max(0, Math.ceil((this.endAt - Date.now()) / 1000)); this.running = false; }
     else { this.endAt = Date.now() + this.remainingAtPause * 1000; this.running = true; }
     this.arm();
+    this.saveRun();
   }
-  reset() { this.running = false; this.arm(); this.remainingAtPause = this.total; }
+  reset() { this.running = false; this.arm(); this.remainingAtPause = this.total; this.saveRun(); }
 
   private tick() {
     if (!this.running) return;
@@ -69,6 +80,7 @@ class Pomodoro {
     if (finished === 'focus') { this.sessions++; this.persist(); }
     this.mode = finished === 'focus' ? 'rest' : 'focus';
     this.remainingAtPause = this.total;
+    this.saveRun();
     news.ring(
       finished === 'focus' ? L('Waktu fokus selesai', 'Focus time is up') : L('Istirahat selesai', 'Break is over'),
       finished === 'focus'
