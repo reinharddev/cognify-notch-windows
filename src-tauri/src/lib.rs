@@ -7,6 +7,7 @@
 //! ke antarmuka lewat perintah dan peristiwa.
 
 mod link;
+mod skins;
 mod taskdock;
 mod updater;
 mod winsys;
@@ -795,10 +796,27 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))
+        // Skin desktop (sama dengan Skins.swift di Mac): skema skin:// untuk halaman skin, dan status skin.
+        .register_uri_scheme_protocol("skin", |ctx, request| skins::protocol(ctx.app_handle(), request))
+        .manage(skins::Skins::new())
         .manage(Shared::default())
         .manage(taskdock::TaskDock::default())
         .manage(updater::Pending::default())
         .invoke_handler(tauri::generate_handler![
+            skins::skins_state,
+            skins::skins_set_enabled,
+            skins::skins_set_option,
+            skins::skins_set_arranging,
+            skins::skins_reset_positions,
+            skins::skins_reveal,
+            skins::skins_reload,
+            skins::skins_save_mimik,
+            skins::skins_save_presets,
+            skins::skins_react,
+            skins::skins_push,
+            skins::skins_audio,
+            skins::skins_hover,
+            skins::skins_notice,
             set_hit_rect,
             open_settings,
             set_eyes_follow,
@@ -866,6 +884,7 @@ pub fn run() {
         .setup(|app| {
             // Taskbar Windows yang tertinggal tersembunyi oleh app yang macet dikembalikan sebelum apa pun.
             taskdock::recover(app.handle());
+            skins::start(app.handle());
             let window = app.get_webview_window("notch").expect("jendela notch tidak ada");
             dock(&window)?;
             window.set_ignore_cursor_events(true)?;

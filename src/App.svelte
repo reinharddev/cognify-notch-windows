@@ -34,6 +34,7 @@
   import NoticeCard from './lib/NoticeCard.svelte';
   import Hud from './lib/Hud.svelte';
   import Eyes from './lib/Eyes.svelte';
+  import { skinBridge } from './lib/skinBridge.svelte';
   import PageDock from './lib/PageDock.svelte';
   import { weather } from './lib/weather.svelte';
   import { skyInk } from './lib/sky';
@@ -97,6 +98,7 @@
   const page = $derived(pages[Math.min(notch.page, pages.length - 1)]);
   // Berdampingan: yang tampil di sayap kanan bergantian tiap 4 detik bila lebih dari satu.
   const pairItem = $derived(notch.pairRight[Math.floor(ticker.now / 4000) % Math.max(1, notch.pairRight.length)] ?? notch.pairRight[0]);
+  void skinBridge; // pemasangan efek jembatan ke skin desktop (hanya aktif bila ada skin yang menyala)
   const time = $derived(headerStamp(ticker.now));
   async function togglePowerSaver() {
     const power = device.power;

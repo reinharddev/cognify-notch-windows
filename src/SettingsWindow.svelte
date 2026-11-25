@@ -14,21 +14,23 @@
   import { ui, THEME_PRESETS, CLOSED_MIN, CLOSED_MAX, CLOSED_DEFAULT, CLOSED_H_MIN, CLOSED_H_MAX, CLOSED_H_DEFAULT, EDGE_MARGIN } from './lib/ui.svelte';
   import { pillLimits } from './lib/geometry';
   import { EMOTIONS, MODES, SITUATIONS, emotionLabel, situationLabel } from './lib/companion';
-  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search, PanelBottom, X } from '@lucide/svelte';
+  import { Settings, Palette, MousePointer2, Smile, ToggleRight, CloudSun, ListOrdered, Archive, ArrowUp, ArrowDown, RotateCcw, Search, PanelBottom, Layers, X } from '@lucide/svelte';
   import CropPicker from './lib/settings/CropPicker.svelte';
   import PreviewStage from './lib/settings/PreviewStage.svelte';
   import { tick, onMount } from 'svelte';
   import Setting from './lib/settings/Setting.svelte';
   import Group from './lib/settings/Group.svelte';
   import Segmented from './lib/settings/Segmented.svelte';
+  import SkinsPane from './lib/settings/SkinsPane.svelte';
 
-  type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'dock' | 'weather' | 'tabs' | 'data';
+  type PaneId = 'general' | 'appearance' | 'behavior' | 'companion' | 'features' | 'skins' | 'dock' | 'weather' | 'tabs' | 'data';
   const panes: { id: PaneId; group: 0 | 1 | 2; label: () => string; desc: () => string; icon: typeof Settings }[] = [
     { id: 'general', group: 2, icon: Settings, label: () => L('Umum', 'General'), desc: () => L('Buka otomatis, bahasa, pintasan, dan pembaruan.', 'Launch at startup, language, shortcut, and updates.') },
     { id: 'appearance', group: 0, icon: Palette, label: () => L('Tampilan', 'Appearance'), desc: () => L('Bentuk, ukuran, dan warna notch.', 'Shape, size, and colors of the notch.') },
     { id: 'behavior', group: 0, icon: MousePointer2, label: () => L('Perilaku', 'Behavior'), desc: () => L('Cara notch terbuka dan tertutup, serta layar yang dipakai.', 'How the notch opens and closes, and which screen it uses.') },
     { id: 'companion', group: 0, icon: Smile, label: () => L('Teman kecil', 'Companion'), desc: () => L('Wajah di notch: ekspresi, kedipan, dan reaksi.', 'The face in the notch: expressions, blinking, and reactions.') },
     { id: 'features', group: 1, icon: ToggleRight, label: () => L('Fitur', 'Features'), desc: () => L('Pilih fitur notch yang ingin dipakai.', 'Choose which notch features to use.') },
+    { id: 'skins', group: 1, icon: Layers, label: () => L('Skin', 'Skins'), desc: () => L('Widget di desktop ala Rainmeter: wajah Mimik, lirik, dan lainnya.', 'Desktop widgets, Rainmeter style: the Mimik face, lyrics and more.') },
     { id: 'dock', group: 1, icon: PanelBottom, label: () => L('Dock & taskbar', 'Dock & taskbar'), desc: () => L('Beta. Taskbar kustom di tepi bawah: aplikasi, jam, dan tombol cepat.', 'Beta. A custom taskbar along the bottom: apps, clock, and quick buttons.') },
     { id: 'weather', group: 1, icon: CloudSun, label: () => L('Cuaca & kalender', 'Weather & calendar'), desc: () => L('Kota untuk cuaca dan sumber agenda.', 'The city for weather and the agenda sources.') },
     { id: 'tabs', group: 1, icon: ListOrdered, label: () => L('Urutan tab', 'Tab order'), desc: () => L('Atur urutan halaman di notch.', 'Arrange the pages in the notch.') },
@@ -36,7 +38,7 @@
   ];
 
   const GROUPS = [() => 'Notch', () => L('Fitur', 'Features'), () => L('App', 'App')];
-  const order: PaneId[] = ['appearance', 'behavior', 'companion', 'features', 'dock', 'weather', 'tabs', 'general', 'data'];
+  const order: PaneId[] = ['appearance', 'behavior', 'companion', 'features', 'skins', 'dock', 'weather', 'tabs', 'general', 'data'];
   const sidebar = $derived(order.map((id) => panes.find((p) => p.id === id)!).filter((p) => p.id !== 'data' || inTauri));
   let pane = $state<PaneId>('appearance');
   let query = $state('');
@@ -560,6 +562,10 @@
     </Group>
 
   {/if}
+  {#if show('skins')}
+    <SkinsPane />
+  {/if}
+
   {#if show('dock')}
     <Group title={L('Dock', 'Dock')}>
       <Setting toggle title={L('Dock di tepi bawah layar', 'Dock along the bottom')} desc={L('Bilah yang menggabungkan aplikasi dan widget, dengan gaya notch. Isinya diatur di bawah.', 'A bar that combines apps and widgets, in the notch style. What it holds is set below.')} bind:checked={dock.enabled} onchange={setDock} />

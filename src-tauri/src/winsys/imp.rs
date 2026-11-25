@@ -26,7 +26,7 @@ use windows::Win32::System::Power::{GetSystemPowerStatus, SYSTEM_POWER_STATUS};
 use windows::Win32::System::Threading::{
     OpenProcess, QueryFullProcessImageNameW, PROCESS_NAME_WIN32, PROCESS_QUERY_LIMITED_INFORMATION,
 };
-use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, GetKeyboardLayout, VK_CAPITAL};
+use windows::Win32::UI::Input::KeyboardAndMouse::{GetAsyncKeyState, GetKeyState, GetKeyboardLayout, VK_CAPITAL, VK_LBUTTON, VK_MENU};
 use windows::Win32::UI::Shell::{
     SHQueryUserNotificationState, ShellExecuteW, QUNS_BUSY, QUNS_PRESENTATION_MODE, QUNS_RUNNING_D3D_FULL_SCREEN,
 };
@@ -242,6 +242,16 @@ pub fn fullscreen_busy() -> bool {
 
 pub fn caps_lock() -> bool {
     unsafe { GetKeyState(VK_CAPITAL.0 as i32) & 1 != 0 }
+}
+
+/// Tombol kiri mouse sedang ditekan (dibaca langsung, tanpa jendela). Dipakai untuk menyeret skin di desktop.
+pub fn mouse_left_down() -> bool {
+    unsafe { GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000 != 0 }
+}
+
+/// Tombol Alt sedang ditekan: tahan Alt lalu seret untuk memindahkan skin (sama dengan ⌥ di Mac).
+pub fn alt_down() -> bool {
+    unsafe { GetAsyncKeyState(VK_MENU.0 as i32) as u16 & 0x8000 != 0 }
 }
 
 /// Kode bahasa keyboard yang sedang dipakai di jendela depan, mis. "EN" atau "ID".

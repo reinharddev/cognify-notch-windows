@@ -13,6 +13,8 @@ pub fn audio_outputs() -> Vec<super::AudioOutput> { Vec::new() }
 pub fn set_default_output(_id: &str) -> Result<(), String> { Err("Pilihan output hanya tersedia di Windows".into()) }
 pub fn fullscreen_busy() -> bool { false }
 pub fn caps_lock() -> bool { false }
+pub fn mouse_left_down() -> bool { false }
+pub fn alt_down() -> bool { false }
 pub fn keyboard_lang() -> Option<String> { None }
 pub fn online() -> bool { true }
 pub fn open_target(_target: &str) {}
