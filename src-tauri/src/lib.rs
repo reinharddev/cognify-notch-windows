@@ -786,6 +786,12 @@ fn watch_downloads(app: AppHandle) {
 
 pub fn run() {
     tauri::Builder::default()
+        // Wajib didaftarkan paling awal. Peluncuran kedua langsung berhenti, dan Notch yang sudah berjalan membuka Pengaturan
+        // sebagai tanda bahwa ia sudah ada (alih-alih membuka notch kedua yang menumpuk di atasnya).
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move { open_settings(app).await });
+        }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(MacosLauncher::LaunchAgent, None))

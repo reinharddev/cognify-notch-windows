@@ -19,6 +19,8 @@ serde_json = "1"
 tauri-plugin-autostart = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "2"
+# Hanya satu Notch yang boleh berjalan: peluncuran kedua (klik ikon lagi, mulai otomatis ganda) tidak membuka notch kedua yang menumpuk.
+tauri-plugin-single-instance = "2"
 ureq = "3"
 dirs = "6"
 velopack = "1.2.161"
