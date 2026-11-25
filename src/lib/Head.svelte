@@ -61,7 +61,9 @@
   const eyeAt = (side: number) => project(side * EYE_X + p.gx * 2, EYE_Y + p.gy * 2);
   const mw = $derived(Math.max(1, p.mw * 2.2)), mc = $derived(p.mc * 2.2), mo = $derived(p.mo * 1.7);
   const mouthSpot = $derived(project(0, MOUTH_Y));
-  const mouthPath = $derived(`M${-mw} ${-mc * 0.3}Q0 ${mc * 0.7} ${mw} ${-mc * 0.3}`);
+  // Satu bentuk mulut: garis lengkung; saat terbuka, sisi bawahnya melengkung ke bawah dan bidangnya terisi.
+  const mouthLine = $derived(`M${-mw} ${-mc * 0.3}Q0 ${mc * 0.7} ${mw} ${-mc * 0.3}`);
+  const mouthBody = $derived(`${mouthLine}Q0 ${mc * 0.7 + mo * 2} ${-mw} ${-mc * 0.3}Z`);
   const lt = $derived(face.blinkPhase === 'close' ? 'transform .11s ease-in' : face.blinkPhase === 'open' ? 'transform .26s ease-out' : undefined);
   const uid = Math.random().toString(36).slice(2, 7);
   const spiral = (() => {
@@ -98,8 +100,8 @@
     {/each}
 
     <g class="place" style:transform={place(mouthSpot)}>
-      <path class="mouth" d={mouthPath} style:opacity={1 - p.mr} />
-      <ellipse class="mouth-o" rx={Math.max(2, mw * 0.55)} ry={Math.max(2, mo * 0.58)} style:opacity={p.mr} />
+      {#if mo > 0.05}<path class="mouth-o" d={mouthBody} style:opacity={clamp(mo / 2, 0, 1)} />{/if}
+      <path class="mouth" d={mouthLine} />
     </g>
 
     {#if p.deco === 'blush'}
