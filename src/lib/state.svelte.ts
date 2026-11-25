@@ -3,6 +3,7 @@ import { news } from './news.svelte';
 import { parseDue } from './due';
 import { features } from './system.svelte';
 import { L } from './i18n';
+import { elapsedSeconds, sanitize } from './stopwatch';
 import { windowKind } from './bridge';
 import { isDue, dayKey, type Alarm } from './alarm';
 
@@ -89,9 +90,11 @@ interface Countdown { id: string; label: string; end: number; total: number }
 class ClockTools {
   alarms = $state<Alarm[]>(load<Alarm[]>('alarms', []));
   private alarmTimer = 0;
-  started = $state(0);            // epoch ms saat mulai, 0 = berhenti
-  accumulated = $state(0);        // detik sebelum jeda terakhir
-  laps = $state<number[]>([]);
+  // Disimpan (localStorage) supaya tetap benar saat laptop tidur atau app ditutup: lihat stopwatch.ts.
+  private sw = sanitize(load('stopwatch', null));
+  started = $state(this.sw.started);            // epoch ms saat mulai, 0 = berhenti
+  accumulated = $state(this.sw.accumulated);    // detik sebelum jeda terakhir
+  laps = $state<number[]>(this.sw.laps);
   countdowns = $state<Countdown[]>(load<Countdown[]>('countdowns', []).filter((c) => c.end > Date.now()));
 
   private fireTimer = 0;
@@ -104,14 +107,17 @@ class ClockTools {
   }
 
   get running() { return this.started > 0; }
-  get elapsed() { return this.accumulated + (this.started ? (ticker.now - this.started) / 1000 : 0); }
+  /** Dibaca dari jam sekarang (bukan hitungan sendiri), jadi tidur dan hibernasi ikut terhitung. `ticker.now` hanya pemicu gambar ulang. */
+  get elapsed() { void ticker.now; return elapsedSeconds(this.accumulated, this.started, Date.now()); }
+  private persistStopwatch() { save('stopwatch', { started: this.started, accumulated: this.accumulated, laps: [...this.laps] }); }
 
   toggle() {
-    if (this.started) { this.accumulated += (Date.now() - this.started) / 1000; this.started = 0; }
+    if (this.started) { this.accumulated = elapsedSeconds(this.accumulated, this.started, Date.now()); this.started = 0; }
     else this.started = Date.now();
+    this.persistStopwatch();
   }
-  lap() { if (this.running) this.laps = [this.elapsed, ...this.laps]; }
-  reset() { this.started = 0; this.accumulated = 0; this.laps = []; }
+  lap() { if (this.running) { this.laps = [this.elapsed, ...this.laps]; this.persistStopwatch(); } }
+  reset() { this.started = 0; this.accumulated = 0; this.laps = []; this.persistStopwatch(); }
 
   start(minutes: number) {
     const total = minutes * 60;
