@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { notch, SIZES, HEAD } from './lib/notch.svelte';
+  import { notch, SIZES, HEAD, type LiveItem } from './lib/notch.svelte';
   import { Spring, springEase } from './lib/spring';
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import { Bell, Brain, Coffee, Download, Hourglass, Leaf } from '@lucide/svelte';
-  const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell } as const;
+  import { Bell, Brain, Coffee, Download, Hourglass, Leaf, Timer } from '@lucide/svelte';
+  const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell, stopwatch: Timer } as const;
   import { cmd, cmdTry, emitPrefs, inTauri, on, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
@@ -95,6 +95,8 @@
   });
     const pages = $derived(ui.pages);
   const page = $derived(pages[Math.min(notch.page, pages.length - 1)]);
+  // Berdampingan: yang tampil di sayap kanan bergantian tiap 4 detik bila lebih dari satu.
+  const pairItem = $derived(notch.pairRight[Math.floor(ticker.now / 4000) % Math.max(1, notch.pairRight.length)] ?? notch.pairRight[0]);
   const time = $derived(headerStamp(ticker.now));
   async function togglePowerSaver() {
     const power = device.power;
@@ -171,6 +173,15 @@
 </script>
 
 <svelte:window onkeydown={key} onwheel={wheel} onblur={() => notch.unpin()} />
+
+{#snippet chip(it: LiveItem)}
+  {@const CI = LIVE_ICONS[it.icon]}
+  <span class="chip" style:--tint={it.tint}>
+    <span class="lic"><CI size={13} strokeWidth={2.4} /></span>
+    {#if it.laps}<span class="lap">L{it.laps}</span>{/if}
+    <span class="dlb" class:dim={it.paused}>{it.text}</span>
+  </span>
+{/snippet}
 
 <!-- Di browser biasa hover memakai pointer; di Tauri hover datang dari Rust. -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
@@ -259,18 +270,8 @@
           <NoticeCard card={news.current} />
         </div>
       {/key}
-    {:else if notch.live}
-      {@const lv = notch.live}
-      {@const LIcon = LIVE_ICONS[lv.icon]}
-      <div class="layer center" style:--lw="{notch.closed.media.w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
-        <div class="wings live" style:--tint={lv.tint}>
-          <span class="lic"><LIcon size={13} strokeWidth={2.4} /></span>
-          {#if lv.title}<span class="song">{lv.title || L('Mengunduh', 'Downloading')}</span>{:else}<span class="grow"></span>{/if}
-          <span class="dlb">{lv.text}</span>
-        </div>
-      </div>
     {:else if notch.wings && device.media}
-      <div class="layer center" style:--lw="{notch.closed.media.w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
+      <div class="layer center" style:--lw="{(notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
           <span class="song" class:scrolling={wingOverflow > 0} bind:this={wingView} title={wingLabel}
@@ -278,7 +279,24 @@
             style:color={wingLine ? (ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined : undefined}>
             <span bind:this={wingText}>{wingLabel}</span>
           </span>
-          <Equalizer />
+          {#if notch.paired}{@render chip(pairItem)}{:else}<Equalizer />{/if}
+        </div>
+      </div>
+    {:else if notch.live}
+      {@const lv = notch.live}
+      {@const LIcon = LIVE_ICONS[lv.icon]}
+      <div class="layer center" style:--lw="{(notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
+        <div class="wings live" style:--tint={lv.tint}>
+          <span class="lic"><LIcon size={13} strokeWidth={2.4} /></span>
+          {#if lv.title}<span class="song">{lv.title || L('Mengunduh', 'Downloading')}</span>{:else}<span class="grow"></span>{/if}
+          {#if notch.paired}
+            <span class="dlb">{lv.text}</span>
+            <span class="vsep"></span>
+            {@render chip(pairItem)}
+          {:else}
+            {#if lv.icon === 'stopwatch' && lv.laps}<span class="lap">L{lv.laps}</span>{/if}
+            <span class="dlb" class:dim={lv.paused}>{lv.text}</span>
+          {/if}
         </div>
       </div>
     {:else}
@@ -310,6 +328,10 @@
   .wings.live { gap: 8px; }
   .lic { display: grid; place-items: center; flex: none; color: var(--tint); }
   .grow { flex: 1; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; flex: none; }
+  .lap { font-size: 9.5px; font-weight: 800; line-height: 1; padding: 2px 5px; border-radius: 99px; background: var(--tint, #ff9f0a); color: #000; font-variant-numeric: tabular-nums; }
+  .dlb.dim { opacity: .55; }
+  .vsep { width: 1px; height: 12px; background: rgba(255, 255, 255, .16); flex: none; }
   .dlb { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .75); flex: none; }
   .song { flex: 1; min-width: 0; padding-inline: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; color: rgba(255, 255, 255, .85); }
   .song > span { display: block; width: max-content; min-width: 100%; white-space: nowrap; }
