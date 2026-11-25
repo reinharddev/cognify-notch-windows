@@ -22,6 +22,8 @@ class Vibe {
   private frame = 0;
   private last = 0;
   private lastBeats = 0;
+  private nextNote = 0;
+  private noteN = 0;
   private prevLevel = -1;
   private levelAt = 0;
 
@@ -57,10 +59,12 @@ class Vibe {
         const amp = 0.5 + 0.35 * Math.min(1, tr.energy * 1.4);
         this.nodY = amp * 2.4 * tr.slowDepth(t);
         this.rot = amp * 1.8 * tr.slowSway(t);
-        // Nada jarang dan lembut: satu tiap empat ketukan, paling banyak dua sekaligus.
-        if (tr.beats > this.lastBeats && tr.beats % 4 === 0 && this.notes.length < 2) {
-          const side = tr.beats % 8 === 0 ? 1 : -1;
-          this.notes = [...this.notes, { t0: t, glyph: ['♪', '♫'][(tr.beats / 4) % 2], side, x0: side * (22 + Math.random() * 8) }];
+        // Nada berdasarkan waktu, bukan ketukan, supaya pasti muncul: satu tiap ~1 sampai 2 detik selama lagu terdengar.
+        if (t >= this.nextNote && this.notes.length < 3) {
+          this.noteN++;
+          const side = this.noteN % 2 === 0 ? 1 : -1;
+          this.notes = [...this.notes, { t0: t, glyph: ['♪', '♫', '♬'][this.noteN % 3], side, x0: side * (22 + Math.random() * 8) }];
+          this.nextNote = t + 1 + Math.random();
         }
       } else { this.nodY = 0; this.rot = 0; }
       this.lastBeats = tr.beats;

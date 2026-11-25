@@ -83,7 +83,7 @@
 
   {#each vibe.notes as n (n.t0)}
     {@const age = (vibe.now - n.t0) / NOTE_LIFE}
-    <text class="vnote" x={n.x0 + Math.sin(age * 5) * 3 + n.side * age * 6} y={-6 - age * 24} style:opacity={Math.sin(Math.PI * Math.min(1, age * 1.05)) * 0.8}>{n.glyph}</text>
+    <text class="vnote" x={n.x0 + Math.sin(age * 5) * 3 + n.side * age * 6} y={-6 - age * 24} style:opacity={Math.sin(Math.PI * Math.min(1, age * 1.05)) * 0.95}>{n.glyph}</text>
   {/each}
 
   {#if p.deco === 'z'}<text class="sym z" x="26" y="-18">z</text>
@@ -112,7 +112,7 @@
   .drop { fill: #7dd3fc; }
   .sym { font: 800 20px system-ui, sans-serif; fill: #fff; }
   .z { fill: rgba(255, 255, 255, .65); font-size: 16px; }
-  .vnote { font: 700 12px system-ui, sans-serif; fill: #fff; text-anchor: middle; }
+  .vnote { font: 800 17px system-ui, sans-serif; fill: #fff; text-anchor: middle; }
   .note { font: 800 18px system-ui, sans-serif; fill: #fff; animation: note 1.3s ease-in-out infinite; }
   .spark { fill: #fde68a; transform-box: fill-box; transform-origin: center; animation: twinkle 1.1s ease-in-out infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
