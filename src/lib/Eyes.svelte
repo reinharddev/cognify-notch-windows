@@ -3,6 +3,7 @@
   import { ui } from './ui.svelte';
   import { notch } from './notch.svelte';
   import { device } from './system.svelte';
+  import Head from './Head.svelte';
 
   // Wajah teman kecil (lihat face.svelte.ts). Mode notch: dua mata persegi panjang bulat 8x12 dengan pendar aksen.
   // Mode kepala (pill mengambang): kepala bulat dengan mata dan mulut. Kelopak, kemiringan, ukuran, dan mulut
@@ -35,11 +36,6 @@
   });
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
 
-  // Mulut melengkung, dengan bentuk oval yang menyatu lembut untuk ekspresi kaget.
-  const mouth = $derived.by(() => {
-    const y = 0, corner = y - p.mc * 0.3, ctl = y + p.mc * 0.7, w = p.mw;
-    return `M${-w} ${corner}Q0 ${ctl} ${w} ${corner}`;
-  });
 
   const uid = Math.random().toString(36).slice(2, 7);
   const tint = 'color-mix(in srgb, var(--accent) 90%, transparent)';
@@ -89,14 +85,7 @@
 {/snippet}
 
 {#if head}
-    <svg class="head" class:groove={face.groove} bind:this={box} viewBox="-21 -21 42 42" aria-hidden="true">
-      <g transform="translate(-8.5 -4)">{@render eye(false, 0.85)}</g>
-      <g transform="translate(8.5 -4)">{@render eye(true, 0.85)}</g>
-      <g transform="translate(0 10)">
-        <path class="mouth" style:d="path('{mouth}')" style:opacity={1 - p.mr} />
-        <ellipse class="mouth-o" cx="0" cy="0" rx={Math.max(1, p.mw * 0.55)} ry={Math.max(1, p.mo * 0.58)} style:opacity={p.mr} />
-      </g>
-    </svg>
+    <div class="headbox" bind:this={box}><Head /></div>
   {:else}
     <span class="eyes" class:groove={face.groove} bind:this={box} style:gap="{gap}px">
       {#each [false, true] as right}
@@ -107,9 +96,9 @@
 
 <style>
   .eyes { display: flex; align-items: center; justify-content: center; }
-  .notchEye, .head { overflow: visible; }
+  .notchEye { overflow: visible; }
   .notchEye { margin: 0 4px; }
-  .head { width: 100%; height: 100%; }
+  .headbox { width: 100%; height: 100%; }
   .eye { transition: transform .08s linear; }
   .heart, .spiral, .z, .sym, .drop, .note, .spark, .blush, .tear { transition: opacity .2s ease; }
   .note { font: 800 9px system-ui, sans-serif; fill: #fff; }
@@ -119,7 +108,6 @@
   .blush { fill: #ff7aa2; }
   .tear { fill: #7dd3fc; }
   .groove { animation: groove .54s ease-in-out infinite alternate; }
-  .mouth, .mouth-o { transition: opacity .18s ease; }
   .eye, .shape, .lid { transform-origin: 0 0; transform-box: view-box; }
   .body { fill: #fff; }
   .lid { fill: #000; stroke: none; }
@@ -129,8 +117,6 @@
   .z { font: 800 8px system-ui, sans-serif; fill: #fff; }
   .sym { font: 800 10px system-ui, sans-serif; fill: #fff; }
   .drop { fill: #7dd3fc; }
-  .mouth { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
-  .mouth-o { fill: #fff; stroke: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes groove { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.5px) rotate(2deg); } }
   @keyframes note { 0% { transform: translate(0, 2px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(3px, -5px); opacity: 0; } }
