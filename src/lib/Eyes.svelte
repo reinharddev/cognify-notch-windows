@@ -2,6 +2,7 @@
   import { face } from './face.svelte';
   import { ui } from './ui.svelte';
   import { notch } from './notch.svelte';
+  import { device } from './system.svelte';
 
   // Wajah teman kecil (lihat face.svelte.ts). Mode notch: dua mata persegi panjang bulat 8x12 dengan pendar aksen.
   // Mode kepala (pill mengambang): kepala bulat dengan mata dan mulut. Kelopak, kemiringan, ukuran, dan mulut
@@ -25,7 +26,13 @@
 
   const gap = $derived(Math.round(notch.closed.idle.w * 0.42));
   const follow = $derived(ui.eyesMode === 'follow');
-  const p = $derived(face.pose);
+  // Bergoyang mengikuti musik: seluruh wajah mengangguk pelan, mata mendenyut dan mulut membuka mengikuti kerasnya suara.
+  const pulse = $derived(face.groove ? Math.min(1, device.level * 1.8) : 0);
+  const p = $derived.by(() => {
+    const base = face.pose;
+    if (!pulse) return base;
+    return { ...base, sy: base.sy * (1 + pulse * 0.14), sx: base.sx * (1 + pulse * 0.06), mo: base.mo + pulse * 2.4, mr: Math.max(base.mr, pulse * 0.7) };
+  });
   const clamp = (v: number) => Math.min(1, Math.max(0, v));
 
   // Mulut melengkung, dengan bentuk oval yang menyatu lembut untuk ekspresi kaget.
@@ -68,8 +75,12 @@
     <rect class="shut" x="-4.5" y="1" width="9" height="2" rx="1" style:opacity={hidden ? 0 : 0.75 * closed} style:transition={lt} />
     <path class="heart" d="M0 4.5C-8 -1 -6 -7 0 -3.5C6 -7 8 -1 0 4.5Z" style:opacity={p.deco === 'heart' ? 1 : 0} />
     <text class="spiral" y="4" text-anchor="middle" style:opacity={p.deco === 'spiral' ? 1 : 0}>@</text>
+    <ellipse class="blush" cx="0" cy="8.5" rx="5" ry="2.2" style:opacity={p.deco === 'blush' ? 0.6 : 0} />
+    <path class="tear" d="M-2 7C-0.4 9.4 0 10.6 -2 12C-4 10.6 -3.6 9.4 -2 7Z" style:opacity={p.deco === 'tear' ? 1 : 0} />
     {#if right}
       <text class="z" x="9" y="-3" style:opacity={p.deco === 'z' ? 0.6 : 0}>z</text>
+      <text class="note" class:on={p.deco === 'note'} x="8" y="-5" style:opacity={p.deco === 'note' ? 1 : 0}>♪</text>
+      <path class="spark" class:on={p.deco === 'sparkle'} d="M9 -11L10 -8L13 -7L10 -6L9 -3L8 -6L5 -7L8 -8Z" style:opacity={p.deco === 'sparkle' ? 1 : 0} />
       <text class="sym" x="8" y="-5" style:opacity={p.deco === 'question' ? 1 : 0}>?</text>
       <text class="sym" x="8" y="-5" style:opacity={p.deco === 'bang' ? 1 : 0}>!</text>
       <path class="drop" d="M8 -9C9.6 -6.6 10 -5.4 8 -4C6 -5.4 6.4 -6.6 8 -9Z" style:opacity={p.deco === 'sweat' ? 1 : 0} />
@@ -78,7 +89,7 @@
 {/snippet}
 
 {#if head}
-    <svg class="head" bind:this={box} viewBox="-21 -21 42 42" aria-hidden="true">
+    <svg class="head" class:groove={face.groove} bind:this={box} viewBox="-21 -21 42 42" aria-hidden="true">
       <g transform="translate(-8.5 -4)">{@render eye(false, 0.85)}</g>
       <g transform="translate(8.5 -4)">{@render eye(true, 0.85)}</g>
       <g transform="translate(0 10)">
@@ -87,7 +98,7 @@
       </g>
     </svg>
   {:else}
-    <span class="eyes" bind:this={box} style:gap="{gap}px">
+    <span class="eyes" class:groove={face.groove} bind:this={box} style:gap="{gap}px">
       {#each [false, true] as right}
         <svg class="notchEye" viewBox="-7 -8 14 16" width="14" height="16" aria-hidden="true">{@render eye(right, 1)}</svg>
       {/each}
@@ -100,7 +111,14 @@
   .notchEye { margin: 0 4px; }
   .head { width: 100%; height: 100%; }
   .eye { transition: transform .08s linear; }
-  .heart, .spiral, .z, .sym, .drop { transition: opacity .2s ease; }
+  .heart, .spiral, .z, .sym, .drop, .note, .spark, .blush, .tear { transition: opacity .2s ease; }
+  .note { font: 800 9px system-ui, sans-serif; fill: #fff; }
+  .note.on { animation: note 1.3s ease-in-out infinite; }
+  .spark { fill: #fde68a; transform-origin: 8px -7px; }
+  .spark.on { animation: twinkle 1.1s ease-in-out infinite; }
+  .blush { fill: #ff7aa2; }
+  .tear { fill: #7dd3fc; }
+  .groove { animation: groove .54s ease-in-out infinite alternate; }
   .mouth, .mouth-o { transition: opacity .18s ease; }
   .eye, .shape, .lid { transform-origin: 0 0; transform-box: view-box; }
   .body { fill: #fff; }
@@ -114,5 +132,8 @@
   .mouth { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
   .mouth-o { fill: #fff; stroke: none; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce) { .spiral { animation: none; } }
+  @keyframes groove { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.5px) rotate(2deg); } }
+  @keyframes note { 0% { transform: translate(0, 2px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(3px, -5px); opacity: 0; } }
+  @keyframes twinkle { 0%, 100% { transform: scale(.6); } 50% { transform: scale(1.15); } }
+  @media (prefers-reduced-motion: reduce) { .spiral, .note.on, .spark.on, .groove { animation: none; } }
 </style>

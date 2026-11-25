@@ -4,7 +4,7 @@ import { device, features } from './system.svelte';
 import { pomodoro } from './state.svelte';
 import { news } from './news.svelte';
 import { ui } from './ui.svelte';
-import { motionOf, pickEmotion, type CompanionConfig, type Emotion, type SituationId } from './companion';
+import { motionOf, pickEmotion, pickPool, type CompanionConfig, type Emotion, type SituationId } from './companion';
 
 // Teman kecil di notch, sama dengan versi Mac (Companion.swift): wajah yang ekspresinya menyesuaikan keadaan.
 // Saat notch menempel di tepi layar hanya dua mata yang tampil; saat mode pill (mengambang) matanya menjadi kepala
@@ -13,7 +13,7 @@ import { motionOf, pickEmotion, type CompanionConfig, type Emotion, type Situati
 // kursor); arah pandang "ikuti kursor" juga datang dari Rust.
 
 export type { Emotion };
-export type Deco = 'none' | 'z' | 'question' | 'bang' | 'sweat' | 'heart' | 'spiral';
+export type Deco = 'none' | 'z' | 'question' | 'bang' | 'sweat' | 'heart' | 'spiral' | 'note' | 'sparkle' | 'tear' | 'blush';
 export type Reaction = 'none' | 'shake' | 'bounce' | 'pop';
 
 /** top/bot: kelopak atas/bawah menutup 0..1, tilt: kemiringan kelopak (derajat, + = ujung dalam turun), sx/sy: ukuran mata,
@@ -48,6 +48,12 @@ export const POSES: Record<Emotion, Pose> = {
   determined: P({ top: 0.4, tilt: 14, mw: 4.5, mc: -0.5 }),
   sleepy: P({ top: 0.75, mw: 2.7, mc: 0, mo: 0.9 }),
   sleep: P({ top: 1, mw: 2.2, mc: 0.9, deco: 'z' }),
+  sing: P({ top: 0.15, bot: 0.5, gy: -0.5, mw: 4.5, mc: 2, mo: 3.5, mr: 0.55, deco: 'note' }),
+  proud: P({ top: 0.3, bot: 0.35, tilt: -6, gy: -1, mw: 5, mc: 3, deco: 'sparkle' }),
+  shy: P({ top: 0.3, bot: 0.4, gx: -3, gy: 1.5, mw: 2.5, mc: 0.8, deco: 'blush' }),
+  cry: P({ top: 0.35, tilt: -18, mw: 4, mc: -2.7, mo: 1.2, mr: 0.4, deco: 'tear' }),
+  hot: P({ top: 0.5, sy: 0.85, mw: 4, mc: -0.5, mo: 3, mr: 0.8, deco: 'sweat' }),
+  wow: P({ sx: 1.3, sy: 1.35, mw: 3.6, mc: 0, mo: 3.8, mr: 1, deco: 'sparkle' }),
 };
 
 type Step = [Emotion, number, Reaction];
@@ -68,6 +74,12 @@ class Face {
   /** Naik tiap reaksi baru supaya animasinya diputar ulang. */
   rxKey = $state(0);
 
+  /** Musik sedang diputar dan wajah sedang "bergoyang" (mode Dinamis): Eyes.svelte menggoyangkan dan mendenyutkan wajah. */
+  groove = $state(false);
+  private poolUntil = 0;
+  private poolState: SituationId = 'normal';
+  private lastVolume: number | null = null;
+  private lastBright: number | null = null;
   private base: Emotion = 'idle';
   private sleeping = false;
   private holding = false;
@@ -121,6 +133,10 @@ class Face {
       $effect(() => {
         const n = news.current;
         untrack(() => { if (n && features.companion) this.reactToNews(n.icon, n.title); });
+      });
+      $effect(() => {
+        const l = news.level;
+        untrack(() => { if (l && features.companion) this.reactToLevel(l.kind, l.value, !!l.muted); });
       });
       $effect(() => {
         const a = news.alert;
@@ -269,12 +285,24 @@ class Face {
     }
     if (this.sleeping || this.holding) return;
     const s = this.state();
+    this.groove = cfg.mode === 'dynamic' && s === 'music';
     let next = pickEmotion(cfg, s) ?? 'idle';
+    if (cfg.mode === 'dynamic' && s !== 'normal') {
+      // Di dalam satu keadaan wajah berganti-ganti ekspresi dari kumpulannya, tidak diam di satu wajah.
+      const now = Date.now();
+      if (s !== this.poolState || now > this.poolUntil) {
+        const fresh = s !== this.poolState;
+        this.poolState = s;
+        this.poolUntil = now + (s === 'music' ? 3500 + Math.random() * 4500 : 7000 + Math.random() * 8000);
+        const picked = pickPool(cfg, s, this.base);
+        if (picked) { this.base = picked; next = picked; if (!fresh) this.react(motionOf(picked)); }
+      } else next = this.base;
+    } else this.poolState = s;
     if (s === 'normal' && cfg.mode === 'dynamic') {
-      // Tidak ada yang istimewa: ganti-ganti santai tiap satu-dua menit.
+      // Tidak ada yang istimewa: ganti-ganti santai tiap beberapa belas detik.
       if (Date.now() > this.neutralUntil) {
-        this.neutral = pick<Emotion>(['idle', 'idle', 'content', 'curious', 'smug']);
-        this.neutralUntil = Date.now() + (45 + Math.random() * 55) * 1000;
+        this.neutral = pickPool(cfg, 'normal', this.neutral) ?? 'idle';
+        this.neutralUntil = Date.now() + (12 + Math.random() * 18) * 1000;
       }
       next = this.neutral;
     }
@@ -319,6 +347,19 @@ class Face {
     this.queue(steps);
   }
 
+  /** Volume atau kecerahan berubah: wajah ikut bereaksi (volume naik: takjub, turun: malu, bisu: sedih, layar terang: kepanasan). */
+  private reactToLevel(kind: 'volume' | 'brightness', value: number, muted: boolean) {
+    const prev = kind === 'volume' ? this.lastVolume : this.lastBright;
+    if (kind === 'volume') this.lastVolume = value; else this.lastBright = value;
+    let id: SituationId | null = null;
+    if (kind === 'volume' && muted) id = 'muted';
+    else if (prev !== null && Math.abs(value - prev) > 0.01) {
+      const up = value > prev;
+      id = kind === 'volume' ? (up ? 'volumeUp' : 'volumeDown') : (up ? 'brightUp' : 'brightDown');
+    }
+    if (id) this.reactToSituation(id);
+  }
+
   /** Mengenali jenis kabar dari ikon dan judulnya. */
   private reactToNews(icon: string, title: string) {
     const t = title.toLowerCase();
@@ -345,9 +386,9 @@ class Face {
   start() {
     const step = () => {
       this.tick();
-      this.timer = window.setTimeout(step, 5000 + Math.random() * 5000);
+      this.timer = window.setTimeout(step, 2500 + Math.random() * 2500);
     };
-    this.timer = window.setTimeout(step, 2500 + Math.random() * 3000);
+    this.timer = window.setTimeout(step, 1500 + Math.random() * 2000);
     return () => clearTimeout(this.timer);
   }
 }

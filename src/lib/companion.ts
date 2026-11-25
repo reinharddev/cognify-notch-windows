@@ -9,6 +9,7 @@ export const EMOTIONS = [
   'suspicious', 'smug', 'bored', 'tired', 'exhausted', 'yawn',
   'worried', 'sad', 'annoyed', 'angry', 'determined',
   'sleepy', 'sleep',
+  'sing', 'proud', 'shy', 'cry', 'hot', 'wow',
 ] as const;
 export type Emotion = (typeof EMOTIONS)[number];
 
@@ -20,6 +21,8 @@ const NAMES: Record<Emotion, [string, string]> = {
   smug: ['Puas', 'Smug'], bored: ['Bosan', 'Bored'], tired: ['Lelah', 'Tired'], exhausted: ['Kehabisan tenaga', 'Exhausted'],
   yawn: ['Menguap', 'Yawning'], worried: ['Cemas', 'Worried'], sad: ['Sedih', 'Sad'], annoyed: ['Kesal', 'Annoyed'],
   angry: ['Marah', 'Angry'], determined: ['Serius', 'Determined'], sleepy: ['Mengantuk', 'Sleepy'], sleep: ['Tidur', 'Asleep'],
+  sing: ['Bernyanyi', 'Singing'], proud: ['Bangga', 'Proud'], shy: ['Malu', 'Shy'], cry: ['Menangis', 'Crying'],
+  hot: ['Kepanasan', 'Hot'], wow: ['Takjub', 'Amazed'],
 };
 export const emotionLabel = (e: Emotion) => L(...NAMES[e]);
 
@@ -33,7 +36,8 @@ export const MODES: { id: Mode; label: () => string; hint: () => string }[] = [
 export type SituationId =
   | 'normal' | 'music' | 'focus' | 'rest' | 'offline' | 'batteryLow' | 'batteryCritical' | 'lateNight' | 'morning' | 'uptimeLong' | 'uptimeVeryLong' | 'sleeping' | 'waking'
   | 'charging' | 'chargerFull' | 'unplugged' | 'lowBatteryNotice' | 'audioConnected' | 'downloadDone' | 'downloadFailed' | 'capsLock' | 'inputSource'
-  | 'networkUp' | 'networkDown' | 'taskDone' | 'taskFailed' | 'alert';
+  | 'networkUp' | 'networkDown' | 'taskDone' | 'taskFailed' | 'alert'
+  | 'volumeUp' | 'volumeDown' | 'muted' | 'brightUp' | 'brightDown';
 
 export interface Situation { id: SituationId; event: boolean; label: [string, string]; emotion: Emotion }
 const S = (id: SituationId, event: boolean, id_: string, en: string, emotion: Emotion): Situation => ({ id, event, label: [id_, en], emotion });
@@ -68,7 +72,40 @@ export const SITUATIONS: Situation[] = [
   S('taskDone', true, 'Tersimpan atau selesai', 'Saved or done', 'joy'),
   S('taskFailed', true, 'Gagal', 'Failed', 'sad'),
   S('alert', true, 'Pengingat (timer, minum, tugas)', 'Reminder (timer, water, task)', 'excited'),
+  S('volumeUp', true, 'Volume dinaikkan', 'Volume turned up', 'wow'),
+  S('volumeDown', true, 'Volume diturunkan', 'Volume turned down', 'shy'),
+  S('muted', true, 'Suara dibisukan', 'Sound muted', 'sad'),
+  S('brightUp', true, 'Layar dicerahkan', 'Screen brightened', 'hot'),
+  S('brightDown', true, 'Layar diredupkan', 'Screen dimmed', 'sleepy'),
 ];
+
+/**
+ * Kumpulan ekspresi per keadaan untuk mode Dinamis: wajah berganti-ganti di dalam satu keadaan (musik: bernyanyi,
+ * senang, jatuh cinta, dan seterusnya) alih-alih satu ekspresi tetap. Mode lain tetap memakai satu ekspresi.
+ * Sama dengan `Companion.pools` di Mac.
+ */
+export const POOLS: Partial<Record<SituationId, Emotion[]>> = {
+  normal: ['idle', 'content', 'curious', 'smug', 'proud', 'idle', 'bored', 'shy'],
+  music: ['sing', 'happy', 'joy', 'love', 'sing', 'excited', 'smug', 'content'],
+  focus: ['determined', 'suspicious', 'determined', 'content', 'proud'],
+  rest: ['content', 'happy', 'sleepy', 'joy', 'yawn'],
+  offline: ['sad', 'cry', 'confused', 'worried', 'bored'],
+  batteryLow: ['tired', 'worried', 'sad', 'bored', 'sleepy'],
+  batteryCritical: ['worried', 'scared', 'exhausted', 'cry', 'scared'],
+  lateNight: ['sleepy', 'yawn', 'tired', 'sleepy', 'bored'],
+  morning: ['content', 'happy', 'yawn', 'hello', 'proud'],
+  uptimeLong: ['tired', 'bored', 'yawn', 'tired', 'hot'],
+  uptimeVeryLong: ['exhausted', 'dizzy', 'tired', 'hot', 'cry'],
+};
+
+/** Ekspresi berikutnya untuk mode Dinamis: dipilih acak dari kumpulannya, tidak sama dengan yang sedang tampil. */
+export function pickPool(cfg: CompanionConfig, id: SituationId, current: Emotion): Emotion | null {
+  if (cfg.mode !== 'dynamic') return pickEmotion(cfg, id);
+  const pool = POOLS[id];
+  if (!pool) return pickEmotion(cfg, id);
+  const options = pool.filter((e) => e !== current);
+  return options[Math.floor(Math.random() * options.length)] ?? pool[0];
+}
 export const situationLabel = (s: Situation) => L(...s.label);
 const BY_ID = new Map(SITUATIONS.map((s) => [s.id, s]));
 export const situationOf = (id: SituationId) => BY_ID.get(id)!;
@@ -94,8 +131,9 @@ export function pickEmotion(cfg: CompanionConfig, id: SituationId): Emotion | nu
 
 /** Gerakan yang menyertai ekspresi saat muncul karena kejadian. */
 export function motionOf(e: Emotion): 'none' | 'shake' | 'bounce' | 'pop' {
-  if (e === 'happy' || e === 'joy' || e === 'excited' || e === 'love') return 'bounce';
-  if (e === 'surprised' || e === 'scared' || e === 'angry') return 'shake';
+  if (e === 'happy' || e === 'joy' || e === 'excited' || e === 'love' || e === 'sing' || e === 'proud') return 'bounce';
+  if (e === 'surprised' || e === 'scared' || e === 'angry' || e === 'hot') return 'shake';
+  if (e === 'wow') return 'pop';
   if (e === 'hello') return 'pop';
   return 'none';
 }
