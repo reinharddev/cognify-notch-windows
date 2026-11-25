@@ -54,7 +54,8 @@ export const POSES: Record<Emotion, Pose> = {
   cry: P({ top: 0.35, tilt: -18, mw: 4, mc: -2.7, mo: 1.2, mr: 0.4, deco: 'tear' }),
   hot: P({ top: 0.5, sy: 0.85, mw: 4, mc: -0.5, mo: 3, mr: 0.8, deco: 'sweat' }),
   wow: P({ sx: 1.3, sy: 1.35, mw: 3.6, mc: 0, mo: 3.8, mr: 1, deco: 'sparkle' }),
-  bliss: P({ top: 0.08, bot: 0.6, sy: 0.92, mw: 5, mc: 4, mo: 1 }),
+  // Menikmati lagu dengan tenang: mata terpejam santai (lengkung tipis ke bawah) dan senyum kecil tertutup.
+  bliss: P({ top: 0.8, sy: 1.08, gy: 0.4, mw: 3.4, mc: 2, mo: 0 }),
 };
 
 type Step = [Emotion, number, Reaction];

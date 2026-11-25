@@ -86,7 +86,7 @@ export const SITUATIONS: Situation[] = [
  */
 export const POOLS: Partial<Record<SituationId, Emotion[]>> = {
   normal: ['idle', 'content', 'curious', 'smug', 'proud', 'idle', 'bored', 'shy'],
-  music: ['bliss', 'happy', 'bliss', 'sing', 'content', 'love', 'bliss', 'joy'],
+  music: ['bliss', 'bliss', 'content', 'bliss', 'content', 'bliss'],
   focus: ['determined', 'suspicious', 'determined', 'content', 'proud'],
   rest: ['content', 'happy', 'sleepy', 'joy', 'yawn'],
   offline: ['sad', 'cry', 'confused', 'worried', 'bored'],

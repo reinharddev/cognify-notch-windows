@@ -49,4 +49,20 @@ describe('pelacak irama', () => {
     expect(t.beats).toBeGreaterThanOrEqual(12);
     expect(t.audible).toBe(true);
   });
+  it('anggukan santai tidak pernah lebih rapat dari ~1,3 detik dan sejalan dengan ketukan', () => {
+    const t = new BeatTracker();
+    const deep: number[] = [];
+    for (let time = 10; time < 16; time += 0.01) {
+      t.feedSteady(time);
+      if (t.slowDepth(time) > 0.999) deep.push(time);
+    }
+    expect(t.slowCycle).toBe(4);
+    expect(deep.length).toBeGreaterThanOrEqual(1);
+    for (let i = 1; i < deep.length; i++) if (deep[i] - deep[i - 1] > 0.05) expect(deep[i] - deep[i - 1]).toBeGreaterThan(1.3);
+  });
+  it('goyangan santai tetap dalam rentang', () => {
+    const t = new BeatTracker();
+    t.feedSteady(0);
+    for (let i = 0; i < 200; i++) expect(Math.abs(t.slowSway(i * 0.05))).toBeLessThanOrEqual(1.0001);
+  });
 });

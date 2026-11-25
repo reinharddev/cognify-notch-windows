@@ -6,7 +6,8 @@ const dynamic: CompanionConfig = { mode: 'dynamic', fixed: 'idle', blink: true, 
 describe('wajah dinamis', () => {
   it('kumpulan ekspresi hanya berisi ekspresi yang ada dan punya variasi', () => {
     for (const [id, pool] of Object.entries(POOLS)) {
-      expect(new Set(pool).size, id).toBeGreaterThanOrEqual(4);
+      // Musik sengaja tenang (menikmati dan tenang saja); keadaan lain bervariasi.
+      expect(new Set(pool).size, id).toBeGreaterThanOrEqual(id === 'music' ? 2 : 4);
       for (const e of pool!) expect((EMOTIONS as readonly string[]).includes(e), `${id}:${e}`).toBe(true);
     }
   });

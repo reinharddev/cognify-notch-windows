@@ -7,12 +7,13 @@ import { device } from './system.svelte';
 // `device.level`, perangkat keluaran bawaan: speaker, headphone, atau Bluetooth) diumpankan ke BeatTracker ~30 kali per detik hanya
 // selama `face.groove` (musik diputar, mode Dinamis). Tanpa data suara, ketukan sintetis pada tempo sedang.
 
+export const NOTE_LIFE = 2.6;
+
 export interface Note { t0: number; glyph: string; side: number; x0: number }
 
 class Vibe {
   nodY = $state(0);
   rot = $state(0);
-  hum = $state(0);
   notes = $state<Note[]>([]);
   /** Waktu bingkai terakhir (detik), supaya nada bisa dihitung umurnya saat digambar. */
   now = $state(0);
@@ -38,7 +39,7 @@ class Vibe {
   private reset() {
     cancelAnimationFrame(this.frame);
     this.frame = 0;
-    this.nodY = 0; this.rot = 0; this.hum = 0; this.notes = [];
+    this.nodY = 0; this.rot = 0; this.notes = [];
   }
 
   private start() {
@@ -52,19 +53,19 @@ class Vibe {
       const tr = this.tracker;
       if (t - this.levelAt < 1.5 && level > 0.01) tr.feed(level, t); else tr.feedSteady(t);
       if (tr.audible) {
-        const amp = 0.45 + 0.55 * Math.min(1, tr.energy * 1.4);
-        const depth = tr.depth(t);
-        this.nodY = amp * 4.4 * depth;
-        this.rot = amp * 3 * tr.sway(t);
-        this.hum = Math.min(0.5, tr.energy * 0.55 * (0.55 + 0.45 * depth));
-        if (tr.beats > this.lastBeats && tr.beats % 2 === 0 && this.notes.length < 3) {
-          const side = tr.beats % 4 === 0 ? 1 : -1;
-          this.notes = [...this.notes, { t0: t, glyph: ['♪', '♫', '♬'][(tr.beats / 2) % 3], side, x0: side * (22 + Math.random() * 8) }];
+        // Santai: anggukan lambat (satu siklus beberapa ketukan, minimal ~1,3 detik) dan kecil; mulut tetap senyum tertutup.
+        const amp = 0.5 + 0.35 * Math.min(1, tr.energy * 1.4);
+        this.nodY = amp * 2.4 * tr.slowDepth(t);
+        this.rot = amp * 1.8 * tr.slowSway(t);
+        // Nada jarang dan lembut: satu tiap empat ketukan, paling banyak dua sekaligus.
+        if (tr.beats > this.lastBeats && tr.beats % 4 === 0 && this.notes.length < 2) {
+          const side = tr.beats % 8 === 0 ? 1 : -1;
+          this.notes = [...this.notes, { t0: t, glyph: ['♪', '♫'][(tr.beats / 4) % 2], side, x0: side * (22 + Math.random() * 8) }];
         }
-      } else { this.nodY = 0; this.rot = 0; this.hum = 0; }
+      } else { this.nodY = 0; this.rot = 0; }
       this.lastBeats = tr.beats;
       this.now = t;
-      if (this.notes.length && this.notes.some((n) => t - n.t0 > 1.7)) this.notes = this.notes.filter((n) => t - n.t0 <= 1.7);
+      if (this.notes.length && this.notes.some((n) => t - n.t0 > NOTE_LIFE)) this.notes = this.notes.filter((n) => t - n.t0 <= NOTE_LIFE);
     };
     this.frame = requestAnimationFrame(step);
   }

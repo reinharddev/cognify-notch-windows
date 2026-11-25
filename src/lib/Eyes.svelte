@@ -89,7 +89,7 @@
 {#if head}
     <div class="headbox" bind:this={box}><Head /></div>
   {:else}
-    <span class="eyes" bind:this={box} style:gap="{gap}px" style:transform={face.groove ? `translateY(${vibe.nodY * 0.4}px) rotate(${vibe.rot * 0.5}deg)` : undefined}>
+    <span class="eyes" bind:this={box} style:gap="{gap}px" style:transform={face.groove ? `translateY(${vibe.nodY * 0.3}px) rotate(${vibe.rot * 0.4}deg)` : undefined}>
       {#each [false, true] as right}
         <svg class="notchEye" viewBox="-7 -8 14 16" width="14" height="16" aria-hidden="true">{@render eye(right, 1)}</svg>
       {/each}
