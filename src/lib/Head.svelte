@@ -1,6 +1,7 @@
 <script lang="ts">
   import { face } from './face.svelte';
   import { gaze } from './gaze.svelte';
+  import { vibe } from './vibe.svelte';
 
   // Kepala bulat untuk mode pill (mengambang), bergaya Mimik/bbot: kepala bulat sempurna dengan cincin tipis, mata bulat
   // besar, dan mulut. Mata dan mulut menempel pada permukaan kepala yang berbentuk bola, dan bola itu diputar mengikuti
@@ -26,7 +27,8 @@
   const p = $derived(face.pose);
   const hidden = $derived(p.deco === 'heart' || p.deco === 'spiral');
   const eyeAt = (side: number) => project(side * EYE_X + p.gx * 2, EYE_Y + p.gy * 2);
-  const mw = $derived(Math.max(1, p.mw * 2.2)), mc = $derived(p.mc * 2.2), mo = $derived(p.mo * 1.7);
+  // Bersenandung: mulut membuka sedikit mengikuti kerasnya musik (vibe.hum), tidak penuh seperti bicara.
+  const mw = $derived(Math.max(1, p.mw * 2.2)), mc = $derived(p.mc * 2.2), mo = $derived(Math.max(p.mo * 1.7, vibe.hum * 9));
   const mouthSpot = $derived(project(0, MOUTH_Y));
   // Satu bentuk mulut: garis lengkung; saat terbuka, sisi bawahnya melengkung ke bawah dan bidangnya terisi.
   const mouthLine = $derived(`M${-mw} ${-mc * 0.3}Q0 ${mc * 0.7} ${mw} ${-mc * 0.3}`);
@@ -46,7 +48,8 @@
     <clipPath id="face{uid}"><circle r={R} /></clipPath>
   </defs>
   <circle class="skin" r={R} />
-  <g clip-path="url(#face{uid})">
+  <!-- Mengangguk mengikuti lagu: seluruh wajah turun sedikit dan miring bergantian; cincin dan bentuk notch tetap diam. -->
+  <g clip-path="url(#face{uid})" style:transform="translate(0px, {vibe.nodY}px) rotate({vibe.rot}deg)">
     {#each [-1, 1] as side}
       {@const right = side > 0}
       {@const e = eyeAt(side)}
@@ -79,6 +82,11 @@
   </g>
   <circle class="ring" r={R - 0.9} />
 
+  {#each vibe.notes as n (n.t0)}
+    {@const age = (vibe.now - n.t0) / 1.7}
+    <text class="vnote" x={n.x0 + Math.sin(age * 5) * 3 + n.side * age * 6} y={-6 - age * 28} style:opacity={Math.sin(Math.PI * Math.min(1, age * 1.05)) * 0.95}>{n.glyph}</text>
+  {/each}
+
   {#if p.deco === 'z'}<text class="sym z" x="26" y="-18">z</text>
   {:else if p.deco === 'question'}<text class="sym" x="27" y="-22">?</text>
   {:else if p.deco === 'bang'}<text class="sym" x="27" y="-22">!</text>
@@ -105,6 +113,7 @@
   .drop { fill: #7dd3fc; }
   .sym { font: 800 20px system-ui, sans-serif; fill: #fff; }
   .z { fill: rgba(255, 255, 255, .65); font-size: 16px; }
+  .vnote { font: 800 14px system-ui, sans-serif; fill: #fff; text-anchor: middle; }
   .note { font: 800 18px system-ui, sans-serif; fill: #fff; animation: note 1.3s ease-in-out infinite; }
   .spark { fill: #fde68a; transform-box: fill-box; transform-origin: center; animation: twinkle 1.1s ease-in-out infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }

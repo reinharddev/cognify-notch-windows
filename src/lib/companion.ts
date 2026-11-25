@@ -9,7 +9,7 @@ export const EMOTIONS = [
   'suspicious', 'smug', 'bored', 'tired', 'exhausted', 'yawn',
   'worried', 'sad', 'annoyed', 'angry', 'determined',
   'sleepy', 'sleep',
-  'sing', 'proud', 'shy', 'cry', 'hot', 'wow',
+  'sing', 'proud', 'shy', 'cry', 'hot', 'wow', 'bliss',
 ] as const;
 export type Emotion = (typeof EMOTIONS)[number];
 
@@ -22,7 +22,7 @@ const NAMES: Record<Emotion, [string, string]> = {
   yawn: ['Menguap', 'Yawning'], worried: ['Cemas', 'Worried'], sad: ['Sedih', 'Sad'], annoyed: ['Kesal', 'Annoyed'],
   angry: ['Marah', 'Angry'], determined: ['Serius', 'Determined'], sleepy: ['Mengantuk', 'Sleepy'], sleep: ['Tidur', 'Asleep'],
   sing: ['Bernyanyi', 'Singing'], proud: ['Bangga', 'Proud'], shy: ['Malu', 'Shy'], cry: ['Menangis', 'Crying'],
-  hot: ['Kepanasan', 'Hot'], wow: ['Takjub', 'Amazed'],
+  hot: ['Kepanasan', 'Hot'], wow: ['Takjub', 'Amazed'], bliss: ['Menikmati', 'Enjoying'],
 };
 export const emotionLabel = (e: Emotion) => L(...NAMES[e]);
 
@@ -86,7 +86,7 @@ export const SITUATIONS: Situation[] = [
  */
 export const POOLS: Partial<Record<SituationId, Emotion[]>> = {
   normal: ['idle', 'content', 'curious', 'smug', 'proud', 'idle', 'bored', 'shy'],
-  music: ['sing', 'happy', 'joy', 'love', 'sing', 'excited', 'smug', 'content'],
+  music: ['bliss', 'happy', 'bliss', 'sing', 'content', 'love', 'bliss', 'joy'],
   focus: ['determined', 'suspicious', 'determined', 'content', 'proud'],
   rest: ['content', 'happy', 'sleepy', 'joy', 'yawn'],
   offline: ['sad', 'cry', 'confused', 'worried', 'bored'],

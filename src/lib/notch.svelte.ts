@@ -179,7 +179,8 @@ class Notch {
 
   /** Mode pill yang sedang diam: tampil sebagai kepala bulat (mata + mulut), bukan pil kosong. */
   get headMode() {
-    return this.pill && features.companion && !this.open && !news.level && !news.current && !this.live && !this.wings;
+    // Lagu yang diputar sendirian tidak menggantikan kepala: kepala justru ikut menikmati (lihat vibe.svelte.ts).
+    return this.pill && features.companion && !this.open && !news.level && !news.current && !this.live;
   }
 
   get size() {

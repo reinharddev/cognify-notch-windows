@@ -5,6 +5,7 @@
   import { device } from './system.svelte';
   import Head from './Head.svelte';
   import { gaze } from './gaze.svelte';
+  import { vibe } from './vibe.svelte';
 
   // Wajah teman kecil (lihat face.svelte.ts). Mode notch: dua mata persegi panjang bulat 8x12 dengan pendar aksen.
   // Mode kepala (pill mengambang): kepala bulat dengan mata dan mulut. Kelopak, kemiringan, ukuran, dan mulut
@@ -88,7 +89,7 @@
 {#if head}
     <div class="headbox" bind:this={box}><Head /></div>
   {:else}
-    <span class="eyes" class:groove={face.groove} bind:this={box} style:gap="{gap}px">
+    <span class="eyes" bind:this={box} style:gap="{gap}px" style:transform={face.groove ? `translateY(${vibe.nodY * 0.4}px) rotate(${vibe.rot * 0.5}deg)` : undefined}>
       {#each [false, true] as right}
         <svg class="notchEye" viewBox="-7 -8 14 16" width="14" height="16" aria-hidden="true">{@render eye(right, 1)}</svg>
       {/each}
@@ -108,7 +109,6 @@
   .spark.on { animation: twinkle 1.1s ease-in-out infinite; }
   .blush { fill: #ff7aa2; }
   .tear { fill: #7dd3fc; }
-  .groove { animation: groove .54s ease-in-out infinite alternate; }
   .eye, .shape, .lid { transform-origin: 0 0; transform-box: view-box; }
   .body { fill: #fff; }
   .lid { fill: #000; stroke: none; }
@@ -119,8 +119,7 @@
   .sym { font: 800 10px system-ui, sans-serif; fill: #fff; }
   .drop { fill: #7dd3fc; }
   @keyframes spin { to { transform: rotate(360deg); } }
-  @keyframes groove { from { transform: translateY(0) rotate(-2deg); } to { transform: translateY(-1.5px) rotate(2deg); } }
   @keyframes note { 0% { transform: translate(0, 2px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translate(3px, -5px); opacity: 0; } }
   @keyframes twinkle { 0%, 100% { transform: scale(.6); } 50% { transform: scale(1.15); } }
-  @media (prefers-reduced-motion: reduce) { .spiral, .note.on, .spark.on, .groove { animation: none; } }
+  @media (prefers-reduced-motion: reduce) { .spiral, .note.on, .spark.on { animation: none; } }
 </style>

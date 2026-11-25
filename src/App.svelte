@@ -270,7 +270,7 @@
           <NoticeCard card={news.current} />
         </div>
       {/key}
-    {:else if notch.wings && device.media}
+    {:else if notch.wings && device.media && !notch.headMode}
       <div class="layer center" style:--lw="{(notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
