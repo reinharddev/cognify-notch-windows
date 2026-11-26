@@ -353,13 +353,42 @@ fn skin_url(id: &str, entry: &str) -> String {
 
 // ------------------------------------------------------------------------------------------------ jendela ---
 
+// ---- Penempatan: tidak pernah keluar layar (sama dengan SkinPlacement.swift di Mac) ----
+
+/// Menggeser jendela (x, y, w, h) supaya seluruhnya di dalam area; bila lebih besar dari area, menempel di tepi kiri atas.
+fn clamp_to(area: (i32, i32, i32, i32), x: i32, y: i32, w: i32, h: i32) -> (i32, i32) {
+    let (ax, ay, aw, ah) = area;
+    (x.min(ax + aw - w).max(ax), y.min(ay + ah - h).max(ay))
+}
+
+/// Pengali yang diminta, dikecilkan bila dengan itu skin tidak muat di area (96%), paling kecil 50% dan paling besar 250%.
+fn fit_scale(wanted: f64, base: (f64, f64), area: (f64, f64)) -> f64 {
+    let limit = (area.0 * 0.96 / base.0).min(area.1 * 0.96 / base.1);
+    wanted.min(limit).min(2.5).max(0.5)
+}
+
+fn work_area_of(monitor: &tauri::window::Monitor) -> (i32, i32, i32, i32) {
+    let a = monitor.work_area();
+    (a.position.x, a.position.y, a.size.width as i32, a.size.height as i32)
+}
+
+/// Pengali yang muat di satu layar (area kerja dalam piksel logis).
+fn fit_on(monitor: &tauri::window::Monitor, info: &SkinInfo, wanted: f64) -> f64 {
+    let (area, dpi) = (monitor.work_area(), monitor.scale_factor());
+    fit_scale(wanted, (info.width, info.height), (area.size.width as f64 / dpi, area.size.height as f64 / dpi))
+}
+
+/// Layar tempat titik berada.
+fn monitor_at(app: &AppHandle, x: f64, y: f64) -> Option<tauri::window::Monitor> {
+    app.available_monitors().ok()?.into_iter().find(|m| {
+        let (p, s) = (m.position(), m.size());
+        x >= p.x as f64 && x < (p.x + s.width as i32) as f64 && y >= p.y as f64 && y < (p.y + s.height as i32) as f64
+    })
+}
+
 /// Ukuran terbesar sebuah skin: tidak melewati 96% area kerja layar utama (tanpa taskbar), paling banyak 250%.
 fn max_scale(app: &AppHandle, info: &SkinInfo) -> f64 {
-    let Some(monitor) = app.primary_monitor().ok().flatten() else { return 2.5 };
-    let (area, dpi) = (monitor.work_area(), monitor.scale_factor());
-    let fit_w = area.size.width as f64 * 0.96 / (info.width * dpi);
-    let fit_h = area.size.height as f64 * 0.96 / (info.height * dpi);
-    fit_w.min(fit_h).min(2.5).max(0.5)
+    app.primary_monitor().ok().flatten().map(|m| fit_on(&m, info, 2.5)).unwrap_or(2.5)
 }
 
 fn scale_of(app: &AppHandle, info: &SkinInfo) -> f64 {
@@ -373,11 +402,7 @@ fn scale_of(app: &AppHandle, info: &SkinInfo) -> f64 {
 /// Jendela tetap di dalam area kerja layar tempatnya berada (diperbesar tidak boleh keluar layar).
 fn keep_on_screen(w: &WebviewWindow, size: (u32, u32)) {
     let (Ok(Some(monitor)), Ok(p)) = (w.current_monitor(), w.outer_position()) else { return };
-    let area = monitor.work_area();
-    let (ax, ay) = (area.position.x, area.position.y);
-    let (aw, ah) = (area.size.width as i32, area.size.height as i32);
-    let x = p.x.min(ax + aw - size.0 as i32).max(ax);
-    let y = p.y.min(ay + ah - size.1 as i32).max(ay);
+    let (x, y) = clamp_to(work_area_of(&monitor), p.x, p.y, size.0 as i32, size.1 as i32);
     if (x, y) != (p.x, p.y) {
         let _ = w.set_position(PhysicalPosition::new(x, y));
     }
@@ -580,6 +605,22 @@ fn close_skin(app: &AppHandle, id: &str) {
     let _ = app.emit("skins-changed", ());
 }
 
+/// Menyesuaikan satu skin dengan layar tempatnya berada: ukuran dikecilkan bila tidak muat (pilihan pengguna tetap
+/// tersimpan), lalu digeser ke dalam layar. Tidak melakukan apa-apa bila sudah pas.
+fn refit(app: &AppHandle, id: &str, w: &WebviewWindow) {
+    let skins = app.state::<Skins>();
+    let Some(info) = info_of(&skins, id) else { return };
+    let monitor = w.current_monitor().ok().flatten().or_else(|| app.primary_monitor().ok().flatten());
+    let Some(monitor) = monitor else { return };
+    let target = fit_on(&monitor, &info, scale_of(app, &info));
+    let current = skins.applied.lock().unwrap().get(id).copied().unwrap_or(target);
+    if (target - current).abs() > 0.005 {
+        resize_skin(app, id, w, &info, target);
+    } else if let Ok(size) = w.outer_size() {
+        keep_on_screen(w, (size.width, size.height));
+    }
+}
+
 // ---------------------------------------------------------------------------------- kursor dan seret ---
 
 struct Drag {
@@ -597,6 +638,7 @@ fn spawn_loop(app: AppHandle) {
         let mut drag: Option<Drag> = None;
         let mut was_down = false;
         let mut last_level = Instant::now();
+        let mut last_fit = Instant::now();
         let mut last_cursor = (i32::MIN, i32::MIN);
         let mut moved_at = Instant::now();
         loop {
@@ -624,11 +666,19 @@ fn spawn_loop(app: AppHandle) {
             if let Some(d) = &drag {
                 if down {
                     if let Some((_, w)) = wins.iter().find(|(id, _)| *id == d.id) {
-                        let nx = d.origin.0 + (cursor.x - d.cursor.0) as i32;
-                        let ny = d.origin.1 + (cursor.y - d.cursor.1) as i32;
+                        let mut nx = d.origin.0 + (cursor.x - d.cursor.0) as i32;
+                        let mut ny = d.origin.1 + (cursor.y - d.cursor.1) as i32;
+                        // Tidak pernah keluar layar: dibatasi ke layar tempat kursor berada (masih bisa pindah ke layar kedua).
+                        if let (Some(m), Ok(size)) = (monitor_at(&app, cursor.x, cursor.y), w.outer_size()) {
+                            (nx, ny) = clamp_to(work_area_of(&m), nx, ny, size.width as i32, size.height as i32);
+                        }
                         let _ = w.set_position(PhysicalPosition::new(nx, ny));
                     }
                 } else {
+                    // Dilepas: bila layarnya lebih kecil, ukurannya disesuaikan.
+                    if let Some((id, w)) = wins.iter().find(|(id, _)| *id == d.id) {
+                        refit(&app, id, w);
+                    }
                     drag = None;
                 }
             } else if down && !was_down && (arranging || winsys::alt_down()) {
@@ -641,6 +691,14 @@ fn spawn_loop(app: AppHandle) {
                 }
             }
             was_down = down;
+
+            // Layar dicabut atau resolusinya berubah: tiap 3 detik skin yang keluar layar dimasukkan kembali.
+            if drag.is_none() && last_fit.elapsed() >= Duration::from_secs(3) {
+                last_fit = Instant::now();
+                for (id, w) in &wins {
+                    refit(&app, id, w);
+                }
+            }
 
             // Skin "di desktop" dijaga tepat di atas desktop (±3 kali per detik; tidak mengubah apa pun bila sudah pas).
             let on_top = skins.saved.lock().unwrap().on_top;
@@ -927,5 +985,33 @@ pub fn skins_notice(app: AppHandle) {
         if info_of(&skins, &id).map(|i| i.notch).unwrap_or(false) {
             eval(&w, "window.cognify&&window.cognify._notice()");
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SCREEN: (i32, i32, i32, i32) = (0, 0, 1440, 875);
+
+    #[test]
+    fn dragged_past_every_edge_stays_inside() {
+        for (x, y) in [(-300, 400), (1300, 400), (100, -90), (100, 860)] {
+            let (nx, ny) = clamp_to(SCREEN, x, y, 620, 150);
+            assert!(nx >= 0 && ny >= 0 && nx + 620 <= 1440 && ny + 150 <= 875, "{x},{y} -> {nx},{ny}");
+        }
+        assert_eq!(clamp_to(SCREEN, 100, 100, 180, 180), (100, 100));
+    }
+
+    #[test]
+    fn second_screen_with_negative_origin() {
+        assert_eq!(clamp_to((-1920, 100, 1920, 1055), -2100, 0, 300, 200), (-1920, 100));
+    }
+
+    #[test]
+    fn scale_shrinks_on_smaller_screen() {
+        assert_eq!(fit_scale(2.5, (620.0, 150.0), (2560.0, 1400.0)), 2.5);
+        assert!((fit_scale(2.5, (620.0, 150.0), (1280.0, 700.0)) - 1280.0 * 0.96 / 620.0).abs() < 0.001);
+        assert_eq!(fit_scale(1.0, (620.0, 150.0), (200.0, 100.0)), 0.5);
     }
 }
