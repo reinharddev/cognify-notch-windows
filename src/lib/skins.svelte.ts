@@ -10,8 +10,13 @@ export interface SkinInfo {
   cursor: boolean; audio: boolean; notch: boolean; anchor: string; entry: string;
 }
 
+/** Warna skin Lirik: baris yang dinyanyikan, dan judul + baris berikutnya. */
+export interface LyricColors { color: string; sub: string }
+export const defaultLyrics = (): LyricColors => ({ color: '#ffffff', sub: '#ffffff' });
+
 interface StateView {
-  skins: SkinInfo[]; enabled: string[]; onTop: boolean; scale: number; arranging: boolean;
+  skins: SkinInfo[]; enabled: string[]; onTop: boolean; arranging: boolean;
+  scales: Record<string, number>; maxScales: Record<string, number>; lyrics: Partial<LyricColors> | null;
   mimik: Partial<MimikStyle> | null; presets: MimikPreset[] | null; folder: string;
 }
 
@@ -19,7 +24,11 @@ class SkinsStore {
   skins = $state<SkinInfo[]>([]);
   enabled = $state<string[]>([]);
   onTop = $state(false);
-  scale = $state(1);
+  /** Ukuran per skin dan batasnya menurut layar (dari Rust). */
+  scales = $state<Record<string, number>>({});
+  maxScales = $state<Record<string, number>>({});
+  lyrics = $state<LyricColors>(defaultLyrics());
+  private lyricTimer = 0;
   arranging = $state(false);
   folder = $state('');
   mimik = $state<MimikStyle>(defaultMimik());
@@ -41,7 +50,9 @@ class SkinsStore {
     this.skins = s.skins;
     this.enabled = s.enabled;
     this.onTop = s.onTop;
-    this.scale = s.scale;
+    this.scales = s.scales ?? {};
+    this.maxScales = s.maxScales ?? {};
+    this.lyrics = { ...defaultLyrics(), ...(s.lyrics ?? {}) };
     this.arranging = s.arranging;
     this.folder = s.folder;
     this.mimik = { ...defaultMimik(), ...(s.mimik ?? {}) };
@@ -57,7 +68,18 @@ class SkinsStore {
   }
 
   setOnTop(v: boolean) { this.onTop = v; void cmd('skins_set_option', { onTop: v }); }
-  setScale(v: number) { this.scale = v; void cmd('skins_set_option', { scale: v }); }
+  scaleOf(id: string) { return this.scales[id] ?? 1; }
+  maxScaleOf(id: string) { return this.maxScales[id] ?? 2.5; }
+  setScale(id: string, v: number) {
+    const value = Math.min(this.maxScaleOf(id), Math.max(0.5, v));
+    this.scales = { ...this.scales, [id]: value };
+    void cmd('skins_set_scale', { id, scale: value });
+  }
+  setLyrics(partial: Partial<LyricColors>) {
+    this.lyrics = { ...this.lyrics, ...partial };
+    clearTimeout(this.lyricTimer);
+    this.lyricTimer = window.setTimeout(() => void cmd('skins_save_lyrics', { style: $state.snapshot(this.lyrics) }), 120);
+  }
   setArranging(v: boolean) { this.arranging = v; void cmd('skins_set_arranging', { on: v }); }
   resetPositions() { void cmd('skins_reset_positions'); }
   reveal() { void cmd('skins_reveal'); }

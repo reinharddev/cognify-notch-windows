@@ -14,6 +14,19 @@ import type { SkinInfo } from './skins.svelte';
 // kursor di atas notch, dan notifikasi. Skin ada di jendela lain tanpa akses ke data ini; semuanya dikirim lewat Rust.
 // Tidak ada yang berjalan selama tidak ada skin yang menyala.
 
+/** Isi data tanpa bagian yang selalu berubah (waktu kirim, posisi lagu yang maju sendiri). Keranjang 10 menit tetap membuat
+ *  suasana menurut jam menyegar. Sama dengan `signature` di Skins.swift (Mac). */
+export function payloadSignature(data: Record<string, unknown>): string {
+  const { now, media, ...rest } = data as { now?: number; media?: { position?: number; sentAt?: number; playing?: boolean; rate?: number } };
+  let m = media as Record<string, unknown> | undefined;
+  if (media) {
+    const { sentAt = 0, position, ...other } = media;
+    const start = position == null ? position : Math.round(media.playing ? position - (sentAt / 1000) * (media.rate ?? 1) : position);
+    m = { ...other, position: start };
+  }
+  return JSON.stringify({ bucket: Math.floor((now ?? 0) / 600_000), media: m, ...rest });
+}
+
 class SkinBridge {
   /** Skin yang sedang menyala (diperbarui Rust lewat `skins-changed`). */
   active = $state<SkinInfo[]>([]);
@@ -24,7 +37,7 @@ class SkinBridge {
     if (!inTauri || windowKind !== 'notch') return;
     void this.refresh();
     void listen('skins-changed', () => void this.refresh());
-    void listen('skins-need-data', () => this.push());
+    void listen('skins-need-data', () => this.push(true));
 
     $effect.root(() => {
       // Data berubah: kirim ulang (ditunda 250 ms seperti di Mac supaya perubahan beruntun jadi satu kiriman).
@@ -95,12 +108,20 @@ class SkinBridge {
     return d;
   }
 
-  push() {
+  private lastSignature = '';
+
+  /** Kirim hanya bila isinya berubah (hemat daya); `force` saat halaman skin baru dimuat. */
+  push(force = false) {
     if (!this.active.length) return;
-    void cmd('skins_push', { json: JSON.stringify(this.build()) });
+    const data = this.build();
+    const signature = payloadSignature(data);
+    if (!force && signature === this.lastSignature) return;
+    this.lastSignature = signature;
+    void cmd('skins_push', { json: JSON.stringify(data) });
   }
 
   // ---- Irama ----
+  // 10 kali per detik cukup: wajah menghitung fasenya sendiri di antara kiriman.
 
   private startAudio() {
     if (this.audioFrame) return;
@@ -109,7 +130,7 @@ class SkinBridge {
     const step = (ms: number) => {
       this.audioFrame = requestAnimationFrame(step);
       const t = ms / 1000;
-      if (t - last < 1 / 15 - 0.004) return;
+      if (t - last < 1 / 10 - 0.004) return;
       last = t;
       const level = device.level;
       if (level !== prevLevel) { prevLevel = level; levelAt = t; }

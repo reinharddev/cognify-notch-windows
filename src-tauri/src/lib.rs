@@ -806,6 +806,8 @@ pub fn run() {
             skins::skins_state,
             skins::skins_set_enabled,
             skins::skins_set_option,
+            skins::skins_set_scale,
+            skins::skins_save_lyrics,
             skins::skins_set_arranging,
             skins::skins_reset_positions,
             skins::skins_reveal,

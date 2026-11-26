@@ -4,7 +4,7 @@
   import Setting from './Setting.svelte';
   import Segmented from './Segmented.svelte';
   import { L } from '../i18n';
-  import { skins } from '../skins.svelte';
+  import { skins, defaultLyrics } from '../skins.svelte';
   import { MOODS, PRESETS, REACTIONS, SHAPES, defaultMimik, mimikConfig, randomPalette } from '../mimik';
 
   // Pengaturan > Skin: sama dengan SkinsPane dan MimikPlayground di Mac (Skins.swift, SkinPlayground.swift): daftar skin,
@@ -109,8 +109,31 @@
   {/if}
   {#each skins.skins as skin (skin.id)}
     <Setting toggle title={skin.name} desc={skin.desc} checked={skins.isOn(skin.id)} onchange={(v) => skins.setOn(skin.id, v)} />
+    {#if skins.isOn(skin.id)}
+      <Setting sub stack title={L('Ukuran', 'Size')}>
+        <div class="slider">
+          <input type="range" min="0.5" max={skins.maxScaleOf(skin.id)} step="0.01" value={skins.scaleOf(skin.id)} oninput={(e) => skins.setScale(skin.id, Number(e.currentTarget.value))} aria-label="{L('Ukuran', 'Size')} {skin.name}" />
+          <span class="val">{Math.round(skins.scaleOf(skin.id) * 100)}%</span>
+          <button class="btn ghost" onclick={() => skins.setScale(skin.id, 1)} disabled={Math.round(skins.scaleOf(skin.id) * 100) === 100} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button>
+        </div>
+      </Setting>
+    {/if}
   {/each}
 </Group>
+
+{#if skins.isOn('lyrics')}
+  <Group title={L('Warna lirik', 'Lyrics colour')}>
+    <Setting title={L('Baris yang dinyanyikan', 'Current line')}>
+      <input class="color" type="color" value={skins.lyrics.color} oninput={(e) => skins.setLyrics({ color: e.currentTarget.value })} aria-label={L('Baris yang dinyanyikan', 'Current line')} />
+    </Setting>
+    <Setting title={L('Judul dan baris berikutnya', 'Title and next line')}>
+      <input class="color" type="color" value={skins.lyrics.sub} oninput={(e) => skins.setLyrics({ sub: e.currentTarget.value })} aria-label={L('Judul dan baris berikutnya', 'Title and next line')} />
+    </Setting>
+    <Setting title={L('Kembalikan ke putih', 'Reset to white')}>
+      <button class="btn" onclick={() => skins.setLyrics(defaultLyrics())} disabled={skins.lyrics.color === '#ffffff' && skins.lyrics.sub === '#ffffff'}>{L('Kembalikan ke putih', 'Reset to white')}</button>
+    </Setting>
+  </Group>
+{/if}
 
 <Group>
   <Setting toggle title={L('Atur posisi', 'Arrange positions')} checked={skins.arranging} onchange={(v) => skins.setArranging(v)}
@@ -124,13 +147,6 @@
   <Setting title={L('Posisi jendela', 'Window level')}>
     <Segmented label={L('Posisi jendela', 'Window level')} value={skins.onTop ? 'top' : 'desk'} onchange={(v) => skins.setOnTop(v === 'top')}
       options={[{ value: 'desk', label: L('Di desktop (di bawah jendela lain)', 'On the desktop (below other windows)') }, { value: 'top', label: L('Selalu di atas', 'Always on top') }]} />
-  </Setting>
-  <Setting stack title={L('Ukuran', 'Size')}>
-    <div class="slider">
-      <input type="range" min="0.5" max="2.5" step="0.1" value={skins.scale} oninput={(e) => skins.setScale(Number(e.currentTarget.value))} aria-label={L('Ukuran', 'Size')} />
-      <span class="val">{Math.round(skins.scale * 100)}%</span>
-      <button class="btn ghost" onclick={() => skins.setScale(1)} disabled={Math.round(skins.scale * 100) === 100} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button>
-    </div>
   </Setting>
 </Group>
 
@@ -167,6 +183,7 @@
   .btn:disabled { opacity: .45; cursor: default; }
   .btn.ghost { background: transparent; padding: 5px 9px; display: inline-flex; align-items: center; }
   .btns { display: flex; gap: 8px; }
+  .color { width: 44px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
   .slider { display: flex; align-items: center; gap: 12px; width: 100%; }
   .slider input[type=range] { flex: 1; min-width: 0; }
   .val { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }

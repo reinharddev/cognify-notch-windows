@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -99,8 +99,15 @@ struct Saved {
     /// false = di desktop (di bawah jendela lain), true = selalu di atas.
     #[serde(default)]
     on_top: bool,
+    /// Ukuran bawaan untuk skin yang belum diatur sendiri (warisan dari satu ukuran untuk semua).
     #[serde(default = "one")]
     scale: f64,
+    /// Ukuran per skin (id → pengali), dibatasi supaya tidak melewati layar.
+    #[serde(default)]
+    scales: HashMap<String, f64>,
+    /// Warna skin Lirik ({color, sub}).
+    #[serde(default)]
+    lyrics: Value,
     #[serde(default)]
     origins: HashMap<String, [i32; 2]>,
     /// Gaya wajah Mimik dari playground (bentuknya milik antarmuka Pengaturan) dan gaya yang disimpan pengguna.
@@ -116,7 +123,7 @@ fn one() -> f64 {
 
 impl Default for Saved {
     fn default() -> Self {
-        Saved { enabled: vec![], on_top: false, scale: 1.0, origins: HashMap::new(), mimik: Value::Null, presets: Value::Null }
+        Saved { enabled: vec![], on_top: false, scale: 1.0, scales: HashMap::new(), lyrics: Value::Null, origins: HashMap::new(), mimik: Value::Null, presets: Value::Null }
     }
 }
 
@@ -124,6 +131,9 @@ pub struct Skins {
     saved: Mutex<Saved>,
     infos: Mutex<Vec<SkinInfo>>,
     arranging: AtomicBool,
+    /// Zoom yang sedang terpasang per jendela (dipakai posisi kursor), dan nomor urut perubahan ukuran.
+    applied: Mutex<HashMap<String, f64>>,
+    resize_generation: AtomicU64,
     /// Reaksi sesaat yang diminta dari playground (nama, nomor urut).
     reaction: Mutex<(String, u32)>,
     folder: PathBuf,
@@ -137,6 +147,8 @@ impl Skins {
             saved: Mutex::new(Saved::default()),
             infos: Mutex::new(vec![]),
             arranging: AtomicBool::new(false),
+            applied: Mutex::new(HashMap::new()),
+            resize_generation: AtomicU64::new(0),
             reaction: Mutex::new((String::new(), 0)),
             folder: base.join("Skins"),
             file: base.join("skins.json"),
@@ -341,6 +353,63 @@ fn skin_url(id: &str, entry: &str) -> String {
 
 // ------------------------------------------------------------------------------------------------ jendela ---
 
+/// Ukuran terbesar sebuah skin: tidak melewati 96% area kerja layar utama (tanpa taskbar), paling banyak 250%.
+fn max_scale(app: &AppHandle, info: &SkinInfo) -> f64 {
+    let Some(monitor) = app.primary_monitor().ok().flatten() else { return 2.5 };
+    let (area, dpi) = (monitor.work_area(), monitor.scale_factor());
+    let fit_w = area.size.width as f64 * 0.96 / (info.width * dpi);
+    let fit_h = area.size.height as f64 * 0.96 / (info.height * dpi);
+    fit_w.min(fit_h).min(2.5).max(0.5)
+}
+
+fn scale_of(app: &AppHandle, info: &SkinInfo) -> f64 {
+    let skins = app.state::<Skins>();
+    let saved = skins.saved.lock().unwrap();
+    let wanted = saved.scales.get(&info.id).copied().unwrap_or(saved.scale);
+    drop(saved);
+    wanted.clamp(0.5, max_scale(app, info))
+}
+
+/// Jendela tetap di dalam area kerja layar tempatnya berada (diperbesar tidak boleh keluar layar).
+fn keep_on_screen(w: &WebviewWindow, size: (u32, u32)) {
+    let (Ok(Some(monitor)), Ok(p)) = (w.current_monitor(), w.outer_position()) else { return };
+    let area = monitor.work_area();
+    let (ax, ay) = (area.position.x, area.position.y);
+    let (aw, ah) = (area.size.width as i32, area.size.height as i32);
+    let x = p.x.min(ax + aw - size.0 as i32).max(ax);
+    let y = p.y.min(ay + ah - size.1 as i32).max(ay);
+    if (x, y) != (p.x, p.y) {
+        let _ = w.set_position(PhysicalPosition::new(x, y));
+    }
+}
+
+/// Mengubah ukuran tanpa memotong isi. Zoom WebView2 berlaku belakangan (tidak serempak dengan ukuran jendela), jadi urutannya:
+/// membesar = jendela dulu lalu zoom; mengecil = zoom dulu, jendela menyusul setelah sebentar (dibatalkan bila sudah ada
+/// perubahan yang lebih baru). Dengan begitu isi tidak pernah lebih besar daripada jendelanya.
+fn resize_skin(app: &AppHandle, id: &str, w: &WebviewWindow, info: &SkinInfo, scale: f64) {
+    let skins = app.state::<Skins>();
+    let generation = skins.resize_generation.fetch_add(1, Ordering::SeqCst) + 1;
+    let before = skins.applied.lock().unwrap().insert(id.to_string(), scale).unwrap_or(scale);
+    let dpi = w.scale_factor().unwrap_or(1.0);
+    let size = ((info.width * scale * dpi).round() as u32, (info.height * scale * dpi).round() as u32);
+    let logical = tauri::LogicalSize::new(info.width * scale, info.height * scale);
+    if scale >= before {
+        keep_on_screen(w, size);
+        let _ = w.set_size(logical);
+        let _ = w.set_zoom(scale);
+        return;
+    }
+    let _ = w.set_zoom(scale);
+    let (app, window) = (app.clone(), w.clone());
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(90));
+        if app.state::<Skins>().resize_generation.load(Ordering::SeqCst) == generation {
+            let _ = window.set_size(logical);
+            keep_on_screen(&window, size);
+        }
+    });
+}
+
 fn label(id: &str) -> String {
     format!("skin-{id}")
 }
@@ -387,9 +456,18 @@ fn saved_origin(app: &AppHandle, id: &str) -> Option<PhysicalPosition<i32>> {
     on_screen.then(|| PhysicalPosition::new(o[0], o[1]))
 }
 
+fn has_config(id: &str) -> bool {
+    id == "mimik" || id == "lyrics"
+}
+
+/// `config` untuk satu skin: gaya Mimik (ditambah reaksi terakhir) atau warna Lirik.
 fn page_json(app: &AppHandle, id: &str) -> Value {
     let skins = app.state::<Skins>();
-    let mut cfg = if id == "mimik" { skins.saved.lock().unwrap().mimik.clone() } else { Value::Null };
+    if id == "lyrics" {
+        let colors = skins.saved.lock().unwrap().lyrics.clone();
+        return if colors.is_null() { json!({}) } else { colors };
+    }
+    let mut cfg = skins.saved.lock().unwrap().mimik.clone();
     if cfg.is_null() {
         cfg = json!({});
     }
@@ -405,7 +483,7 @@ fn eval(w: &WebviewWindow, js: &str) {
 }
 
 fn push_config(app: &AppHandle, w: &WebviewWindow, id: &str) {
-    if id == "mimik" {
+    if has_config(id) {
         eval(w, &format!("window.cognify&&window.cognify._cfg({})", page_json(app, id)));
     }
 }
@@ -441,11 +519,8 @@ async fn open_skin(app: AppHandle, info: SkinInfo) {
     if app.get_webview_window(&label(&id)).is_some() {
         return;
     }
-    let (scale, on_top) = {
-        let skins = app.state::<Skins>();
-        let saved = skins.saved.lock().unwrap();
-        (saved.scale, saved.on_top)
-    };
+    let scale = scale_of(&app, &info);
+    let on_top = app.state::<Skins>().saved.lock().unwrap().on_top;
     let Ok(url) = Url::parse(&skin_url(&id, &info.entry)) else { return };
     let load_app = app.clone();
     let load_id = id.clone();
@@ -475,6 +550,9 @@ async fn open_skin(app: AppHandle, info: SkinInfo) {
     let origin = saved_origin(&app, &id).unwrap_or_else(|| default_origin(&app, &info, scale));
     let _ = win.set_position(origin);
     let _ = win.set_zoom(scale);
+    app.state::<Skins>().applied.lock().unwrap().insert(id.clone(), scale);
+    let dpi = win.scale_factor().unwrap_or(1.0);
+    keep_on_screen(&win, ((info.width * scale * dpi) as u32, (info.height * scale * dpi) as u32));
     // Tingkat jendela diterapkan setelah dibuat (bukan hanya lewat builder), supaya pasti berlaku di Windows.
     let arranging = app.state::<Skins>().arranging.load(Ordering::Relaxed);
     apply_level(&win, on_top, arranging);
@@ -519,6 +597,8 @@ fn spawn_loop(app: AppHandle) {
         let mut drag: Option<Drag> = None;
         let mut was_down = false;
         let mut last_level = Instant::now();
+        let mut last_cursor = (i32::MIN, i32::MIN);
+        let mut moved_at = Instant::now();
         loop {
             let wins = skin_windows(&app);
             if wins.is_empty() {
@@ -527,11 +607,17 @@ fn spawn_loop(app: AppHandle) {
                 std::thread::sleep(Duration::from_millis(400));
                 continue;
             }
-            std::thread::sleep(Duration::from_millis(33));
+            // Hemat daya: 30 kali per detik hanya selama kursor bergerak atau menyeret; diam lebih dari sedetik cukup 10 kali.
+            let idle = drag.is_none() && moved_at.elapsed() > Duration::from_secs(1);
+            std::thread::sleep(Duration::from_millis(if idle { 100 } else { 33 }));
             let Some(cursor) = wins[0].1.cursor_position().ok() else { continue };
+            let here = (cursor.x as i32, cursor.y as i32);
+            if here != last_cursor {
+                last_cursor = here;
+                moved_at = Instant::now();
+            }
             let skins = app.state::<Skins>();
             let arranging = skins.arranging.load(Ordering::Relaxed);
-            let zoom = skins.saved.lock().unwrap().scale;
 
             // Seret.
             let down = winsys::mouse_left_down();
@@ -558,7 +644,7 @@ fn spawn_loop(app: AppHandle) {
 
             // Skin "di desktop" dijaga tepat di atas desktop (±3 kali per detik; tidak mengubah apa pun bila sudah pas).
             let on_top = skins.saved.lock().unwrap().on_top;
-            if !on_top && !arranging && drag.is_none() && last_level.elapsed() >= Duration::from_millis(300) {
+            if !on_top && !arranging && drag.is_none() && last_level.elapsed() >= Duration::from_millis(500) {
                 last_level = Instant::now();
                 let handles: Vec<isize> = wins.iter().filter_map(|(_, w)| handle_of(w)).collect();
                 winsys::keep_above_desktop(&handles);
@@ -580,6 +666,7 @@ fn spawn_loop(app: AppHandle) {
                 }
                 last.insert(id.clone(), key);
                 // Titik layar (piksel fisik) → piksel CSS di dalam skin (asal kiri atas).
+                let zoom = skins.applied.lock().unwrap().get(id).copied().unwrap_or(1.0);
                 let x = (cursor.x - p.x as f64) / (scale * zoom);
                 let y = (cursor.y - p.y as f64) / (scale * zoom);
                 eval(w, &format!("window.cognify&&window.cognify._cursor({},{})", x as i32, y as i32));
@@ -615,7 +702,10 @@ pub struct StateView {
     skins: Vec<SkinInfo>,
     enabled: Vec<String>,
     on_top: bool,
-    scale: f64,
+    /// Ukuran per skin yang sedang berlaku dan batas atasnya (menurut layar).
+    scales: HashMap<String, f64>,
+    max_scales: HashMap<String, f64>,
+    lyrics: Value,
     arranging: bool,
     mimik: Value,
     presets: Value,
@@ -629,11 +719,15 @@ pub fn skins_state(app: AppHandle) -> StateView {
     let infos = skins.infos.lock().unwrap().clone();
     let folder = skins.folder.to_string_lossy().to_string();
     let arranging = skins.arranging.load(Ordering::Relaxed);
+    let scales: HashMap<String, f64> = infos.iter().map(|i| (i.id.clone(), scale_of(&app, i))).collect();
+    let max_scales: HashMap<String, f64> = infos.iter().map(|i| (i.id.clone(), max_scale(&app, i))).collect();
     StateView {
         skins: infos,
         enabled: saved.enabled,
         on_top: saved.on_top,
-        scale: saved.scale,
+        scales,
+        max_scales,
+        lyrics: saved.lyrics,
         arranging,
         mimik: saved.mimik,
         presets: saved.presets,
@@ -662,32 +756,42 @@ pub async fn skins_set_enabled(app: AppHandle, id: String, on: bool) {
     }
 }
 
-/// Tingkat jendela (`onTop`) dan ukuran (`scale`, 0,5 sampai 2,5).
+/// Tingkat jendela: di desktop atau selalu di atas.
 #[tauri::command]
-pub fn skins_set_option(app: AppHandle, on_top: Option<bool>, scale: Option<f64>) {
+pub fn skins_set_option(app: AppHandle, on_top: Option<bool>) {
     let skins = app.state::<Skins>();
-    {
-        let mut saved = skins.saved.lock().unwrap();
-        if let Some(v) = on_top {
-            saved.on_top = v;
-        }
-        if let Some(v) = scale {
-            saved.scale = v.clamp(0.5, 2.5);
-        }
+    if let Some(v) = on_top {
+        skins.saved.lock().unwrap().on_top = v;
     }
     persist(&skins);
-    let (top, scale) = {
-        let s = skins.saved.lock().unwrap();
-        (s.on_top, s.scale)
-    };
+    let top = skins.saved.lock().unwrap().on_top;
     let arranging = skins.arranging.load(Ordering::Relaxed);
-    for (id, w) in skin_windows(&app) {
+    for (_, w) in skin_windows(&app) {
         apply_level(&w, top, arranging);
-        if let Some(info) = info_of(&skins, &id) {
-            let _ = w.set_zoom(scale);
-            // Sudut kiri atas tetap: ukuran jendela berubah tanpa memindahkan posisinya.
-            let _ = w.set_size(tauri::LogicalSize::new(info.width * scale, info.height * scale));
-        }
+    }
+}
+
+/// Ukuran satu skin (pengali ukuran dasarnya), dibatasi supaya tidak melewati layar.
+#[tauri::command]
+pub fn skins_set_scale(app: AppHandle, id: String, scale: f64) {
+    let skins = app.state::<Skins>();
+    let Some(info) = info_of(&skins, &id) else { return };
+    let value = scale.clamp(0.5, max_scale(&app, &info));
+    skins.saved.lock().unwrap().scales.insert(id.clone(), value);
+    persist(&skins);
+    if let Some(w) = app.get_webview_window(&label(&id)) {
+        resize_skin(&app, &id, &w, &info, value);
+    }
+}
+
+/// Warna skin Lirik: disimpan dan langsung dikirim ke skin.
+#[tauri::command]
+pub fn skins_save_lyrics(app: AppHandle, style: Value) {
+    let skins = app.state::<Skins>();
+    skins.saved.lock().unwrap().lyrics = style;
+    persist(&skins);
+    if let Some(w) = app.get_webview_window(&label("lyrics")) {
+        push_config(&app, &w, "lyrics");
     }
 }
 
@@ -709,10 +813,9 @@ pub fn skins_reset_positions(app: AppHandle) {
     let skins = app.state::<Skins>();
     skins.saved.lock().unwrap().origins.clear();
     persist(&skins);
-    let scale = skins.saved.lock().unwrap().scale;
     for (id, w) in skin_windows(&app) {
         if let Some(info) = info_of(&skins, &id) {
-            let _ = w.set_position(default_origin(&app, &info, scale));
+            let _ = w.set_position(default_origin(&app, &info, scale_of(&app, &info)));
         }
     }
 }
@@ -785,7 +888,7 @@ pub fn skins_push(app: AppHandle, json: String) {
         return;
     }
     for (id, w) in skin_windows(&app) {
-        if id == "mimik" {
+        if has_config(&id) {
             data["config"] = page_json(&app, &id);
         } else if let Value::Object(map) = &mut data {
             map.remove("config");
