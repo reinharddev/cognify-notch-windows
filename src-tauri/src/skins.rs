@@ -418,10 +418,21 @@ fn arrange_css(on: bool) -> String {
     )
 }
 
+/// Di Windows "di desktop" TIDAK memakai `always_on_bottom` (HWND_BOTTOM bisa tertutup desktop): urutannya dijaga
+/// `keep_above_desktop` dalam putaran kursor. Platform lain memakai `always_on_bottom`.
 fn apply_level(w: &WebviewWindow, on_top: bool, arranging: bool) {
     let top = on_top || arranging;
     let _ = w.set_always_on_top(top);
-    let _ = w.set_always_on_bottom(!top);
+    let _ = w.set_always_on_bottom(!top && !cfg!(windows));
+}
+
+#[cfg(windows)]
+fn handle_of(w: &WebviewWindow) -> Option<isize> {
+    w.hwnd().ok().map(|h| h.0 as isize)
+}
+#[cfg(not(windows))]
+fn handle_of(_w: &WebviewWindow) -> Option<isize> {
+    None
 }
 
 /// Membuka jendela satu skin. Harus dipanggil dari konteks async (membuat jendela dari penangan sinkron membuat WebView2 macet).
@@ -450,7 +461,7 @@ async fn open_skin(app: AppHandle, info: SkinInfo) {
         .focused(false)
         .visible(false)
         .always_on_top(on_top)
-        .always_on_bottom(!on_top)
+        .always_on_bottom(!on_top && !cfg!(windows))
         .initialization_script(BRIDGE)
         .on_page_load(move |win, payload| {
             if let PageLoadEvent::Finished = payload.event() {
@@ -507,6 +518,7 @@ fn spawn_loop(app: AppHandle) {
         let mut last_sent = Instant::now();
         let mut drag: Option<Drag> = None;
         let mut was_down = false;
+        let mut last_level = Instant::now();
         loop {
             let wins = skin_windows(&app);
             if wins.is_empty() {
@@ -543,6 +555,14 @@ fn spawn_loop(app: AppHandle) {
                 }
             }
             was_down = down;
+
+            // Skin "di desktop" dijaga tepat di atas desktop (±3 kali per detik; tidak mengubah apa pun bila sudah pas).
+            let on_top = skins.saved.lock().unwrap().on_top;
+            if !on_top && !arranging && drag.is_none() && last_level.elapsed() >= Duration::from_millis(300) {
+                last_level = Instant::now();
+                let handles: Vec<isize> = wins.iter().filter_map(|(_, w)| handle_of(w)).collect();
+                winsys::keep_above_desktop(&handles);
+            }
 
             // Kursor untuk skin yang memintanya (±30 kali per detik, hanya bila berubah).
             if last_sent.elapsed() < Duration::from_millis(30) {

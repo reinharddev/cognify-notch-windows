@@ -15,6 +15,7 @@ pub fn fullscreen_busy() -> bool { false }
 pub fn caps_lock() -> bool { false }
 pub fn mouse_left_down() -> bool { false }
 pub fn alt_down() -> bool { false }
+pub fn keep_above_desktop(_ids: &[isize]) {}
 pub fn keyboard_lang() -> Option<String> { None }
 pub fn online() -> bool { true }
 pub fn open_target(_target: &str) {}

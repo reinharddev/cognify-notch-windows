@@ -578,3 +578,57 @@ pub fn play_chime(soft: bool) {
         let _ = unsafe { MessageBeep(if soft { MB_OK } else { MB_ICONASTERISK }) };
     }
 }
+
+// ---------- Skin di desktop ----------
+// Skin "di desktop" harus berada tepat DI ATAS jendela desktop, bukan di dasar tumpukan (HWND_BOTTOM): desktop bisa terangkat
+// di atas jendela dasar (mis. Pengaturan ditutup lalu fokus jatuh ke desktop, atau Win+D), sehingga skin hilang di baliknya.
+mod desktop {
+    use std::ffi::c_void;
+    use windows::core::{w, PCWSTR};
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        FindWindowExW, FindWindowW, GetWindow, SetWindowPos, GW_HWNDPREV, HWND_TOP, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE,
+    };
+
+    /// Jendela desktop (yang memuat ikon desktop): WorkerW yang berisi SHELLDLL_DefView, atau Progman.
+    unsafe fn desktop_window() -> Option<HWND> {
+        let mut after: Option<HWND> = None;
+        while let Ok(worker) = FindWindowExW(None, after, w!("WorkerW"), PCWSTR::null()) {
+            if worker.0.is_null() {
+                break;
+            }
+            if FindWindowExW(Some(worker), None, w!("SHELLDLL_DefView"), PCWSTR::null()).map(|h| !h.0.is_null()).unwrap_or(false) {
+                return Some(worker);
+            }
+            after = Some(worker);
+        }
+        FindWindowW(w!("Progman"), PCWSTR::null()).ok().filter(|h| !h.0.is_null())
+    }
+
+    /// Memastikan jendela-jendela ini berada tepat di atas desktop (di bawah semua jendela lain), tanpa mengaktifkannya.
+    pub fn keep_above_desktop(ids: &[isize]) {
+        unsafe {
+            let Some(desktop) = desktop_window() else { return };
+            let mut missing: Vec<isize> = ids.to_vec();
+            // Telusuri ke atas dari desktop selama jendelanya milik kita: skin yang sudah pas tidak disentuh.
+            let mut above = GetWindow(desktop, GW_HWNDPREV).ok().filter(|h| !h.0.is_null());
+            while let Some(h) = above {
+                let id = h.0 as isize;
+                if !missing.contains(&id) {
+                    break;
+                }
+                missing.retain(|m| *m != id);
+                above = GetWindow(h, GW_HWNDPREV).ok().filter(|n| !n.0.is_null());
+            }
+            // Sisanya diselipkan di bawah jendela pertama yang bukan milik kita, jadi tetap di atas desktop.
+            let insert_after = above.unwrap_or(HWND_TOP);
+            for id in missing {
+                let _ = SetWindowPos(
+                    HWND(id as *mut c_void), Some(insert_after), 0, 0, 0, 0,
+                    SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_NOOWNERZORDER,
+                );
+            }
+        }
+    }
+}
+pub use desktop::keep_above_desktop;
