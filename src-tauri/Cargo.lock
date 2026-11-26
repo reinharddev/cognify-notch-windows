@@ -549,7 +549,7 @@ dependencies = [
 
 [[package]]
 name = "cognify-notch"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "arboard",
  "base64 0.22.1",
