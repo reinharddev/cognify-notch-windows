@@ -229,6 +229,8 @@
     clampPill(); setUi();
   };
   const chosenStyle = $derived(ui.style === 'notch' ? 'notch' : ui.face ? 'face' : 'pill');
+  /** Wajah melayang menaruh lirik di sampingnya (tanpa Ekspresi CogniFace ia jadi kapsul). */
+  const faceStyle = $derived(chosenStyle === 'face' && features.companion);
   const resetPill = () => { ui.pillX = 0.5; ui.pillY = 0; clampPill(); setUi(); };
   const STYLES = [
     { id: 'notch', label: () => L('Notch', 'Notch'), hint: () => L('Menempel di tepi atas', 'Attached to the top edge') },
@@ -478,7 +480,9 @@
 
     <Group title={L('Lirik dan equalizer', 'Lyrics and equalizer')}>
       <Setting toggle title={L('Lirik di bawah notch', 'Lyrics below the notch')} desc={L('Baris kedua di bawah notch atau kapsul tertutup. Menghilang saat kursor di atasnya.', 'A second line under the closed notch or pill. Hides when the pointer is on it.')}
-        disabled={!features.lyrics || !features.lyricsWing} why={L('Nyalakan dulu Lirik lagu dan Lirik di notch tertutup di Fitur.', 'First turn on Synced lyrics and Lyrics in the closed notch in Features.')} bind:checked={ui.lyricsBelow} onchange={setUi} />
+        disabled={faceStyle || !features.lyrics || !features.lyricsWing}
+        why={faceStyle ? L('Hanya tersedia di gaya Notch dan Kapsul melayang.', 'Only available with the Notch and Floating pill styles.') : L('Nyalakan dulu Lirik lagu dan Lirik di notch tertutup di Fitur.', 'First turn on Synced lyrics and Lyrics in the closed notch in Features.')}
+        checked={ui.lyricsBelow && !faceStyle} onchange={(v) => { ui.lyricsBelow = v; setUi(); }} />
       <Setting toggle title={L('Warna equalizer dari sampul', 'Equalizer color from the album cover')} bind:checked={ui.equalizerAuto} onchange={setUi} />
       {#if !ui.equalizerAuto}
         <Setting title={L('Warna equalizer', 'Equalizer color')}>
