@@ -1,6 +1,4 @@
-// Teks antarmuka dalam dua bahasa, sama seperti versi Mac: L('indonesia', 'english').
-// Bahasa mengikuti bahasa Windows; Indonesia dan Melayu memilih Indonesia.
-// Pilihan di Pengaturan (id atau en) menggantikan bahasa Windows; berlaku setelah jendela dimuat ulang.
-const chosen = (() => { try { return JSON.parse(localStorage.getItem('cn.lang') ?? 'null'); } catch { return null; } })();
-export const lang: 'id' | 'en' = chosen === 'id' || chosen === 'en' ? chosen : /^(id|ms)\b/i.test(navigator.language) ? 'id' : 'en';
+// Notch Windows berbahasa Inggris saja, sama seperti versi Mac. Pasangan L('indonesia', 'english') yang sudah ada
+// tetap dipakai; yang ditampilkan selalu teks Inggrisnya. Teks baru cukup ditulis Inggris di argumen kedua.
+export const lang: 'id' | 'en' = 'en' as 'id' | 'en';
 export const L = (id: string, en: string) => (lang === 'id' ? id : en);

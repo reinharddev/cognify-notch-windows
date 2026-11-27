@@ -28,12 +28,6 @@ button { font: inherit; color: inherit; }
 .bar { height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .12); overflow: hidden; }
 .bar i { display: block; height: 100%; border-radius: inherit; background: var(--tint, var(--accent)); transition: width .3s; }
 .empty { display: grid; place-items: center; height: 100%; color: rgba(255, 255, 255, .4); text-align: center; padding: 0 20px; }
-input:not([type]), input[type=text], textarea {
-  font: inherit; color: inherit; background: rgba(255, 255, 255, .08); border: 0; border-radius: 9px; padding: 6px 10px;
-  outline: none; user-select: text; -webkit-user-select: text; width: 100%;
-}
-input[type=text]:focus, textarea:focus { background: rgba(255, 255, 255, .13); }
-textarea { resize: none; }
 .list { display: flex; flex-direction: column; gap: 5px; overflow-y: auto; min-height: 0; }
 .list::-webkit-scrollbar { width: 0; }
 .item { display: flex; align-items: center; gap: 8px; padding: 5px 9px; border-radius: 9px; background: rgba(255, 255, 255, .06); }
@@ -54,5 +48,33 @@ input[type=checkbox]:checked::after {
 input[type=checkbox]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 /* Jendela Pengaturan: jendela biasa, bukan overlay transparan. */
-body.settings-window { background: #17171b; overflow: hidden; }
-body.settings-window input[type=text] { user-select: text; }
+body.settings-window { background: #000; overflow: hidden; }
+
+/* Penyegaran panel notch, diambil dari docs/desain/mockup-penyegaran-notch.html (repo utama).
+   Hanya berlaku di panel terbuka (.openl); Pengaturan dan dock punya gayanya sendiri. */
+.openl { --card: linear-gradient(rgba(255, 255, 255, .07), rgba(255, 255, 255, .04)); --soft: rgba(255, 255, 255, .06); --fill: rgba(255, 255, 255, .09); --muted: color-mix(in srgb, var(--ink, #fff) 60%, transparent); --hi: color-mix(in srgb, var(--accent) 50%, #fff); }
+.openl .card { display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 8px; border-radius: 20px; background: var(--card); box-shadow: inset 0 1px rgba(255, 255, 255, .08); }
+.openl .scroll { overflow-y: auto; scrollbar-width: none; }
+.openl .scroll::-webkit-scrollbar { display: none; }
+.openl .lb { margin: 4px 8px 8px; font-size: 12px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+.openl .btn { display: inline-flex; align-items: center; justify-content: center; gap: 5px; flex: none; height: 26px; padding: 0 10px; border-radius: 99px; background: var(--fill); font-size: 11px; font-weight: 600; }
+.openl .btn:hover:not(:disabled) { background: rgba(255, 255, 255, .15); }
+.openl .btn.on { background: var(--accent); color: #fff; }
+.openl .btn.on:hover:not(:disabled) { filter: brightness(1.1); background: var(--accent); }
+.openl .round { display: grid; place-items: center; flex: none; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 50%; background: var(--fill); color: inherit; cursor: pointer; }
+.openl .round.on { background: var(--accent); color: #fff; }
+.openl .round:disabled { opacity: .35; cursor: default; }
+.openl .icon { display: grid; place-items: center; padding: 2px; border: 0; background: none; color: var(--muted); cursor: pointer; }
+.openl .icon:hover:not(:disabled) { color: var(--ink, #fff); }
+.openl .icon.on { color: var(--hi); }
+.openl .icon:disabled { opacity: .35; cursor: default; }
+.openl .top { display: flex; align-items: center; gap: 6px; height: 28px; flex: none; margin-bottom: 4px; padding: 0 8px; }
+.openl .top .lb { margin: 0; flex: 1; }
+.openl .li { display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; padding: 4px 8px; border-radius: 99px; background: var(--soft); font-size: 11px; white-space: nowrap; }
+.openl .item { display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; padding: 4px 8px; border: 0; border-radius: 12px; background: var(--soft); color: inherit; font: inherit; text-align: left; }
+.openl .badge { display: grid; place-items: center; flex: none; width: 28px; height: 28px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--hi); }
+.openl .grow { flex: 1; min-width: 0; }
+.openl .one { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.openl small { display: block; font-size: 11px; line-height: 1.25; color: var(--muted); }
+.openl .chip { flex: none; padding: 2px 8px; border-radius: 99px; background: color-mix(in srgb, var(--c, var(--accent)) 22%, transparent); color: color-mix(in srgb, var(--c, var(--accent)) 45%, var(--ink, #fff)); font-size: 11px; font-weight: 600; white-space: nowrap; }
+.openl .hint { margin: 8px 8px 0; font-size: 11px; color: var(--muted); }

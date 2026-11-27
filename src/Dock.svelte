@@ -281,7 +281,7 @@
       { id: 2, title: 'YouTube - Browser', exe: exe('browser'), name: 'browser', active: false },
       { id: 3, title: 'dock.svelte.ts - Editor', exe: exe('editor'), name: 'editor', active: false },
       { id: 4, title: 'Musik', exe: exe('music'), name: 'music', active: false },
-      { id: 5, title: 'Catatan', exe: exe('notes'), name: 'notes', active: false },
+      { id: 5, title: 'Notes', exe: exe('notes'), name: 'notes', active: false },
       { id: 6, title: 'Terminal', exe: exe('term'), name: 'term', active: false },
       { id: 7, title: 'Kalkulator', exe: exe('calc'), name: 'calc', active: false },
     ];
@@ -347,7 +347,7 @@
       {:else}
         <div class="mhead">{L('Dock', 'Dock')}</div>
       {/if}
-      <button class="mrow mact" role="menuitem" onclick={() => { openSettings(); closeMenus(); }}><SlidersHorizontal size={14} />{L('Pengaturan dock…', 'Dock settings…')}</button>
+      <button class="mrow mact" role="menuitem" onclick={() => { openSettings(); closeMenus(); }}><SlidersHorizontal size={14} />{L('Lihat semua jendela…', 'Show all windows…')}</button>
       <button class="mrow mact danger" role="menuitem" onclick={turnOff}><X size={14} />{L('Matikan dock', 'Turn the dock off')}</button>
     </div>
   {:else if overflowOpen}
@@ -416,7 +416,7 @@
           <button class="tool" aria-label={L('Pengaturan cepat Windows', 'Windows quick settings')} title={L('Pengaturan cepat Windows', 'Windows quick settings')} onclick={() => void cmd('taskdock_keys', { name: 'quick' })}><SlidersHorizontal size={16} /></button>
         {:else if id === 'tray'}
           {#if dock.hideTaskbar}
-            <button class="tool" aria-label={L('Ikon tersembunyi', 'Hidden icons')} title={L('Tampilkan taskbar Windows sebentar untuk ikon tersembunyi', 'Show the Windows taskbar briefly for hidden icons')} onclick={() => void cmd('taskbar_peek')}><ChevronUp size={16} /></button>
+            <button class="tool" aria-label={L('Ikon tersembunyi', 'Hidden icons')} title={L('Munculkan taskbar Windows sebentar buat lihat ikon tersembunyi', 'Peek at the Windows taskbar to reach hidden icons')} onclick={() => void cmd('taskbar_peek')}><ChevronUp size={16} /></button>
           {/if}
         {:else if id === 'clock'}
           <button class="clock" aria-label={L('Notifikasi dan kalender', 'Notifications and calendar')} title={L('Notifikasi dan kalender', 'Notifications and calendar')} onclick={() => void cmd('taskdock_keys', { name: 'notifications' })}>

@@ -7,24 +7,34 @@
   let { height = 150, face = true }: { height?: number; face?: boolean } = $props();
   let open = $state(false);
   const pill = $derived(ui.style === 'pill');
-  const closedW = $derived(pill ? ui.pillWidth : ui.closedWidth);
+  // Wajah butuh Ekspresi CogniFace; tanpanya yang diam tampil sebagai kapsul, sama seperti di notch.
+  const head = $derived(pill && ui.face && features.companion && !open);
+  const closedW = $derived(head ? 42 : pill ? ui.pillWidth : ui.closedWidth);
   const bg = $derived(ui.bgCss);
 </script>
 
 <div class="stage" style:height="{height}px" class:open>
   <div class="bar"></div>
-  <div class="notch" class:pill style:--nh={pill ? undefined : `${Math.round(ui.closedHeight * 0.9)}px`} style:width={open ? '' : `${closedW}px`} style:border-radius={pill ? '99px' : `0 0 ${ui.roundness}px ${ui.roundness}px`}>
-    {#if (open || ui.idleThemed) && bg}<span class="bg" style:background={bg.background}></span>{/if}
+  <div class="notch" class:pill class:head style:--nh={pill ? undefined : `${Math.round(ui.closedHeight * 0.9)}px`} style:width={open ? '' : `${closedW}px`} style:border-radius={pill ? '99px' : `0 0 ${ui.roundness}px ${ui.roundness}px`}>
+    {#if (open || ui.idleThemed) && bg && !head}<span class="bg" style:background={bg.background}></span>{/if}
     {#if face && features.companion}<i class="eye"></i><i class="eye"></i>{/if}
   </div>
+  {#if !pill}
+    <!-- Lengkung cekung di kiri dan kanan atas, seperti notch aslinya. -->
+    <i class="ear left" style:right="calc(50% + {(open ? 340 : closedW) / 2}px)"></i>
+    <i class="ear" style:left="calc(50% + {(open ? 340 : closedW) / 2}px)"></i>
+  {/if}
   <div class="hint">{L('Pratinjau langsung', 'Live preview')} <button type="button" onclick={() => (open = !open)}>{L('Buka / tutup', 'Open / close')}</button></div>
 </div>
 
 <style>
-  .stage { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: linear-gradient(160deg, #1a1830, #3d2a63 55%, #6f3a7e); }
+  .stage { position: relative; overflow: hidden; border-radius: 20px; background: linear-gradient(160deg, #1a1830, #3d2a63 55%, #6f3a7e); }
   .bar { position: absolute; top: 0; left: 0; right: 0; height: 22px; background: rgba(0, 0, 0, .28); }
   .notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%); background: #000; height: var(--nh, 32px); display: flex; align-items: center; justify-content: center; gap: 10px; overflow: hidden; transition: width .15s, border-radius .15s, top .15s; max-width: 94%; }
   .notch.pill { top: 34px; }
+  .notch.head { height: 42px; top: 28px; }
+  .ear { position: absolute; top: 0; width: 12px; height: 12px; background: radial-gradient(circle at 100% 100%, transparent 11.5px, #000 12px); transition: left .15s, right .15s; }
+  .ear.left { background: radial-gradient(circle at 0 100%, transparent 11.5px, #000 12px); }
   .bg { position: absolute; inset: 0; opacity: .95; }
   .eye { position: relative; width: 8px; height: 13px; background: var(--accent); border-radius: 50%; animation: blink 4s infinite; }
   .stage.open .notch { width: 340px; height: 92px; align-items: flex-start; padding-top: 14px; }

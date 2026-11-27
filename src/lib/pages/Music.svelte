@@ -1,6 +1,7 @@
 <script lang="ts">
+  import Select from '../ui/Select.svelte';
   import { onMount } from 'svelte';
-  import { Repeat, Repeat1, Shuffle } from '@lucide/svelte';
+  import { Pause, Play, Repeat, Repeat1, Shuffle, SkipBack, SkipForward, Volume1, VolumeX } from '@lucide/svelte';
   import { device, features } from '../system.svelte';
   import { lyrics } from '../lyrics.svelte';
   import { ui } from '../ui.svelte';
@@ -26,7 +27,7 @@
     audioError = '';
     const result = await cmdTry<void>('set_audio_output', { id });
     if (result.ok) await refreshAudioOutputs();
-    else audioError = L('Output suara tidak bisa diganti.', 'Could not change the sound output.');
+    else audioError = L('Output suara gagal diganti.', 'Couldn\'t switch the sound output.');
     outputBusy = false;
   }
 
@@ -54,14 +55,13 @@
 
 {#if !m}
   <div class="empty empty-music">
-    <span>{L('Putar musik di Spotify, browser, atau pemutar lain. Judulnya muncul di sini.', 'Play music in Spotify, a browser, or another player. It shows up here.')}</span>
+    <span>{L('Putar musik di Spotify, browser, atau pemutar lain. Judulnya bakal muncul di sini.', 'Play something in Spotify, your browser, or any player and it\'ll show up here.')}</span>
     {#if audioOutputs.length}
-      <label class="empty-output">
+      <div class="empty-output">
         <span>{L('Output suara', 'Sound output')}</span>
-        <select class="out-select" value={currentOutputId} onchange={(event) => chooseAudioOutput(event.currentTarget.value)} disabled={outputBusy} aria-label={L('Pilih perangkat keluaran suara', 'Choose the sound output device')}>
-          {#each audioOutputs as output (output.id)}<option value={output.id}>{output.name}</option>{/each}
-        </select>
-      </label>
+        <Select size="sm" width="108px" value={currentOutputId} onchange={(v) => chooseAudioOutput(v)} disabled={outputBusy} label={L('Pilih perangkat output suara', 'Choose where sound plays')}
+          options={audioOutputs.map((o) => ({ value: o.id, label: o.name }))} />
+      </div>
     {:else}
       <button class="btn" title={L('Buka pengaturan suara Windows', 'Open Windows sound settings')} onclick={() => cmd('open_target', { target: 'ms-settings:sound' })}>{L('Pilih output suara', 'Choose sound output')}</button>
     {/if}
@@ -72,46 +72,38 @@
     <div class="wash-tint" style:--wash-color={artColors.on || undefined} aria-hidden="true"></div>
     <img class="wash" src={m.thumb} alt="" aria-hidden="true" />
   {/if}
-  <div class="cols">
-    <div class="col" style="width:264px">
-      <div class="row" style="gap:12px">
-        <div class="artw">{#if m.thumb}<img class="glow" src={m.thumb} alt="" aria-hidden="true" />{/if}<div class="art">{#if m.thumb}<img src={m.thumb} alt="" />{:else}<span>♪</span>{/if}</div></div>
-        <div class="col" style="gap:2px;min-width:0">
-          <b class="one">{m.title}</b>
-          <span class="dim one">{m.artist || m.app}</span>
-          {#if m.album}<span class="dim one" style="font-size:10.5px">{m.album}</span>{/if}
-        </div>
+  <div class="music">
+    <div class="card player">
+      <div class="row" style="gap:8px">
+        <div class="art">{#if m.thumb}<img src={m.thumb} alt="" />{:else}<span>♪</span>{/if}</div>
+        <span class="grow"><b class="one">{m.title}</b><small class="one">{m.artist || m.app}</small></span>
       </div>
-      <div class="col" style="gap:3px">
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="bar seek" onclick={seek}><i style:width="{m.duration ? (pos / m.duration) * 100 : 0}%"></i></div>
-        <div class="row dim" style="justify-content:space-between;font-size:10px"><span>{clock(pos)}</span><span>{m.duration ? clock(m.duration) : ''}</span></div>
+      <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+      <div class="track seek" onclick={seek}><i style:width="{m.duration ? (pos / m.duration) * 100 : 0}%"></i></div>
+      <div class="times"><small>{clock(pos)}</small><small>{m.duration ? '-' + clock(Math.max(0, m.duration - pos)) : ''}</small></div>
+      <div class="ctrls">
+        <button class="icon" class:on={m.shuffle === true} aria-label={L('Acak', 'Shuffle')} title={L('Acak', 'Shuffle')} disabled={m.shuffle == null} onclick={() => cmd('media_cmd', { action: 'shuffle' })}><Shuffle size={14} /></button>
+        <button class="icon" aria-label={L('Sebelumnya', 'Previous')} onclick={() => cmd('media_cmd', { action: 'prev' })}><SkipBack size={15} fill="currentColor" /></button>
+        <button class="round big" aria-label={m.playing ? L('Jeda', 'Pause') : L('Putar', 'Play')} onclick={() => cmd('media_cmd', { action: 'toggle' })}>{#if m.playing}<Pause size={14} fill="currentColor" strokeWidth={0} />{:else}<Play size={14} fill="currentColor" strokeWidth={0} />{/if}</button>
+        <button class="icon" aria-label={L('Berikutnya', 'Next')} onclick={() => cmd('media_cmd', { action: 'next' })}><SkipForward size={15} fill="currentColor" /></button>
+        <button class="icon" class:on={(m.repeat ?? 0) > 0} aria-label={L('Ulangi', 'Repeat')} title={L('Ulangi', 'Repeat')} disabled={m.repeat == null} onclick={() => cmd('media_cmd', { action: 'repeat' })}>{#if m.repeat === 2}<Repeat1 size={14} />{:else}<Repeat size={14} />{/if}</button>
       </div>
-      <div class="row" style="justify-content:center;gap:10px">
-        <button class="btn" class:on={m.shuffle === true} aria-label={L('Acak', 'Shuffle')} title={L('Acak', 'Shuffle')} disabled={m.shuffle == null} onclick={() => cmd('media_cmd', { action: 'shuffle' })}><Shuffle size={13} /></button>
-        <button class="btn" aria-label={L('Sebelumnya', 'Previous')} onclick={() => cmd('media_cmd', { action: 'prev' })}>⏮</button>
-        <button class="btn on" style="padding:6px 16px" aria-label={m.playing ? L('Jeda', 'Pause') : L('Putar', 'Play')} onclick={() => cmd('media_cmd', { action: 'toggle' })}>{m.playing ? '⏸' : '▶'}</button>
-        <button class="btn" aria-label={L('Berikutnya', 'Next')} onclick={() => cmd('media_cmd', { action: 'next' })}>⏭</button>
-        <button class="btn" class:on={(m.repeat ?? 0) > 0} aria-label={L('Ulangi', 'Repeat')} title={L('Ulangi', 'Repeat')} disabled={m.repeat == null} onclick={() => cmd('media_cmd', { action: 'repeat' })}>{#if m.repeat === 2}<Repeat1 size={13} />{:else}<Repeat size={13} />{/if}</button>
-      </div>
-      <div class="row dim">
-        <span>{device.muted ? '🔇' : '🔈'}</span>
+      <div class="row vol">
+        {#if device.muted}<VolumeX size={14} />{:else}<Volume1 size={14} />{/if}
         <input type="range" min="0" max="100" value={Math.round(device.volume * 100)} oninput={setVolume} aria-label={L('Volume', 'Volume')} />
         {#if audioOutputs.length}
-          <select class="out-select" value={currentOutputId} onchange={(event) => chooseAudioOutput(event.currentTarget.value)} disabled={outputBusy} aria-label={L('Pilih perangkat keluaran suara', 'Choose the sound output device')} title={L('Pilih perangkat keluaran suara', 'Choose the sound output device')}>
-            {#each audioOutputs as output (output.id)}<option value={output.id}>{output.name}</option>{/each}
-          </select>
+          <Select size="sm" width="84px" value={currentOutputId} onchange={(v) => chooseAudioOutput(v)} disabled={outputBusy} label={L('Pilih perangkat output suara', 'Choose where sound plays')}
+            options={audioOutputs.map((o) => ({ value: o.id, label: o.name }))} />
         {:else}
           <button class="btn" title={L('Buka pengaturan suara Windows', 'Open Windows sound settings')} onclick={() => cmd('open_target', { target: 'ms-settings:sound' })}>{L('Output', 'Output')}</button>
         {/if}
       </div>
       {#if audioError}<span class="audio-error">{audioError}</span>{/if}
     </div>
-    <div class="sep"></div>
     <div class="lyr grow" bind:this={box} style:--on={(ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined} style:--off={(ui.lyricAuto ? artColors.off : null) || ui.lyricIdle || undefined}>
       {#if !features.lyrics}
-        <span class="dim">{L('Lirik dimatikan di pengaturan.', 'Lyrics are off in settings.')}</span>
-      {:else if ls.kind === 'loading'}<span class="dim">{L('Mencari lirik…', 'Looking for lyrics…')}</span>
+        <span class="dim">{L('Lirik lagi dimatikan di pengaturan.', 'Lyrics are turned off in settings.')}</span>
+      {:else if ls.kind === 'loading'}<span class="dim">{L('Lagi cari lirik…', 'Looking for lyrics…')}</span>
       {:else if ls.kind === 'synced'}
         {#each ls.lines as line, i}
           <div class="lyric-line" data-lyric-line>
@@ -127,36 +119,38 @@
           </div>
         {/each}
       {:else if ls.kind === 'instrumental'}<span class="dim">{L('Lagu instrumental.', 'Instrumental.')}</span>
-      {:else if ls.kind === 'failed'}<span class="dim">{L('Lirik tidak bisa diambil. Periksa internet.', 'Couldn\'t fetch lyrics. Check your connection.')}</span>
-      {:else}<span class="dim">{L('Lirik tidak ditemukan.', 'No lyrics found.')}</span>{/if}
+      {:else if ls.kind === 'failed'}<span class="dim">{L('Lirik gagal diambil. Cek internet kamu.', 'Couldn\'t get the lyrics. Check your connection.')}</span>
+      {:else}<span class="dim">{L('Liriknya tidak ketemu.', 'No lyrics found.')}</span>{/if}
     </div>
   </div>
 {/if}
 
 <style>
-  /* Pendar: salinan sampul yang diburamkan di belakangnya, warnanya sama dengan foto lagu. */
-  .artw { position: relative; flex: none; width: 84px; height: 84px; }
-  .glow { position: absolute; left: -6px; top: -36px; width: 290px; height: 156px; object-fit: cover; border-radius: 50%; filter: blur(38px); opacity: .5; pointer-events: none; }
+  .music { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 16px; height: 164px; }
+  .player { gap: 4px; padding: 8px 12px; }
+  .times { display: flex; justify-content: space-between; margin-top: -2px; }
+  .ctrls { display: flex; justify-content: space-between; align-items: center; }
+  .big { width: 30px; height: 30px; }
+  .vol { gap: 6px; color: var(--muted); }
+  .track { height: 4px; flex: none; border-radius: 99px; background: rgba(255, 255, 255, .13); }
+  .track i { display: block; height: 100%; border-radius: 99px; background: var(--ink, #fff); }
   /* Cahaya warna sampul: memudar ke semua sisi lewat mask radial, tanpa clip-path (clip memotong blur jadi kotak). */
   .wash-tint { position: absolute; z-index: -1; right: 0; top: 0; bottom: 0; width: 380px; background: radial-gradient(ellipse closest-side at 50% 46%, color-mix(in srgb, var(--wash-color, transparent) 44%, transparent) 0%, color-mix(in srgb, var(--wash-color, transparent) 20%, transparent) 50%, color-mix(in srgb, var(--wash-color, transparent) 5%, transparent) 80%, transparent 100%); pointer-events: none; }
   .wash { position: absolute; z-index: -1; right: 0; top: 0; bottom: 0; width: 380px; object-fit: cover; filter: blur(64px); opacity: .3; -webkit-mask-image: radial-gradient(ellipse closest-side at 50% 46%, #000 0%, rgba(0, 0, 0, .55) 55%, rgba(0, 0, 0, .12) 85%, transparent 100%); mask-image: radial-gradient(ellipse closest-side at 50% 46%, #000 0%, rgba(0, 0, 0, .55) 55%, rgba(0, 0, 0, .12) 85%, transparent 100%); pointer-events: none; }
-  .art { position: relative; width: 84px; height: 84px; border-radius: 12px; background: rgba(255, 255, 255, .08); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 28px; }
+  .art { width: 36px; height: 36px; border-radius: 12px; background: rgba(255, 255, 255, .08); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 16px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
-  .one { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .seek { cursor: pointer; height: 6px; }
-  .lyr { overflow-y: auto; position: relative; padding: 70px 12px; scroll-padding-block: 70px; mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
+  .seek { cursor: pointer; }
+  .lyr { overflow-y: auto; position: relative; padding: 66px 8px; scroll-padding-block: 66px; mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
   .lyr::-webkit-scrollbar { width: 0; }
-  .out-select { min-width: 0; max-width: 108px; height: 28px; padding: 0 6px; border: 1px solid rgba(255,255,255,.14); border-radius: 9px; background: rgba(255,255,255,.08); color: rgba(255,255,255,.76); font: inherit; font-size: 10px; text-overflow: ellipsis; }
-  .out-select option { color: #171717; }
   .audio-error { color: #ffb4a8; font-size: 10px; }
   .empty-music { display: flex; flex-direction: column; align-items: center; gap: 10px; }
   .empty-output { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,.56); font-size: 10px; }
-  .lyric-line { margin: 0 0 8px; }
-  .lyr .ln { display: block; width: 100%; max-width: 100%; box-sizing: border-box; border: 0; background: none; padding: 0 8px; text-align: left; margin: 0; font-family: inherit; font-size: 15px; font-weight: 700; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; color: var(--off, rgba(255, 255, 255, .32)); cursor: pointer; transition: color .25s, transform .25s; transform-origin: center; }
-  .lyr .ln.now { color: var(--on, #fff); transform: scale(1.04); }
+  .lyric-line { margin: 0 0 6px; }
+  .lyr .ln { display: block; width: 100%; max-width: 100%; box-sizing: border-box; border: 0; background: none; padding: 0 8px; text-align: left; margin: 0; font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; color: var(--off, rgba(255, 255, 255, .32)); cursor: pointer; transition: color .25s, transform .25s; transform-origin: center; }
+  .lyr .ln.now { color: var(--on, #fff); font-size: 18px; }
   .reading { padding: 1px 8px 0; color: color-mix(in srgb, var(--off, rgba(255, 255, 255, .56)) 74%, transparent); font-size: 10px; line-height: 1.3; overflow-wrap: anywhere; }
   .reading.now { color: color-mix(in srgb, var(--on, #fff) 72%, transparent); }
   .plain-line { padding: 0 8px; }
   .plain-text { color: rgba(255,255,255,.7); font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; white-space: pre-wrap; }
-  input[type=range] { flex: 1; accent-color: var(--accent); }
+  input[type=range] { flex: 1; min-width: 0; height: 4px; accent-color: var(--ink, #fff); }
 </style>

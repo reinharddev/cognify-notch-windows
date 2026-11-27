@@ -1,24 +1,27 @@
 <script lang="ts">
+  import Input from '../ui/Input.svelte';
+  import { X, Zap } from '@lucide/svelte';
   import { shortcuts } from '../shelf.svelte';
   import { L } from '../i18n';
   let name = $state(''), target = $state('');
   const add = () => { shortcuts.add(name, target); name = ''; target = ''; };
 </script>
 
-<div class="col" style="height:100%">
-  <div class="row">
-    <input type="text" style="width:150px" bind:value={name} placeholder={L('Nama', 'Name')} />
-    <input type="text" bind:value={target} placeholder={L('Tautan, folder, atau lokasi app', 'Link, folder, or app path')} onkeydown={(e) => e.key === 'Enter' && add()} />
-    <button class="btn on" onclick={add}>{L('Tambah', 'Add')}</button>
+<div class="shortcuts">
+  <div class="top">
+    <span class="lb">{L('Pintasan', 'Shortcuts')}</span>
+    <Input size="sm" width="110px" bind:value={name} placeholder={L('Nama', 'Name')} />
+    <Input size="sm" width="210px" bind:value={target} placeholder={L('Tautan, folder, atau lokasi app', 'Link, folder, or app path')} onkeydown={(e) => e.key === 'Enter' && add()} />
+    <button class="btn" onclick={add}>{L('Tambah', 'Add')}</button>
   </div>
   {#if shortcuts.items.length === 0}
-    <div class="empty">{L('Buat pintasan ke situs, folder, atau app yang sering kamu buka.', 'Make shortcuts to sites, folders, or apps you open often.')}</div>
+    <div class="empty">{L('Bikin pintasan ke situs, folder, atau app yang sering kamu buka.', 'Make shortcuts to the sites, folders, and apps you open a lot.')}</div>
   {:else}
-    <div class="grid">
+    <div class="grid scroll">
       {#each shortcuts.items as s (s.id)}
         <div class="tile">
-          <button class="go" onclick={() => shortcuts.run(s)}>{s.name}</button>
-          <button class="x" aria-label={L('Hapus', 'Delete')} onclick={() => shortcuts.remove(s.id)}>×</button>
+          <button class="go" onclick={() => shortcuts.run(s)}><span class="badge"><Zap size={14} fill="currentColor" /></span><span class="one">{s.name}</span></button>
+          <button class="icon del" aria-label={L('Hapus', 'Delete')} onclick={() => shortcuts.remove(s.id)}><X size={12} /></button>
         </div>
       {/each}
     </div>
@@ -26,9 +29,11 @@
 </div>
 
 <style>
-  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; overflow-y: auto; align-content: start; min-height: 0; }
-  .grid::-webkit-scrollbar { width: 0; }
-  .tile { display: flex; align-items: center; border-radius: 10px; background: rgba(255, 255, 255, .07); padding-right: 4px; }
-  .go { flex: 1; border: 0; background: none; padding: 11px 10px; text-align: left; cursor: pointer; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .tile:hover { background: rgba(255, 255, 255, .13); }
+  .shortcuts { display: flex; flex-direction: column; height: 164px; }
+  .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; align-content: start; min-height: 0; padding: 0 4px; }
+  .tile { position: relative; display: flex; align-items: center; height: 44px; min-width: 0; border-radius: 99px; background: var(--fill); }
+  .tile:hover { background: rgba(255, 255, 255, .15); }
+  .go { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; height: 100%; padding: 0 8px; border: 0; background: none; color: inherit; font: inherit; font-size: 11px; font-weight: 600; text-align: left; cursor: pointer; }
+  .del { margin-right: 6px; opacity: 0; }
+  .tile:hover .del, .del:focus-visible { opacity: 1; }
 </style>

@@ -43,7 +43,7 @@
   {#if !features.clipboard}
     <span class="dk-dim dk-ell">{L('Riwayat clipboard mati', 'Clipboard history off')}</span>
   {:else if items.length === 0}
-    <span class="dk-dim dk-ell">{L('Belum ada salinan', 'Nothing copied yet')}</span>
+    <span class="dk-dim dk-ell">{L('Belum ada yang disalin', 'Nothing copied yet')}</span>
   {:else}
     <span class="clips">
       {#each items as c (c.id)}

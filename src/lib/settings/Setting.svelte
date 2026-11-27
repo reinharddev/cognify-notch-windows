@@ -24,16 +24,15 @@
 {/if}
 
 <style>
-  .set { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; min-height: 48px; border-top: 1px solid rgba(255, 255, 255, .06); }
-  .set:first-child { border-top: 0; }
-  .set.sub { padding-left: 34px; background: rgba(255, 255, 255, .025); }
+  .set { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 4px 8px; min-height: 34px; border-radius: 14px; flex: none; }
+  .set:hover { background: rgba(255, 255, 255, .05); }
+  .set.sub { padding-left: 22px; }
   label.set { cursor: pointer; }
-  label.set:hover { background: rgba(255, 255, 255, .03); }
   label.set.disabled { cursor: not-allowed; }
-  .set.stack { flex-direction: column; align-items: stretch; gap: 10px; }
+  .set.stack { flex-direction: column; align-items: stretch; gap: 8px; padding: 6px 8px; }
   .txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  b { font-weight: 600; font-size: 13px; }
-  small { font-size: 12px; line-height: 1.4; color: var(--dim); }
+  b { font-weight: 500; font-size: 13px; }
+  small { font-size: 11px; line-height: 1.4; color: var(--dim); }
   small.why { color: var(--warn); }
   .ctl { display: flex; align-items: center; gap: 8px; flex: none; max-width: 100%; }
   .stack .ctl { flex: 1; flex-wrap: wrap; }

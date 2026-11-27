@@ -1,4 +1,6 @@
 <script lang="ts">
+  import ColorPicker from './ColorPicker.svelte';
+  import Input from '../ui/Input.svelte';
   import { RotateCcw } from '@lucide/svelte';
   import Group from './Group.svelte';
   import Setting from './Setting.svelte';
@@ -38,10 +40,10 @@
 </script>
 
 {#if showPlayground}
-  <Group title={L('Mimik: atur wajahmu', 'Mimik: make a face you like')}>
+  <Group title={L('CogniFace: atur wajahnya', 'CogniFace: give it your own look')}>
     <div class="play">
       <div class="top">
-        <iframe bind:this={frame} class="preview" title={L('Pratinjau Mimik', 'Mimik preview')} src={previewSrc} onload={send}></iframe>
+        <iframe bind:this={frame} class="preview" title={L('Pratinjau CogniFace', 'CogniFace preview')} src={previewSrc} onload={send}></iframe>
         <div class="side">
           <div class="cap">{L('Preset', 'Preset')}</div>
           <div class="chips">
@@ -57,16 +59,16 @@
           <div class="savebox">
             <div class="cap2">{L('Simpan gaya ini', 'Save this style')}</div>
             <div class="row">
-              <input type="text" class="name" bind:value={presetName} maxlength="24" placeholder={L('Nama gaya', 'Style name')} aria-label={L('Nama gaya', 'Style name')} onkeydown={(e) => e.key === 'Enter' && savePreset()} />
+              <Input width="200px" bind:value={presetName} maxlength={24} placeholder={L('Nama gaya', 'Style name')} aria-label={L('Nama gaya', 'Style name')} onkeydown={(e) => e.key === 'Enter' && savePreset()} />
               <button class="btn" onclick={savePreset} disabled={!presetName.trim()}>{L('Simpan', 'Save')}</button>
             </div>
-            {#if skins.presets.length}<div class="note">{L('Klik kanan gaya buatanmu untuk menghapusnya.', 'Right-click one of your styles to delete it.')}</div>{/if}
+            {#if skins.presets.length}<div class="note">{L('Klik kanan gaya buatanmu buat menghapusnya.', 'Right-click one of your styles to delete it.')}</div>{/if}
           </div>
           <div class="cap">{L('Warna', 'Colour')}</div>
           <div class="swatches">
-            <label><input type="color" value={style.skin} oninput={(e) => skins.patch({ skin: e.currentTarget.value, ...custom() })} /><span>{L('Kepala', 'Head')}</span></label>
-            <label><input type="color" value={style.ink} oninput={(e) => skins.patch({ ink: e.currentTarget.value, ...custom() })} /><span>{L('Mata', 'Eyes')}</span></label>
-            <label><input type="color" value={style.ring} oninput={(e) => skins.patch({ ring: e.currentTarget.value, ...custom() })} /><span>{L('Cincin', 'Ring')}</span></label>
+            <span class="pick"><ColorPicker value={style.skin} label="Head colour" onchange={(v) => skins.patch({ skin: v, ...custom() })} /><span>{L('Kepala', 'Head')}</span></span>
+            <span class="pick"><ColorPicker value={style.ink} label="Eyes colour" onchange={(v) => skins.patch({ ink: v, ...custom() })} /><span>{L('Mata', 'Eyes')}</span></span>
+            <span class="pick"><ColorPicker value={style.ring} label="Ring colour" onchange={(v) => skins.patch({ ring: v, ...custom() })} /><span>{L('Cincin', 'Ring')}</span></span>
           </div>
           <div class="cap">{L('Bentuk', 'Shape')}</div>
           <div class="chips">
@@ -85,7 +87,7 @@
         <button class="chip" class:on={style.mood === 'auto'} onclick={() => skins.patch({ mood: 'auto' })}>{L('Otomatis', 'Auto')}</button>
         {#each MOODS as m}<button class="chip" class:on={style.mood === m} onclick={() => skins.patch({ mood: m })}>{m}</button>{/each}
       </div>
-      <div class="note">{L('Otomatis: wajah mengikuti harimu (musik, jam, tugas). Pilih satu untuk menetapkannya.', 'Auto: the face follows your day (music, time, tasks). Pick one to lock it.')}</div>
+      <div class="note">{L('Otomatis: wajahnya ikut harimu (musik, jam, tugas). Pilih satu kalau mau tetap.', 'Auto: the face follows your day (music, time, tasks). Pick one to keep it that way.')}</div>
 
       <div class="cap">{L('Efek', 'Effects')}</div>
       <div class="chips">
@@ -102,10 +104,10 @@
   </Group>
 {/if}
 
-<Group hint={L('Pindahkan skin dengan mode Atur posisi di bawah, atau tahan Alt lalu seret. Skin tidak punya akses internet dan hanya membaca folder skinnya sendiri.',
-  'Move skins with Arrange positions below, or hold Alt and drag. Skins have no internet access and only read their own folder.')}>
+<Group hint={L('Pindahkan widget lewat mode Atur posisi di bawah, atau tahan Alt sambil menyeret. Widget tidak bisa akses internet dan cuma membaca foldernya sendiri.',
+  'To move widgets, use Arrange positions below, or hold Alt and drag. Widgets can\'t go online and only read their own folder.')}>
   {#if skins.skins.length === 0}
-    <Setting title={L('Belum ada skin. Letakkan folder skin di folder skin lalu tekan Muat ulang.', 'No skins yet. Put a skin folder in the skins folder, then press Reload.')} />
+    <Setting title={L('Belum ada widget. Taruh folder widget di folder widget, lalu tekan Muat ulang.', 'No widgets yet. Drop a widget folder into the widgets folder, then hit Reload.')} />
   {/if}
   {#each skins.skins as skin (skin.id)}
     <Setting toggle title={skin.name} desc={skin.desc} checked={skins.isOn(skin.id)} onchange={(v) => skins.setOn(skin.id, v)} />
@@ -124,10 +126,10 @@
 {#if skins.isOn('lyrics')}
   <Group title={L('Warna lirik', 'Lyrics colour')}>
     <Setting title={L('Baris yang dinyanyikan', 'Current line')}>
-      <input class="color" type="color" value={skins.lyrics.color} oninput={(e) => skins.setLyrics({ color: e.currentTarget.value })} aria-label={L('Baris yang dinyanyikan', 'Current line')} />
+      <ColorPicker value={skins.lyrics.color} label={L('Baris yang dinyanyikan', 'Current line')} onchange={(v) => skins.setLyrics({ color: v })} />
     </Setting>
     <Setting title={L('Judul dan baris berikutnya', 'Title and next line')}>
-      <input class="color" type="color" value={skins.lyrics.sub} oninput={(e) => skins.setLyrics({ sub: e.currentTarget.value })} aria-label={L('Judul dan baris berikutnya', 'Title and next line')} />
+      <ColorPicker value={skins.lyrics.sub} label={L('Judul dan baris berikutnya', 'Title and next line')} onchange={(v) => skins.setLyrics({ sub: v })} />
     </Setting>
     <Setting title={L('Kembalikan ke putih', 'Reset to white')}>
       <button class="btn" onclick={() => skins.setLyrics(defaultLyrics())} disabled={skins.lyrics.color === '#ffffff' && skins.lyrics.sub === '#ffffff'}>{L('Kembalikan ke putih', 'Reset to white')}</button>
@@ -137,7 +139,7 @@
 
 <Group>
   <Setting toggle title={L('Atur posisi', 'Arrange positions')} checked={skins.arranging} onchange={(v) => skins.setArranging(v)}
-    desc={L('Skin berbingkai dan bisa diseret bebas ke mana saja. Matikan setelah selesai; posisinya tersimpan.', 'Skins get an outline and can be dragged anywhere. Turn it off when done; positions are saved.')} />
+    desc={L('Widget diberi bingkai dan bisa diseret ke mana saja. Matikan kalau sudah pas; posisinya disimpan.', 'Widgets get an outline so you can drag them anywhere. Turn it off when you\'re happy; positions are saved.')} />
   <Setting title={L('Kembalikan ke posisi awal', 'Reset positions')}>
     <button class="btn" onclick={() => skins.resetPositions()}>{L('Kembalikan ke posisi awal', 'Reset positions')}</button>
   </Setting>
@@ -151,9 +153,9 @@
 </Group>
 
 <Group>
-  <Setting title={L('Folder skin', 'Skins folder')}>
+  <Setting title={L('Folder widget', 'Widgets folder')}>
     <div class="btns">
-      <button class="btn" onclick={() => skins.reveal()}>{L('Buka folder skin', 'Open skins folder')}</button>
+      <button class="btn" onclick={() => skins.reveal()}>{L('Buka folder widget', 'Open widgets folder')}</button>
       <button class="btn" onclick={() => skins.reload()}>{L('Muat ulang', 'Reload')}</button>
     </div>
   </Setting>
@@ -173,17 +175,14 @@
   .chip.on { background: #f2f2f4; color: #121214; }
   .savebox { display: flex; flex-direction: column; gap: 4px; }
   .row { display: flex; gap: 8px; align-items: center; }
-  .name { min-width: 110px; max-width: 220px; flex: 1; padding: 5px 8px; border-radius: 8px; border: 1px solid var(--line); background: rgba(255, 255, 255, .05); color: inherit; font: inherit; font-size: 12px; }
   .note { font-size: 12px; color: var(--dim); }
   .swatches { display: flex; gap: 18px; }
-  .swatches label { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
-  .swatches input[type=color] { width: 44px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
+  .swatches .pick { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--dim); }
   .foot { display: flex; justify-content: flex-end; }
   .btn { border: 1px solid var(--line); background: rgba(255, 255, 255, .07); color: inherit; font: inherit; font-size: 12px; padding: 5px 14px; border-radius: 99px; cursor: pointer; }
   .btn:disabled { opacity: .45; cursor: default; }
   .btn.ghost { background: transparent; padding: 5px 9px; display: inline-flex; align-items: center; }
   .btns { display: flex; gap: 8px; }
-  .color { width: 44px; height: 24px; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: none; cursor: pointer; }
   .slider { display: flex; align-items: center; gap: 12px; width: 100%; }
   .slider input[type=range] { flex: 1; min-width: 0; }
   .val { min-width: 56px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }

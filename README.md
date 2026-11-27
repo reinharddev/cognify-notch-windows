@@ -38,3 +38,7 @@ lalu Run anyway.
 ## Lisensi
 
 [AGPL-3.0](LICENSE).
+
+## Language
+
+The interface is English only.

@@ -46,6 +46,9 @@ const BRIDGE: &str = r#"
 const PREVIEW_BRIDGE: &str =
     "window.addEventListener('message', function (e) { if (e.data && e.data.cognifyCfg) window.cognify._cfg(e.data.cognifyCfg) });";
 
+/// Notch berbahasa Inggris saja: skin yang memilih bahasa lewat `navigator.language` ikut Inggris.
+const ENGLISH: &str = "Object.defineProperty(navigator, 'language', { get: () => 'en-US' });";
+
 const CSP: &str = "default-src skin: http://skin.localhost data: blob: 'unsafe-inline' 'unsafe-eval'";
 
 /// Skin bawaan: dibenamkan ke dalam exe (paket Velopack hanya berisi exe) lalu disalin ke folder pengguna.
@@ -81,6 +84,11 @@ pub struct SkinInfo {
 struct Manifest {
     name: Option<String>,
     description: Option<String>,
+    // Teks Inggris di skin.json; Notch berbahasa Inggris saja.
+    #[serde(rename = "nameEn")]
+    name_en: Option<String>,
+    #[serde(rename = "descriptionEn")]
+    description_en: Option<String>,
     width: Option<f64>,
     height: Option<f64>,
     cursor: Option<bool>,
@@ -241,8 +249,8 @@ fn scan(s: &Skins) {
         }
         out.push(SkinInfo {
             id: name.clone(),
-            name: m.name.unwrap_or(name),
-            desc: m.description.unwrap_or_default(),
+            name: m.name_en.or(m.name).unwrap_or(name),
+            desc: m.description_en.or(m.description).unwrap_or_default(),
             width: m.width.unwrap_or(240.0).clamp(80.0, 1200.0),
             height: m.height.unwrap_or(240.0).clamp(60.0, 900.0),
             cursor: m.cursor.unwrap_or(false),
@@ -316,7 +324,7 @@ pub fn protocol(app: &AppHandle, request: Request<Vec<u8>>) -> Response<Cow<'sta
     let Ok(mut bytes) = fs::read(&file_c) else { return reply(404, "text/plain", b"not found".to_vec()) };
     let ty = content_type(&file_c);
     if ty == "text/html" && request.uri().query().map(|q| q.contains("preview=1")).unwrap_or(false) {
-        bytes = inject(&bytes, &format!("<script>{BRIDGE}{PREVIEW_BRIDGE}</script>"));
+        bytes = inject(&bytes, &format!("<script>{ENGLISH}{BRIDGE}{PREVIEW_BRIDGE}</script>"));
     }
     reply(200, ty, bytes)
 }
@@ -562,6 +570,7 @@ async fn open_skin(app: AppHandle, info: SkinInfo) {
         .visible(false)
         .always_on_top(on_top)
         .always_on_bottom(!on_top && !cfg!(windows))
+        .initialization_script(ENGLISH)
         .initialization_script(BRIDGE)
         .on_page_load(move |win, payload| {
             if let PageLoadEvent::Finished = payload.event() {

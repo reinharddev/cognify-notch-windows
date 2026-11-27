@@ -4,7 +4,7 @@
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
-  import { Bell, Brain, Coffee, Download, Hourglass, Leaf, Timer } from '@lucide/svelte';
+  import { Bell, Brain, Coffee, Download, Hourglass, Leaf, Timer , Settings } from '@lucide/svelte';
   const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell, stopwatch: Timer } as const;
   import { cmd, cmdTry, emitPrefs, inTauri, on, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
@@ -33,6 +33,8 @@
   import Equalizer from './lib/Equalizer.svelte';
   import NoticeCard from './lib/NoticeCard.svelte';
   import Hud from './lib/Hud.svelte';
+  import { notchPath } from './lib/geometry';
+  import FaceExtras from './lib/FaceExtras.svelte';
   import Eyes from './lib/Eyes.svelte';
   import { skinBridge } from './lib/skinBridge.svelte';
   import PageDock from './lib/PageDock.svelte';
@@ -40,7 +42,6 @@
   import { skyInk } from './lib/sky';
   import { artColors } from './lib/artColor.svelte';
   import { ICONS } from './lib/icons';
-  import { headerStamp } from './lib/relative';
   import { lyrics } from './lib/lyrics.svelte';
   import { agenda } from './lib/agenda.svelte';
   import { hotkey } from './lib/hotkey.svelte';
@@ -56,7 +57,7 @@
   void cmd('set_display', { mode: ui.display });
   $effect.root(() => { $effect(() => { void cmd('set_panel_scale', { percent: Math.round(ui.scale * 100) }); }); });
   // Timer cepat di dock selesai: kartu di notch (bunyinya sudah dimainkan oleh dock).
-  on<number>('dock-timer-done', (minutes) => news.device(L('Timer selesai', 'Timer done'), L(`${minutes} menit berlalu`, `${minutes} minutes are up`), 'timer', TINT.accent));
+  on<number>('dock-timer-done', (minutes) => news.device(L('Timer selesai', 'Timer done'), L(`${minutes} menit sudah habis`, `${minutes} minutes are up`), 'timer', TINT.accent));
   on<string>('prefs-changed', (scope) => {
     if (scope === 'features') { features.reload(); weather.reload(); syncEyes(); hotkey.apply(); }
     else if (scope === 'weather') weather.reload();
@@ -99,14 +100,15 @@
   // Berdampingan: yang tampil di sayap kanan bergantian tiap 4 detik bila lebih dari satu.
   const pairItem = $derived(notch.pairRight[Math.floor(ticker.now / 4000) % Math.max(1, notch.pairRight.length)] ?? notch.pairRight[0]);
   void skinBridge; // pemasangan efek jembatan ke skin desktop (hanya aktif bila ada skin yang menyala)
-  const time = $derived(headerStamp(ticker.now));
+  const date = $derived(new Date(ticker.now).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }).replace(',', ''));
+  const hhmm = $derived(new Date(ticker.now).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
   async function togglePowerSaver() {
     const power = device.power;
     if (!power?.power_saver_available) return;
     const enabled = !power.power_saver;
     const result = await cmdTry<boolean>('set_power_saver', { enabled });
     if (result.ok && device.power) device.power = { ...device.power, power_saver: result.value ?? enabled };
-    else if (!result.ok) news.device(L('Mode hemat daya gagal diubah', 'Could not change power mode'), result.error, 'battery-warning', '#ff9f0a');
+    else if (!result.ok) news.device(L('Mode hemat daya gagal diganti', 'Couldn\'t switch power mode'), result.error, 'battery-warning', '#ff9f0a');
   }
   $effect(() => { artColors.update(device.media?.thumb ?? undefined); });
   // Halaman Langit: warna tulisan menyesuaikan terang gelapnya langit.
@@ -132,12 +134,16 @@
     void dock.apply();
     const p0 = notch.pos;
     spring = new Spring({ x: p0.x, y: p0.y, w: p0.w, h: p0.h, r: p0.r }, (v) => {
-      shellEl.style.left = `${v.x}px`;
-      shellEl.style.top = `${v.y}px`;
-      shellEl.style.width = `${v.w}px`;
-      shellEl.style.height = `${v.h}px`;
       const r = Math.max(0, v.r);
-      shellEl.style.borderRadius = notch.pill ? `${r}px` : `0 0 ${r}px ${r}px`;
+      // Gaya Notch: kotak sedikit lebih lebar, lalu dipotong supaya sudut atasnya melengkung halus ke tepi layar.
+      const notched = notch.pill ? null : notchPath(v.w, v.h, r);
+      const ear = notched?.ear ?? 0;
+      shellEl.style.left = `${v.x - ear}px`;
+      shellEl.style.top = `${v.y}px`;
+      shellEl.style.width = `${v.w + ear * 2}px`;
+      shellEl.style.height = `${v.h}px`;
+      shellEl.style.borderRadius = notched ? '0' : `${r}px`;
+      shellEl.style.clipPath = notched ? `path('${notched.path}')` : 'none';
     });
   });
   $effect(() => {
@@ -210,19 +216,23 @@
           <span class="title"><b>{page.title()}</b></span>
           <span class="right">
             {#if features.weather && weather.now}<span class="wx" title={weather.now.place}>{weather.now.icon} {weather.now.temp}°</span>{/if}
-            {#if device.media?.playing}<Equalizer />{/if}
             {#if device.power}
-              <span class="batt" class:chg={device.power.charging} class:low={device.power.percent <= 20 && !device.power.charging}
-                title={L(`Baterai ${device.power.percent}%`, `Battery ${device.power.percent}%`)}>{device.power.charging ? '⚡' : ''}{device.power.percent}%</span>
+              <span class="batt" class:chg={device.power.charging} class:low={device.power.percent <= 20 && !device.power.charging} role="img"
+                aria-label={L(`Baterai ${device.power.percent}%`, `Battery ${device.power.percent}%`)} title={L(`Baterai ${device.power.percent}%`, `Battery ${device.power.percent}%`) + (device.power.charging ? ' ⚡' : '')}>
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-opacity=".22" stroke-width="2.5" />
+                  <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-dasharray="37.7" stroke-dashoffset={37.7 * (1 - device.power.percent / 100)} transform="rotate(-90 8 8)" /></svg>
+              </span>
               {#if device.power.power_saver_available}
                 <button class="power-saver" class:on={device.power.power_saver} aria-label={L('Mode hemat daya', 'Power saver mode')}
-                  title={(device.power.power_saver ? L('Efisiensi daya aktif · klik untuk mematikan', 'Power efficiency on · click to turn off') : L('Nyalakan efisiensi daya', 'Turn on power efficiency')) + (device.power.plugged ? L(' (saat tersambung charger)', ' (while plugged in)') : L(' (saat memakai baterai)', ' (on battery)'))}
+                  title={(device.power.power_saver ? L('Efisiensi daya aktif · klik buat mematikan', 'Power efficiency is on · click to turn off') : L('Nyalakan efisiensi daya', 'Turn on power efficiency')) + (device.power.plugged ? L(' (saat tersambung charger)', ' (while plugged in)') : L(' (saat memakai baterai)', ' (on battery)'))}
                   aria-pressed={device.power.power_saver}
-                  onclick={(event) => { event.stopPropagation(); void togglePowerSaver(); }}><Leaf size={12} /></button>
+                  onclick={(event) => { event.stopPropagation(); void togglePowerSaver(); }}><Leaf size={13} /></button>
               {/if}
             {/if}
-            <span class="clock">{time}</span>
-            <button class="gear" aria-label={L('Pengaturan', 'Settings')} onclick={openSettings}>⚙</button>
+            <span class="date">{date}</span>
+            <span class="clock">{hhmm}</span>
+            <button class="gear" aria-label={L('Pengaturan', 'Settings')} onclick={openSettings}><Settings size={14} /></button>
+            {#if device.media?.playing}<Equalizer />{/if}
           </span>
         </header>
 
@@ -262,6 +272,10 @@
         {/if}
 
       </div>
+    {:else if notch.headMode}
+      <div class="layer center" style:--lw="{HEAD}px" style:--lh="{HEAD}px" in:enter out:leave>
+        <Eyes head />
+      </div>
     {:else if news.level}
       <div class="layer hudl" style:--lw="{notch.closed.hud.w}px" style:--lh="{notch.closed.hud.h}px" in:enter out:leave>
         <Hud level={news.level} />
@@ -272,7 +286,7 @@
           <NoticeCard card={news.current} />
         </div>
       {/key}
-    {:else if notch.wings && device.media && !notch.headMode}
+    {:else if notch.wings && device.media}
       <div class="layer center" style:--lw="{(notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
@@ -281,7 +295,7 @@
             style:color={wingLine ? (ui.lyricAuto ? artColors.on : null) || ui.lyricActive || undefined : undefined}>
             <span bind:this={wingText}>{wingLabel}</span>
           </span>
-          {#if notch.paired}{@render chip(pairItem)}{:else}<Equalizer />{/if}
+          {#if notch.paired}{@render chip(pairItem)}{#if notch.pairRight.length > 1}<span class="more">+{notch.pairRight.length - 1}</span>{/if}{:else}<Equalizer />{/if}
         </div>
       </div>
     {:else if notch.live}
@@ -295,6 +309,7 @@
             <span class="dlb">{lv.text}</span>
             <span class="vsep"></span>
             {@render chip(pairItem)}
+            {#if notch.pairRight.length > 1}<span class="more">+{notch.pairRight.length - 1}</span>{/if}
           {:else}
             {#if lv.icon === 'stopwatch' && lv.laps}<span class="lap">L{lv.laps}</span>{/if}
             <span class="dlb" class:dim={lv.paused}>{lv.text}</span>
@@ -302,11 +317,12 @@
         </div>
       </div>
     {:else}
-      <div class="layer center" style:--lw="{notch.headMode ? HEAD : notch.closed.idle.w}px" style:--lh="{notch.headMode ? HEAD : notch.closed.idle.h}px" in:enter out:leave>
-        {#if features.companion}<Eyes head={notch.headMode} />{/if}
+      <div class="layer center" style:--lw="{notch.closed.idle.w}px" style:--lh="{notch.closed.idle.h}px" in:enter out:leave>
+        {#if features.companion}<Eyes />{/if}
       </div>
     {/if}
   </div>
+  {#if notch.headMode && !notch.autoHidden}<FaceExtras line={wingLine} />{/if}
 </main>
 
 <style>
@@ -323,7 +339,7 @@
   .shell.ax-right .layer.openl { transform-origin: 100% 0; }
   /* Tiap bentuk punya lapisan berukuran tetap, menempel di atas tengah; notch yang membesar hanya memotongnya. */
   .layer { position: absolute; top: 0; left: 50%; width: var(--lw); height: var(--lh); margin-left: calc(var(--lw) / -2); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
-  .layer.openl { transform: scale(var(--sc, 1)); transform-origin: 50% 0; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0 22px 10px; }
+  .layer.openl { transform: scale(var(--sc, 1)); transform-origin: 50% 0; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0 0 6px; }
   .wings { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
   .art { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 12px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
@@ -333,6 +349,7 @@
   .chip { display: inline-flex; align-items: center; gap: 5px; flex: none; }
   .lap { font-size: 9.5px; font-weight: 800; line-height: 1; padding: 2px 5px; border-radius: 99px; background: var(--tint, #ff9f0a); color: #000; font-variant-numeric: tabular-nums; }
   .dlb.dim { opacity: .55; }
+  .more { flex: none; padding: 0 5px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: 9px; font-weight: 700; line-height: 14px; }
   .vsep { width: 1px; height: 12px; background: rgba(255, 255, 255, .16); flex: none; }
   .dlb { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .75); flex: none; }
   .song { flex: 1; min-width: 0; padding-inline: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; color: rgba(255, 255, 255, .85); }
@@ -344,28 +361,31 @@
     .song.scrolling::-webkit-scrollbar { display: none; }
     .song.scrolling > span { animation: none; }
   }
-  header { white-space: nowrap; height: 36px; flex: none; display: flex; align-items: center; justify-content: space-between; font-size: 12.5px; }
-  .title { border: 0; background: none; padding: 0; cursor: default; font-size: 13px; }
-  .right { display: flex; align-items: center; gap: 10px; }
-  .clock { font-weight: 600; font-variant-numeric: tabular-nums; color: color-mix(in srgb, var(--ink, #fff) 80%, transparent); font-size: 11.5px; }
-  .wx { font-size: 11.5px; font-weight: 600; }
-  .batt { font-size: 11px; font-weight: 600; }
-  .batt.chg { color: #5fd38d; }
-  .batt.low { color: #ff6b63; }
-  .power-saver { display: grid; place-items: center; width: 20px; height: 20px; padding: 0; line-height: 0; flex: none; border: 1px solid rgba(255,255,255,.18); border-radius: 50%; background: transparent; color: rgba(255,255,255,.65); cursor: pointer; }
+  header { white-space: nowrap; height: 32px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+  .title { font-size: 13px; }
+  .right { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--ink, #fff) 62%, transparent); }
+  .clock { color: var(--ink, #fff); font-variant-numeric: tabular-nums; }
+  .batt { display: grid; place-items: center; }
+  .batt.chg { color: #30d158; }
+  .batt.low { color: #ff453a; }
+  .power-saver { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; flex: none; border: 0; border-radius: 50%; background: transparent; color: inherit; cursor: pointer; }
   .power-saver:hover { background: rgba(255,255,255,.1); }
-  .power-saver.on { border-color: rgba(76,217,100,.55); background: rgba(76,217,100,.17); color: #4cd964; }
-  .gear { border: 0; background: none; cursor: pointer; opacity: .5; font-size: 14px; padding: 0 2px; }
-  .gear:hover { opacity: 1; }
-  .banner { display: flex; align-items: center; gap: 14px; padding: 0 8px; }
+  .power-saver.on { color: #30d158; }
+  .gear { display: grid; place-items: center; border: 0; background: none; color: inherit; cursor: pointer; padding: 0; }
+  .gear:hover { color: var(--ink, #fff); }
+  .banner { height: 100%; display: flex; align-items: center; gap: 14px; padding: 0 8px; }
   .bico { width: 48px; height: 48px; border-radius: 50%; display: grid; place-items: center; flex: none; color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
   .btxt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
   .btxt b { font-size: 14px; font-weight: 600; display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .btxt small { font-size: 11.5px; color: rgba(255, 255, 255, .6); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .bact { border: 0; border-radius: 99px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 90%, transparent); cursor: pointer; flex: none; transition: transform .12s; }
   .bact:active { transform: scale(.95); }
-  .pg { position: absolute; left: 0; right: 0; top: 4px; bottom: 0; }
+  .pg { position: absolute; left: 8px; right: 8px; top: 8px; bottom: 0; }
   /* Musik: glow sampul boleh melewati tepi area konten (dipotong bentuk notch), supaya tidak ada sisi persegi yang tajam. */
   .page.bleed { overflow: visible; }
-  .page { flex: 1; min-height: 0; padding-top: 4px; position: relative; overflow: hidden; }
+  .page { flex: 1; min-height: 0; position: relative; overflow: hidden; }
+  /* Tepi tipis terang dan pendar warna aksen di sudut kiri bawah, seperti di mockup. */
+  .shell.open.pillmode::after { content: ''; position: absolute; inset: 0; border-radius: inherit; border: 1px solid rgba(255, 255, 255, .08); pointer-events: none; }
+  .shell.open::before { content: ''; position: absolute; z-index: -1; left: -60px; bottom: -140px; width: 380px; height: 240px; background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 22%, transparent), transparent); pointer-events: none; }
+  .shell.open:has(:global(.sky))::before { display: none; }
 </style>

@@ -17,7 +17,6 @@ export const dayText = (d: Date) => {
 const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
 
 /** Teks jam di header: "Kam 22 Okt  19.03" (id) atau "Thu Oct 22  7:03 PM" (en). */
-export const headerStamp = (ms: number) => `${dayText(new Date(ms))}  ${timeText(new Date(ms))}`;
 
 export function relativeLong(dueMs: number, allDay: boolean, nowMs: number): string {
   const due = new Date(dueMs), now = new Date(nowMs);

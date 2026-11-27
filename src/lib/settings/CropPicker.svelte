@@ -64,7 +64,7 @@
     <span class="pill">{Math.round(z * 100)}%</span>
     <button type="button" class="step" onclick={reset} disabled={!dirty} aria-label={L('Atur ulang', 'Reset')} title={L('Atur ulang', 'Reset')}><RotateCcw size={13} /></button>
   </div>
-  <p class="tip">{L('Seret di gambar untuk memilih bagian yang tampil. Gulir untuk zoom.', 'Drag on the image to pick the visible part. Scroll to zoom.')}</p>
+  <p class="tip">{L('Seret gambarnya buat pilih bagian yang tampil. Gulir buat zoom.', 'Drag the image to choose what shows. Scroll to zoom.')}</p>
 </div>
 
 <style>

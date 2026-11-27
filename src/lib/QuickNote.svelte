@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Inbox } from '@lucide/svelte';
+  import Input from './ui/Input.svelte';
+  import { CornerDownLeft } from '@lucide/svelte';
   import { notes } from './state.svelte';
   import { annotated, currencyPair, formatCurrency, preview } from './calc';
   import { cmdTry } from './bridge';
@@ -49,46 +50,40 @@
 </script>
 
 <div class="qn">
-  <span class="label">{L('Catatan cepat', 'Quick note')}</span>
-  <textarea class:focus={focused} bind:value={text} onfocus={() => (focused = true)} onblur={() => (focused = false)}
-    placeholder={L('Tulis sesuatu, tekan Enter…', 'Type something, press Enter…')} aria-label={L('Catatan cepat', 'Quick note')}
-    onkeydown={(e) => {
-      if (e.ctrlKey || e.metaKey) e.stopPropagation(); // biarkan pintasan edit ditangani textarea
-      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
-    }}></textarea>
+  <div class="lb">{L('Catatan cepat', 'Quick note')}</div>
+  <div class="field" class:focus={focused}>
+    <Input bare multiline bind:value={text} onfocus={() => (focused = true)} onblur={() => (focused = false)}
+      placeholder={L('Tulis apa saja…', 'Write anything…')} aria-label={L('Catatan cepat', 'Quick note')}
+      onkeydown={(e) => {
+        if (e.ctrlKey || e.metaKey) e.stopPropagation(); // biarkan pintasan edit ditangani textarea
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); }
+      }} />
+    <button class="round" disabled={!text.trim()} aria-label={L('Simpan', 'Save')} title={L('Simpan', 'Save')} onclick={save}><CornerDownLeft size={14} /></button>
+  </div>
   <div class="foot">
     {#if result}
-      <button class="res" title={currency ? L('Kurs Yahoo Finance · klik untuk menyalin', 'Yahoo Finance rate · click to copy') : L('Klik untuk menyalin hasil', 'Click to copy the result')} onclick={copyResult}>{currency ? '' : '= '}{result}</button>
+      <button class="res" title={currency ? L('Kurs Yahoo Finance · klik buat salin', 'Yahoo Finance rate · click to copy') : L('Klik buat salin hasilnya', 'Click to copy the result')} onclick={copyResult}>{currency ? '' : '= '}{result}</button>
     {:else if currency && rateLoading}
-      <span class="hint">{L('Mengambil kurs Yahoo…', 'Fetching Yahoo rate…')}</span>
+      <span>{L('Ambil kurs dari Yahoo…', 'Getting the rate from Yahoo…')}</span>
     {:else if currency && rateError}
-      <span class="hint">{L('Kurs tidak tersedia', 'Rate unavailable')}</span>
+      <span>{L('Kurs tidak bisa diambil', 'Rate unavailable')}</span>
     {:else}
-      <span class="hint"><Inbox size={11} /> {L('Seret file ke notch → tray', 'Drop files on the notch → tray')}</span>
+      <span class="one">{L('Tekan Enter untuk menyimpan ke Catatan', 'Press Enter to save to Notes')}</span>
     {/if}
     <span class="grow"></span>
-    {#if hub.connected}
-      <button class="doc" disabled={!text.trim()} title={L('Kirim sebagai dokumen baru di Cognify', 'Send as a new document in Cognify')}
+    {#if hub.connected && text.trim()}
+      <button class="btn" title={L('Kirim ke Cognify jadi dokumen baru', 'Send to Cognify as a new doc')}
         onclick={async () => { if (await hub.noteToDoc(text)) text = ''; }}>{L('Jadikan dokumen', 'Make doc')}</button>
     {/if}
-    <button class="save" disabled={!text.trim()} onclick={save}>{L('Simpan', 'Save')}</button>
   </div>
 </div>
 
 <style>
-  .qn { display: flex; flex-direction: column; gap: 6px; min-width: 0; flex: 1; }
-  .label { padding-left: 6px; font-size: 9.5px; letter-spacing: .06em; font-weight: 600; text-transform: uppercase; color: rgba(255, 255, 255, .42); }
-  textarea { height: 66px; resize: none; box-sizing: border-box; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: rgba(255, 255, 255, .07); color: #fff; font: inherit; font-size: 12px; outline: none; }
-  textarea.focus { background: rgba(255, 255, 255, .1); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-  textarea::placeholder { color: rgba(255, 255, 255, .4); }
-  .foot { display: flex; align-items: center; gap: 5px; color: rgba(255, 255, 255, .5); }
-  .hint { display: inline-flex; align-items: center; gap: 5px; font-size: 10.5px; }
-  .res { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); cursor: pointer; }
-  .grow { flex: 1; }
-  .save { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 90%, transparent); cursor: pointer; }
-  .doc { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(255, 255, 255, .12); cursor: pointer; }
-  .doc:disabled { color: rgba(255, 255, 255, .4); cursor: default; }
-  .doc { border: 0; border-radius: 99px; padding: 4px 10px; font-size: 11px; font-weight: 600; color: #fff; background: rgba(255, 255, 255, .12); cursor: pointer; }
-  .doc:disabled { color: rgba(255, 255, 255, .4); cursor: default; }
-  .save:disabled { background: color-mix(in srgb, var(--accent) 35%, transparent); color: rgba(255, 255, 255, .5); cursor: default; }
+  .qn { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+  .field { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 6px 0 12px; border-radius: 12px; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 255, 255, .09); }
+  .field.focus { border-color: var(--accent); }
+  .field :global(textarea) { flex: 1; min-width: 0; height: 18px; resize: none; color: var(--ink, #fff); font-size: 12.5px; }
+  .field .round { width: 32px; height: 32px; }
+  .foot { display: flex; align-items: center; gap: 6px; min-height: 26px; margin: 6px 8px 0; font-size: 11px; color: var(--muted); }
+  .res { border: 0; background: none; padding: 0; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--hi); cursor: pointer; }
 </style>

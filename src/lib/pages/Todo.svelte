@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Check, Circle, CircleCheck, Bell, ListChecks, Trash2, Plus } from '@lucide/svelte';
+  import Input from '../ui/Input.svelte';
+  import { Bell, Check, ListChecks, Plus, Trash2 } from '@lucide/svelte';
   import { todo } from '../state.svelte';
   import { parseDue } from '../due';
   import { L } from '../i18n';
@@ -34,67 +35,57 @@
 
 <div class="todo">
   <div class="left">
-    <div class="count"><b>{todo.doneToday}</b><span>/{todo.totalToday}</span></div>
+    <div class="count"><b>{todo.doneToday}</b><span>/ {todo.totalToday}</span></div>
     <small>{L('Tugas selesai hari ini', 'Tasks done today')}</small>
     <div class="field">
-      <input type="text" bind:value={text} placeholder={L('Tugas baru, mis. PR jam 7', 'New task, e.g. call at 5pm')} onkeydown={(e) => e.key === 'Enter' && add()} />
-      <button class="plus" aria-label={L('Tambah tugas', 'Add task')} disabled={!text.trim()} onclick={add}><Plus size={14} strokeWidth={2.8} /></button>
+      <Input bare bind:value={text} placeholder={L('Tugas baru, mis. PR jam 7', 'New task, e.g. call at 5pm')} aria-label={L('Tugas baru', 'New task')} onkeydown={(e) => e.key === 'Enter' && add()} />
+      <button class="round on" aria-label={L('Tambah tugas', 'Add task')} disabled={!text.trim()} onclick={add}><Plus size={14} strokeWidth={2.8} /></button>
     </div>
     <div class="chips">
-      {#each options as o, i}
-        <button class:sel={choice === i} onclick={() => (choice = choice === i ? null : i)}>{o.label}</button>
-      {/each}
+      {#each options as o, i}<button class="btn" class:on={choice === i} aria-pressed={choice === i} onclick={() => (choice = choice === i ? null : i)}>{o.label}</button>{/each}
     </div>
     {#if remind}<span class="rem"><Bell size={10} fill="currentColor" /> {L('Diingatkan ', 'Reminder ')}{when(remind.getTime())}</span>{/if}
   </div>
 
-  <div class="list">
+  <div class="card scroll tasks">
     {#if todo.items.length === 0}
-      <div class="empty"><ListChecks size={22} /><span>{L('Belum ada tugas. Tulis di kiri, tekan Enter.', 'No tasks yet. Type on the left and press Enter.')}</span></div>
+      <div class="empty"><ListChecks size={20} /><span>{L('Belum ada tugas. Tulis di kiri, lalu tekan Enter.', 'No tasks yet. Type one on the left and press Enter.')}</span></div>
     {/if}
-    {#each todo.sorted as t (t.id)}
-      <div class="item" class:done={t.done}>
-        <button class="chk" aria-label={t.done ? L('Batal selesai', 'Mark as not done') : L('Selesai', 'Mark as done')} onclick={() => todo.toggle(t.id)}>
-          {#if t.done}<CircleCheck size={15} />{:else}<Circle size={15} />{/if}
+    {#each todo.sorted as t, i (t.id)}
+      <div class="task" class:done={t.done}>
+        <button class="box" aria-label={t.done ? L('Batal selesai', 'Mark as not done') : L('Selesai', 'Mark as done')} onclick={() => todo.toggle(t.id)}>
+          {#if t.done}<Check size={11} strokeWidth={3.2} />{/if}
         </button>
-        <span class="txt">{t.text}</span>
-        {#if t.due}
-          <span class="when" class:late={!t.done && t.due < ticker.now}>{when(t.due)}</span>
-        {:else if t.done}<span class="when">{L('selesai', 'done')}</span>{/if}
-        <button class="del" aria-label={L('Hapus', 'Delete')} onclick={() => todo.remove(t.id)}><Trash2 size={11} /></button>
+        <span class="grow one">{t.text}</span>
+        {#if t.done}<span class="tag">{L('selesai', 'done')}</span>
+        {:else if i === 0}<span class="tag hot">{t.due ? when(t.due) : L('Sekarang', 'Current')}</span>
+        {:else if t.due}<span class="tag" class:late={t.due < ticker.now}>{when(t.due)}</span>{/if}
+        <button class="icon del" aria-label={L('Hapus', 'Delete')} onclick={() => todo.remove(t.id)}><Trash2 size={11} /></button>
       </div>
     {/each}
   </div>
 </div>
 
 <style>
-  .todo { display: flex; gap: 18px; height: 100%; }
-  .left { width: 230px; flex: none; display: flex; flex-direction: column; gap: 6px; }
-  .count { display: flex; align-items: baseline; gap: 2px; }
-  .count b { font-size: 34px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  .count span { font-size: 17px; font-weight: 600; color: rgba(255, 255, 255, .5); }
-  small { font-size: 11px; color: rgba(255, 255, 255, .55); }
-  .field { display: flex; gap: 6px; align-items: center; }
-  .field input { flex: 1; min-width: 0; height: 28px; padding: 0 8px; border: 1px solid transparent; border-radius: 9px; background: rgba(255, 255, 255, .07); color: #fff; font-size: 11.5px; outline: none; }
-  .field input:focus { background: rgba(255, 255, 255, .1); border-color: color-mix(in srgb, var(--accent) 70%, transparent); }
-  .plus { width: 28px; height: 28px; border: 0; border-radius: 50%; background: var(--accent); color: #0b0a1a; display: grid; place-items: center; cursor: pointer; flex: none; }
-  .plus:disabled { opacity: .35; cursor: default; }
-  .chips { display: flex; gap: 4px; }
-  .chips button { border: 0; border-radius: 99px; padding: 4px 6px; font-size: 10px; font-weight: 600; white-space: nowrap; background: rgba(255, 255, 255, .08); color: #fff; cursor: pointer; }
-  .chips button.sel { background: var(--accent); color: #0b0a1a; }
-  .rem { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--accent); }
-  .list { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; overflow-y: auto; align-content: start; }
-  .list::-webkit-scrollbar { width: 0; }
-  .empty { display: flex; align-items: center; gap: 8px; color: rgba(255, 255, 255, .4); font-size: 11.5px; }
-  .item { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border-radius: 9px; background: rgba(255, 255, 255, .06); flex: none; }
-  .item:hover { background: rgba(255, 255, 255, .1); }
-  .chk { border: 0; background: none; padding: 0; color: rgba(255, 255, 255, .5); cursor: pointer; display: grid; }
-  .done .chk { color: #5fd38d; }
-  .txt { flex: 1; min-width: 0; font-size: 11.5px; font-weight: 500; color: rgba(255, 255, 255, .95); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .done .txt { text-decoration: line-through; color: rgba(255, 255, 255, .4); }
-  .when { font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .5); white-space: nowrap; }
-  .done .when { color: rgba(255, 255, 255, .3); }
-  .when.late { color: #ff9f43; }
-  .del { border: 0; background: none; color: rgba(255, 255, 255, .6); cursor: pointer; display: none; padding: 0; }
-  .item:hover .del { display: grid; }
+  .todo { display: grid; grid-template-columns: 190px minmax(0, 1fr); gap: 12px; height: 164px; padding-left: 8px; }
+  .left { display: flex; flex-direction: column; min-width: 0; }
+  .count b { font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.15; }
+  .count span { margin-left: 4px; font-size: 13px; color: var(--muted); }
+  .field { display: flex; align-items: center; gap: 6px; height: 34px; flex: none; margin: 6px 0; padding: 0 3px 0 12px; border-radius: 99px; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 255, 255, .09); }
+  .field:focus-within { border-color: var(--accent); }
+  .field :global(input) { flex: 1; min-width: 0; color: var(--ink, #fff); font-size: 11px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chips .btn { height: 22px; padding: 0 9px; }
+  .rem { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; font-size: 10px; color: var(--hi); }
+  .tasks { gap: 4px; }
+  .empty { display: flex; align-items: center; gap: 8px; padding: 4px 8px; color: var(--muted); font-size: 11.5px; }
+  .task { display: flex; align-items: center; gap: 8px; height: 34px; flex: none; padding: 0 8px; border-radius: 12px; background: rgba(255, 255, 255, .06); font-size: 12px; }
+  .box { display: grid; place-items: center; flex: none; width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 1.5px solid #8e8e93; background: none; cursor: pointer; }
+  .done .box { background: #30d158; border-color: #30d158; color: #000; }
+  .done .grow { color: var(--muted); text-decoration: line-through; }
+  .tag { font-size: 10px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .tag.late { color: #ff9f43; }
+  .tag.hot { color: #ffb340; background: rgba(255, 159, 10, .18); padding: 2px 8px; border-radius: 99px; font-weight: 600; }
+  .del { display: none; }
+  .task:hover .del, .del:focus-visible { display: grid; }
 </style>

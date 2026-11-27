@@ -1,10 +1,16 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+  import Select from '../ui/Select.svelte';
+  import MicCard from '../MicCard.svelte';
+  import { features } from '../system.svelte';
+  import { onMount, tick } from 'svelte';
+  import { ScanFace } from '@lucide/svelte';
   import { L } from '../i18n';
 
   type CameraChoice = { deviceId: string; label: string };
   let video: HTMLVideoElement | undefined = $state();
   let error = $state('');
+  // Kamera mati sampai dinyalakan sendiri.
+  let on = $state(false);
   let cameras = $state<CameraChoice[]>([]);
   let selectedCameraId = $state('');
   let stream: MediaStream | undefined;
@@ -39,15 +45,30 @@
       await refreshCameras();
     } catch {
       if (gone || request !== requestId) return;
-      error = L('Kamera tidak bisa dipakai. Izinkan kamera untuk app ini di Pengaturan Windows > Privasi > Kamera.', 'Camera unavailable. Allow camera access for this app in Windows Settings > Privacy > Camera.');
+      error = L('Kamera tidak bisa dipakai. Izinkan kamera buat app ini di Pengaturan Windows > Privasi > Kamera.', 'Can\'t use the camera. Allow it for this app in Windows Settings > Privacy > Camera.');
       await refreshCameras().catch(() => {});
     }
+  }
+
+  function stopCamera() {
+    requestId++;
+    on = false;
+    error = '';
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = undefined;
+  }
+
+  async function toggleCamera() {
+    if (on) return stopCamera();
+    on = true;
+    await tick(); // elemen video baru ada setelah `on`
+    await startCamera(selectedCameraId);
   }
 
   function chooseCamera(deviceId: string) {
     selectedCameraId = deviceId;
     if (deviceId) localStorage.setItem('cognify.camera.input', deviceId);
-    void startCamera(deviceId);
+    if (on) void startCamera(deviceId);
   }
 
   onMount(() => {
@@ -57,8 +78,7 @@
     navigator.mediaDevices?.addEventListener('devicechange', onDeviceChange);
     void (async () => {
       await refreshCameras().catch(() => {});
-      const available = cameras.some((camera) => camera.deviceId === preferred) ? preferred : '';
-      await startCamera(available);
+      if (cameras.some((camera) => camera.deviceId === preferred)) selectedCameraId = preferred;
     })();
     return () => {
       gone = true;
@@ -70,27 +90,27 @@
   });
 </script>
 
-<div class="cols" style="align-items:center;gap:22px;padding-left:6px">
-  {#if !error}<video bind:this={video} autoplay playsinline muted></video>{:else}<div class="empty camera-error">{error}</div>{/if}
-  <div class="col">
-    <b style="font-size:15px">{L('Cermin', 'Mirror')}</b>
-    <span class="dim" style="max-width:300px">{L('Lihat dirimu sebelum rapat. Kamera hanya menyala selama halaman ini terbuka dan tidak merekam apa pun.', 'Check yourself before a call. The camera is on only while this page is open and nothing is recorded.')}</span>
-    {#if cameras.length}
-      <label class="camera-picker">
-        <span>{L('Input kamera', 'Camera input')}</span>
-        <select value={selectedCameraId} onchange={(event) => chooseCamera(event.currentTarget.value)} aria-label={L('Pilih kamera', 'Choose camera')}>
-          {#each cameras as camera (camera.deviceId)}<option value={camera.deviceId}>{camera.label}</option>{/each}
-        </select>
-      </label>
-    {/if}
-  </div>
+<div class="mirror" class:solo={!features.camera || !features.micTest}>
+  {#if features.camera}
+    <div class="card cam">
+      {#if on && !error}<video bind:this={video} autoplay playsinline muted></video>{:else if error}<p class="err">{error}</p>{:else}<ScanFace size={40} strokeWidth={1} />{/if}
+      {#if cameras.length}
+        <div class="pick"><Select size="sm" value={selectedCameraId} onchange={(v) => chooseCamera(v)} width="100%" label="Choose camera"
+          options={cameras.map((c) => ({ value: c.deviceId, label: c.label }))} /></div>
+      {/if}
+      <button class="btn toggle" onclick={toggleCamera}>{on ? 'Turn camera off' : 'Turn camera on'}</button>
+    </div>
+  {/if}
+  {#if features.micTest}<MicCard />{/if}
 </div>
 
 <style>
-  /* Kotak tetap di kiri, apa pun resolusi kameranya (mis. OBS 1920x1080): gambar dipotong tengahnya. */
-  video { width: 176px; height: 176px; flex: none; border-radius: 28px; transform: scaleX(-1); object-fit: cover; background: #111; }
-  .camera-error { max-width: 200px; padding: 12px; font-size: 11px; }
-  .camera-picker { display: grid; gap: 5px; max-width: 280px; color: rgba(255,255,255,.56); font-size: 11px; }
-  .camera-picker select { width: 100%; min-width: 0; padding: 8px 10px; border: 1px solid rgba(255,255,255,.14); border-radius: 10px; background: rgba(255,255,255,.08); color: #fff; font: inherit; outline: none; }
-  .camera-picker option { color: #171717; }
+  .mirror { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 8px; height: 164px; }
+  .mirror.solo { grid-template-columns: minmax(0, 1fr); }
+  .cam { position: relative; align-items: center; justify-content: center; padding: 0; overflow: hidden; color: var(--muted); }
+  /* Gambar dipotong tengahnya, apa pun resolusi kameranya (mis. OBS 1920x1080). */
+  video { width: 100%; height: 100%; transform: scaleX(-1); object-fit: cover; }
+  .pick { position: absolute; left: 8px; right: 8px; top: 6px; }
+  .toggle { position: absolute; bottom: 8px; }
+  .err { margin: 0; padding: 0 16px 20px; font-size: 11px; text-align: center; color: #ffb4a8; }
 </style>

@@ -28,9 +28,9 @@ export const emotionLabel = (e: Emotion) => L(...NAMES[e]);
 
 export type Mode = 'dynamic' | 'custom' | 'fixed';
 export const MODES: { id: Mode; label: () => string; hint: () => string }[] = [
-  { id: 'dynamic', label: () => L('Dinamis (acak)', 'Dynamic (random)'), hint: () => L('Mengikuti keadaan, kadang kaget atau iseng sendiri.', 'Follows what is going on, sometimes startled or playful on its own.') },
-  { id: 'custom', label: () => L('Per kejadian', 'Per event'), hint: () => L('Kamu menentukan ekspresi tiap keadaan dan kejadian. Tidak ada yang acak.', 'You choose the expression for each situation and event. Nothing is random.') },
-  { id: 'fixed', label: () => L('Statis', 'Static'), hint: () => L('Satu ekspresi saja, tidak berubah.', 'One expression that never changes.') },
+  { id: 'dynamic', label: () => L('Dinamis (acak)', 'Dynamic (random)'), hint: () => L('Ikut suasana sekitar, sesekali kaget atau iseng sendiri.', 'Reacts to what\'s going on, and now and then gets startled or playful by itself.') },
+  { id: 'custom', label: () => L('Per momen', 'Per moment'), hint: () => L('Kamu yang pilih ekspresi buat tiap situasi dan momen. Tidak ada yang acak.', 'You pick the face for every situation and moment. Nothing is random.') },
+  { id: 'fixed', label: () => L('Statis', 'Static'), hint: () => L('Satu ekspresi terus, tidak ganti-ganti.', 'One face, all the time.') },
 ];
 
 export type SituationId =
@@ -44,39 +44,39 @@ const S = (id: SituationId, event: boolean, id_: string, en: string, emotion: Em
 
 export const SITUATIONS: Situation[] = [
   // Keadaan (berlangsung selama kondisinya ada)
-  S('normal', false, 'Keadaan biasa', 'Nothing special', 'idle'),
+  S('normal', false, 'Situasi biasa', 'Nothing special', 'idle'),
   S('music', false, 'Musik diputar', 'Music playing', 'happy'),
   S('focus', false, 'Pomodoro fokus berjalan', 'Focus Pomodoro running', 'determined'),
   S('rest', false, 'Pomodoro istirahat berjalan', 'Break Pomodoro running', 'content'),
   S('offline', false, 'Internet putus', 'Offline', 'sad'),
   S('batteryLow', false, 'Baterai 20% ke bawah', 'Battery 20% or less', 'tired'),
   S('batteryCritical', false, 'Baterai 10% ke bawah', 'Battery 10% or less', 'worried'),
-  S('lateNight', false, 'Larut malam (00.00 sampai 05.00)', 'Late night (12 am to 5 am)', 'sleepy'),
+  S('lateNight', false, 'Begadang (00.00 sampai 05.00)', 'Up late (12 am to 5 am)', 'sleepy'),
   S('morning', false, 'Pagi (05.00 sampai 09.00)', 'Morning (5 am to 9 am)', 'content'),
-  S('uptimeLong', false, 'Windows menyala 5 hari atau lebih', 'Windows on for 5 days or more', 'tired'),
-  S('uptimeVeryLong', false, 'Windows menyala 10 hari atau lebih', 'Windows on for 10 days or more', 'exhausted'),
-  S('sleeping', false, 'Mouse lama tidak digerakkan', 'Mouse idle for a while', 'sleep'),
-  S('waking', false, 'Mouse bergerak lagi', 'Mouse moves again', 'hello'),
+  S('uptimeLong', false, 'Windows sudah nyala 5 hari lebih', 'Windows\'s been on for 5+ days', 'tired'),
+  S('uptimeVeryLong', false, 'Windows sudah nyala 10 hari lebih', 'Windows\'s been on for 10+ days', 'exhausted'),
+  S('sleeping', false, 'Mouse lama diam', 'Mouse hasn\'t moved in a while', 'sleep'),
+  S('waking', false, 'Mouse gerak lagi', 'Mouse moves again', 'hello'),
   // Kejadian (muncul sebentar)
   S('charging', true, 'Charger dicolok', 'Charger plugged in', 'happy'),
   S('chargerFull', true, 'Baterai penuh', 'Fully charged', 'joy'),
   S('unplugged', true, 'Charger dicabut', 'Charger unplugged', 'worried'),
-  S('lowBatteryNotice', true, 'Peringatan baterai lemah', 'Low battery warning', 'scared'),
-  S('audioConnected', true, 'Headphone tersambung', 'Headphones connected', 'excited'),
-  S('downloadDone', true, 'Unduhan selesai', 'Download finished', 'joy'),
-  S('downloadFailed', true, 'Unduhan gagal', 'Download failed', 'sad'),
-  S('capsLock', true, 'Caps Lock menyala', 'Caps Lock turned on', 'surprised'),
-  S('inputSource', true, 'Bahasa keyboard berganti', 'Keyboard language changed', 'curious'),
-  S('networkUp', true, 'Internet kembali', 'Back online', 'happy'),
-  S('networkDown', true, 'Internet terputus (kabar)', 'Connection lost (notice)', 'sad'),
+  S('lowBatteryNotice', true, 'Baterai mau habis', 'Low battery warning', 'scared'),
+  S('audioConnected', true, 'Headphone nyambung', 'Headphones connect', 'excited'),
+  S('downloadDone', true, 'Unduhan selesai', 'Download finishes', 'joy'),
+  S('downloadFailed', true, 'Unduhan gagal', 'Download fails', 'sad'),
+  S('capsLock', true, 'Caps Lock nyala', 'Caps Lock turns on', 'surprised'),
+  S('inputSource', true, 'Ganti bahasa keyboard', 'Keyboard language changes', 'curious'),
+  S('networkUp', true, 'Internet balik lagi', 'Back online', 'happy'),
+  S('networkDown', true, 'Internet putus (kabar)', 'Connection drops (notice)', 'sad'),
   S('taskDone', true, 'Tersimpan atau selesai', 'Saved or done', 'joy'),
   S('taskFailed', true, 'Gagal', 'Failed', 'sad'),
-  S('alert', true, 'Pengingat (timer, minum, tugas)', 'Reminder (timer, water, task)', 'excited'),
-  S('volumeUp', true, 'Volume dinaikkan', 'Volume turned up', 'wow'),
-  S('volumeDown', true, 'Volume diturunkan', 'Volume turned down', 'shy'),
-  S('muted', true, 'Suara dibisukan', 'Sound muted', 'sad'),
-  S('brightUp', true, 'Layar dicerahkan', 'Screen brightened', 'hot'),
-  S('brightDown', true, 'Layar diredupkan', 'Screen dimmed', 'sleepy'),
+  S('alert', true, 'Pengingat (timer, minum, tugas)', 'Reminders (timer, water, tasks)', 'excited'),
+  S('volumeUp', true, 'Volume naik', 'Volume up', 'wow'),
+  S('volumeDown', true, 'Volume turun', 'Volume down', 'shy'),
+  S('muted', true, 'Suara dimatikan', 'Muted', 'sad'),
+  S('brightUp', true, 'Layar makin terang', 'Screen gets brighter', 'hot'),
+  S('brightDown', true, 'Layar makin redup', 'Screen gets dimmer', 'sleepy'),
 ];
 
 /**

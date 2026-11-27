@@ -56,3 +56,18 @@ export function hotZone(r: Rect, edge: Edge, vw: number, vh: number, thick = 4, 
     default: return { x: r.x - pad, y: 0, w: r.w + pad * 2, h: thick };
   }
 }
+
+/**
+ * Bentuk notch yang menempel di tepi atas: dua lengkung cekung halus selebar `ear` (sekitar 12 saat tertutup, 22 saat terbuka) di kiri dan kanan atas, lalu
+ * sudut bawah membulat `r`. Lebar kotaknya `w + 2 * ear`. Dipakai sebagai `clip-path`, jadi latar apa pun ikut.
+ */
+export function notchPath(w: number, h: number, r: number) {
+  const ear = Math.max(0, Math.min(22, 8 + h * 0.12, h / 2));
+  const br = Math.max(0, Math.min(r, h - ear, w / 2));
+  const W = w + ear * 2, a = ear * 0.55, b = ear * 0.45;
+  const n = (v: number) => +v.toFixed(2);
+  return {
+    ear,
+    path: `M0 0H${n(W)}C${n(W - a)} 0 ${n(W - ear)} ${n(b)} ${n(W - ear)} ${n(ear)}V${n(h - br)}A${n(br)} ${n(br)} 0 0 1 ${n(W - ear - br)} ${n(h)}H${n(ear + br)}A${n(br)} ${n(br)} 0 0 1 ${n(ear)} ${n(h - br)}V${n(ear)}C${n(ear)} ${n(b)} ${n(a)} 0 0 0Z`,
+  };
+}

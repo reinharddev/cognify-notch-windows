@@ -90,18 +90,18 @@ fn on_ac() -> bool {
 pub fn set_power_saver(enabled: bool) -> Result<bool, String> {
     let ac = on_ac();
     unsafe {
-        let module = LoadLibraryW(w!("PowrProf.dll")).map_err(|_| "Mode hemat daya cepat perlu Windows 11".to_string())?;
+        let module = LoadLibraryW(w!("PowrProf.dll")).map_err(|_| "Quick power saver mode needs Windows 11".to_string())?;
         let name = if ac { windows::core::s!("PowerSetUserConfiguredACPowerMode") } else { windows::core::s!("PowerSetUserConfiguredDCPowerMode") };
         let address = GetProcAddress(module, name);
         let Some(address) = address else {
             let _ = FreeLibrary(module);
-            return Err("Mode hemat daya cepat perlu Windows 11".into());
+            return Err("Quick power saver mode needs Windows 11".into());
         };
         let set: unsafe extern "system" fn(*const GUID) -> u32 = std::mem::transmute(address);
         let mode = if enabled { &POWER_MODE_BEST_EFFICIENCY } else { &POWER_MODE_BALANCED };
         let status = set(mode);
         let _ = FreeLibrary(module);
-        if status != 0 { return Err(format!("Windows gagal mengubah mode daya ({status})")); }
+        if status != 0 { return Err(format!("Windows couldn't change the power mode ({status})")); }
         Ok(power_saver_status(ac).unwrap_or(enabled))
     }
 }
@@ -192,7 +192,7 @@ pub fn audio_outputs() -> Vec<AudioOutput> {
 /// dibatasi ke daftar endpoint aktif yang ditampilkan di menu.
 pub fn set_default_output(id: &str) -> Result<(), String> {
     if !audio_outputs().iter().any(|device| device.id == id) {
-        return Err("Perangkat output tidak ditemukan atau sudah terputus".into());
+        return Err("Output device not found or already disconnected".into());
     }
     const CLSID_POLICY_CONFIG_CLIENT: GUID = GUID::from_u128(0x870af99c_171d_4f9e_af0d_e63df40c2bc9);
     const IID_POLICY_CONFIG: GUID = GUID::from_u128(0xf8679f50_850a_41cf_9c72_430f290290c8);
@@ -202,7 +202,7 @@ pub fn set_default_output(id: &str) -> Result<(), String> {
         let mut policy = std::ptr::null_mut();
         (unknown.vtable().QueryInterface)(unknown.as_raw(), &IID_POLICY_CONFIG, &mut policy)
             .ok().map_err(|e| e.to_string())?;
-        if policy.is_null() { return Err("Windows tidak memberi akses ke pemilih output".into()); }
+        if policy.is_null() { return Err("Windows didn't allow access to the output picker".into()); }
         let vtable = *(policy as *mut *const *const std::ffi::c_void);
         let set_default: unsafe extern "system" fn(*mut std::ffi::c_void, PCWSTR, i32) -> HRESULT =
             std::mem::transmute(*vtable.add(13));

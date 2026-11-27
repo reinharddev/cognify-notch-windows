@@ -46,10 +46,10 @@ fn read_consent(dir: &Path) -> Consent {
 /// Ditolak bila persetujuan sudah dicabut, bukan JSON, atau terlalu besar.
 fn write_data(dir: &Path, json: &str) -> Result<(), String> {
     if !read_consent(dir).enabled {
-        return Err("Hubungan ke Cognify belum diizinkan".into());
+        return Err("The link to Cognify isn't allowed yet".into());
     }
     if json.len() > MAX_BYTES {
-        return Err("Data terlalu besar".into());
+        return Err("Data is too large".into());
     }
     serde_json::from_str::<serde_json::Value>(json).map_err(|e| format!("Bukan JSON: {e}"))?;
     let tmp = dir.join(format!("{DATA}.tmp"));
@@ -145,17 +145,17 @@ fn valid_id(id: &str) -> bool {
 /// Tulis satu perintah ke `inbox/<id>.json` secara atomik. Ditolak tanpa persetujuan, id tak sah, bukan objek JSON, atau di atas 64 KB.
 fn write_command(dir: &Path, id: &str, json: &str) -> Result<(), String> {
     if !read_consent(dir).enabled {
-        return Err("Hubungan ke Cognify belum diizinkan".into());
+        return Err("The link to Cognify isn't allowed yet".into());
     }
     if !valid_id(id) {
-        return Err("Id perintah tidak sah".into());
+        return Err("Invalid command id".into());
     }
     if json.len() > MAX_COMMAND_BYTES {
-        return Err("Perintah terlalu besar".into());
+        return Err("Command is too large".into());
     }
     let v = serde_json::from_str::<serde_json::Value>(json).map_err(|e| format!("Bukan JSON: {e}"))?;
     if !v.is_object() || !v["type"].is_string() {
-        return Err("Perintah harus objek dengan bidang type".into());
+        return Err("A command must be an object with a type field".into());
     }
     let inbox = dir.join(INBOX);
     fs::create_dir_all(&inbox).map_err(|e| e.to_string())?;
@@ -197,7 +197,7 @@ pub fn link_consent() -> Consent {
 
 #[tauri::command]
 pub fn link_write(json: String) -> Result<(), String> {
-    write_data(&dir().ok_or("Folder data tidak ditemukan")?, &json)
+    write_data(&dir().ok_or("Data folder not found")?, &json)
 }
 
 #[tauri::command]
@@ -212,7 +212,7 @@ pub fn link_read_hub() -> Option<Hub> {
 
 #[tauri::command]
 pub fn link_send(id: String, json: String) -> Result<(), String> {
-    write_command(&dir().ok_or("Folder data tidak ditemukan")?, &id, &json)
+    write_command(&dir().ok_or("Data folder not found")?, &id, &json)
 }
 
 #[tauri::command]

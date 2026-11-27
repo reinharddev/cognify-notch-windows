@@ -41,13 +41,13 @@
 </script>
 
 <div class="sky">
-  <div class="info">
+  <div class="info" class:night={!pos.isDay && kind === 'clear'}>
     <span class="big">{hm(ms)}</span>
     {#if weather.now && kind}
       <span class="cond">{weather.now.temp}° · {weatherLabel(kind)}</span>
       <span class="place">{weather.now.place}</span>
     {:else}
-      <span class="place">{weather.problem || L('Nyalakan Cuaca dan isi kota di Pengaturan untuk matahari dan cuaca asli (sementara 06.00 sampai 18.00).', 'Turn on Weather and enter a city in Settings for real sun times and weather (6 am to 6 pm for now).')}</span>
+      <span class="place">{weather.problem || L('Nyalakan Cuaca dan isi kota di Pengaturan biar matahari dan cuacanya asli (sementara pakai 06.00 sampai 18.00).', 'Turn on Weather and add a city in Settings for real sun times and weather (using 6 am to 6 pm for now).')}</span>
     {/if}
   </div>
   <svg viewBox="0 0 320 138" aria-hidden="true">
@@ -81,10 +81,12 @@
 </div>
 
 <style>
-  .sky { display: flex; align-items: center; gap: 20px; height: 100%; }
-  .info { width: 210px; display: flex; flex-direction: column; gap: 4px; }
-  .big { font-size: 46px; font-weight: 300; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
-  .cond { font-size: 12.5px; font-weight: 600; }
+  .sky { display: flex; align-items: center; gap: 12px; height: 164px; padding: 0 8px; }
+  .info { width: 188px; flex: none; box-sizing: border-box; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 16px; border-radius: 20px; background: linear-gradient(150deg, rgba(255, 255, 255, .24), rgba(255, 255, 255, .08)); backdrop-filter: blur(14px) saturate(1.5); border: 1px solid rgba(255, 255, 255, .3); box-shadow: inset 0 1px rgba(255, 255, 255, .35), 0 8px 24px rgba(0, 0, 0, .19); }
+  /* Malam cerah: kaca bening tanpa buram supaya rasi bintang tetap terlihat. */
+  .info.night { background: rgba(255, 255, 255, .04); backdrop-filter: none; box-shadow: none; }
+  .big { font-size: 50px; font-weight: 300; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .cond { padding: 4px 10px; border-radius: 99px; background: rgba(255, 255, 255, .15); font-size: 12px; font-weight: 700; }
   .place { font-size: 10.5px; color: color-mix(in srgb, currentColor 75%, transparent); display: -webkit-box; -webkit-line-clamp: 3; line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   .ray { animation: pulse 2.6s ease-in-out infinite; }
   @keyframes pulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }

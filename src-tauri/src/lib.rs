@@ -143,7 +143,7 @@ async fn open_settings(app: AppHandle) {
         return;
     }
     let _ = WebviewWindowBuilder::new(&app, "settings", WebviewUrl::App("index.html".into()))
-        .title("Pengaturan Cognify Notch")
+        .title("Cognify Notch Settings")
         .inner_size(640.0, 740.0)
         .min_inner_size(520.0, 480.0)
         .center()
@@ -217,7 +217,7 @@ async fn currency_rate(from: String, to: String) -> Result<f64, String> {
     let to = to.trim().to_ascii_uppercase();
     let valid = |code: &str| code.len() == 3 && code.bytes().all(|b| b.is_ascii_uppercase());
     if !valid(&from) || !valid(&to) || from == to {
-        return Err("Pasangan mata uang tidak valid".into());
+        return Err("Invalid currency pair".into());
     }
     tauri::async_runtime::spawn_blocking(move || {
         let url = format!("https://query1.finance.yahoo.com/v8/finance/chart/{from}{to}=X?range=1d&interval=1d");
@@ -226,7 +226,7 @@ async fn currency_rate(from: String, to: String) -> Result<f64, String> {
         let json: serde_json::Value = serde_json::from_str(&body).map_err(|e| e.to_string())?;
         let rate = json["chart"]["result"][0]["meta"]["regularMarketPrice"].as_f64()
             .filter(|value| value.is_finite() && *value > 0.0)
-            .ok_or_else(|| "Yahoo Finance tidak menyediakan kurs untuk pasangan ini".to_string())?;
+            .ok_or_else(|| "Yahoo Finance has no rate for this pair".to_string())?;
         Ok(rate)
     }).await.map_err(|e| e.to_string())?
 }
@@ -235,11 +235,11 @@ async fn currency_rate(from: String, to: String) -> Result<f64, String> {
 #[tauri::command]
 fn read_ics_file(path: String) -> Result<String, String> {
     if !path.to_lowercase().ends_with(".ics") {
-        return Err("Pilih file berekstensi .ics".into());
+        return Err("Choose an .ics file".into());
     }
     let meta = std::fs::metadata(&path).map_err(|e| e.to_string())?;
     if meta.len() > 3_000_000 {
-        return Err("File terlalu besar".into());
+        return Err("File is too large".into());
     }
     std::fs::read_to_string(&path).map_err(|e| e.to_string())
 }
@@ -386,10 +386,10 @@ fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, Physica
         return Some((*monitor.position(), PhysicalSize::new(size.width.saturating_sub(2), size.height.saturating_sub(2))));
     }
     let scale = monitor.scale_factor();
-    // Panel terbuka 680 x 260 dikalikan skala pilihan; jendela minimal 800 x 330 dan tidak lebih lebar dari layar.
+    // Panel terbuka 620 x 224 dikalikan skala pilihan; jendela minimal 800 x 330 dan tidak lebih lebar dari layar.
     let pct = window.app_handle().state::<Shared>().panel_scale.load(Ordering::Relaxed).max(1) as f64 / 100.0;
-    let win_w = WIN_W.max(680.0 * pct + 40.0);
-    let win_h = WIN_H.max(260.0 * pct + 70.0);
+    let win_w = WIN_W.max(620.0 * pct + 40.0);
+    let win_h = WIN_H.max(224.0 * pct + 70.0);
     let size = PhysicalSize::new(((win_w * scale).round() as u32).min(monitor.size().width), (win_h * scale).round() as u32);
     let origin = monitor.position();
     let x = origin.x + (monitor.size().width as i32 - size.width as i32) / 2;
@@ -887,31 +887,31 @@ pub fn run() {
             // Taskbar Windows yang tertinggal tersembunyi oleh app yang macet dikembalikan sebelum apa pun.
             taskdock::recover(app.handle());
             skins::start(app.handle());
-            let window = app.get_webview_window("notch").expect("jendela notch tidak ada");
+            let window = app.get_webview_window("notch").expect("notch window missing");
             dock(&window)?;
             window.set_ignore_cursor_events(true)?;
             window.show()?;
 
             // Ikon di area ikon tersembunyi taskbar: klik kiri menyembunyikan atau menampilkan notch,
             // klik kanan membuka menu.
-            let toggle = MenuItem::with_id(app, "toggle", "Sembunyikan notch", true, None::<&str>)?;
-            let settings = MenuItem::with_id(app, "settings", "Pengaturan…", true, None::<&str>)?;
-            let taskbar = MenuItem::with_id(app, "taskbar", "Pulihkan taskbar Windows", true, None::<&str>)?;
-            let quit = MenuItem::with_id(app, "quit", "Keluar", true, None::<&str>)?;
+            let toggle = MenuItem::with_id(app, "toggle", "Hide notch", true, None::<&str>)?;
+            let settings = MenuItem::with_id(app, "settings", "Settings…", true, None::<&str>)?;
+            let taskbar = MenuItem::with_id(app, "taskbar", "Restore Windows taskbar", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&toggle, &settings, &taskbar, &PredefinedMenuItem::separator(app)?, &quit])?;
             let toggle_label = toggle.clone();
             let flip = move |app: &AppHandle| {
                 let s = app.state::<Shared>();
                 let hidden = !s.user_hidden.load(Ordering::Relaxed);
                 s.user_hidden.store(hidden, Ordering::Relaxed);
-                let _ = toggle_label.set_text(if hidden { "Tampilkan notch" } else { "Sembunyikan notch" });
+                let _ = toggle_label.set_text(if hidden { "Show notch" } else { "Hide notch" });
                 if let Some(w) = app.get_webview_window("notch") {
                     sync_visibility(app, &w);
                 }
             };
             let flip_menu = flip.clone();
             TrayIconBuilder::new()
-                .icon(app.default_window_icon().cloned().expect("ikon tidak ada"))
+                .icon(app.default_window_icon().cloned().expect("icon missing"))
                 .tooltip("Cognify Notch")
                 .menu(&menu)
                 .show_menu_on_left_click(false)

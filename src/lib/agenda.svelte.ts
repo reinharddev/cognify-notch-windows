@@ -61,16 +61,16 @@ class Agenda {
 
     if (this.url || this.file) {
       const text = this.file ? await cmd<string>('read_ics_file', { path: this.file }) : await cmd<string>('fetch_text', { url: this.url });
-      if (typeof text !== 'string') problem = L('Kalender tidak bisa dimuat. Periksa tautan atau file.', 'Couldn\'t load the calendar. Check the link or file.');
+      if (typeof text !== 'string') problem = L('Kalender gagal dimuat. Cek lagi tautan atau filenya.', 'Couldn\'t load the calendar. Check the link or file.');
       else {
         const name = /^X-WR-CALNAME[^:]*:(.+)$/m.exec(text)?.[1]?.trim() ?? L('Kalender', 'Calendar');
         events = parseIcs(text, from, to).map((e) => ({ ...e, calendar: name }));
-        if (!events.length && !text.includes('BEGIN:VCALENDAR')) problem = L('Isinya bukan kalender ICS.', 'That isn\'t an ICS calendar.');
+        if (!events.length && !text.includes('BEGIN:VCALENDAR')) problem = L('Ini bukan kalender ICS.', 'That isn\'t an ICS calendar.');
       }
     }
     if (this.cognify) {
       const json = await cmd<string | null>('link_read_agenda');
-      if (typeof json !== 'string') problem ||= L('Kalender Cognify belum tersedia. Hubungkan Cognify ke Notch di app Cognify.', 'The Cognify calendar isn\'t available yet. Connect Cognify to Notch in the Cognify app.');
+      if (typeof json !== 'string') problem ||= L('Kalender Cognify belum bisa dipakai. Sambungkan Cognify ke Notch lewat app Cognify.', 'The Cognify calendar isn\'t ready yet. Connect Cognify to Notch from the Cognify app.');
       else events = [...events, ...parseCognifyAgenda(json, from, to).map((e) => ({ ...e, calendar: e.calendar ?? 'Cognify' }))];
     }
     this.events = events.filter((e) => (e.end ?? e.start) > now).sort((a, b) => a.start - b.start);

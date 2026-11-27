@@ -46,8 +46,7 @@
       "nsis": {
         "installMode": "currentUser",
         "languages": [
-          "English",
-          "Indonesian"
+          "English"
         ],
         "installerIcon": "icons/icon.ico",
         "sidebarImage": "installer/sidebar.bmp",

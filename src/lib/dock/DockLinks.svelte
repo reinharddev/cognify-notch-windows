@@ -20,7 +20,7 @@
     </button>
   {/each}
   {#if dock.links.length === 0}
-    <button class="cell" data-name={L('Tambah tautan', 'Add a link')} title={L('Tambah tautan di Pengaturan > Dock', 'Add links in Settings > Dock')} aria-label={L('Tambah tautan', 'Add a link')} onclick={openSettings}>
+    <button class="cell" data-name={L('Tambah tautan', 'Add a link')} title={L('Tambahkan tautan di Pengaturan > Dock', 'Add links in Settings > Dock')} aria-label={L('Tambah tautan', 'Add a link')} onclick={openSettings}>
       <span class="tile add"><Plus size={16} /></span>
     </button>
   {/if}

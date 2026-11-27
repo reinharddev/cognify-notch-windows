@@ -61,17 +61,18 @@
 </div>
 
 <style>
-  .pomo { display: flex; align-items: center; gap: 18px; height: 100%; padding: 0 6px; }
+  .pomo { display: flex; align-items: center; gap: 20px; height: 164px; padding: 0 16px; }
   .ring { position: relative; width: 124px; height: 124px; flex: none; }
+  .ring svg { overflow: visible; filter: drop-shadow(0 0 8px color-mix(in srgb, var(--accent) 35%, transparent)); }
   .inside { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-  .time { font-size: 27px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .time { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .inside small { font-size: 10.5px; font-weight: 500; }
-  .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; align-items: flex-start; transition: opacity .2s; }
-  .mid.locked { opacity: .55; }
+  .mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; transition: opacity .2s; }
+  .mid.locked { opacity: .75; }
   button { border: 0; background: none; cursor: pointer; color: inherit; padding: 0; }
   button:disabled { cursor: default; }
-  .seg { display: flex; padding: 3px; border-radius: 99px; background: rgba(255, 255, 255, .08); }
-  .seg button { display: flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 99px; font-size: 11.5px; font-weight: 600; color: rgba(255, 255, 255, .6); }
+  .seg { display: flex; padding: 3px; border-radius: 99px; background: rgba(255, 255, 255, .06); }
+  .seg button { display: flex; align-items: center; gap: 5px; padding: 5px 14px; border-radius: 99px; font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, .6); }
   .seg button small { font-size: 10.5px; font-weight: 500; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .45); }
   .seg button.sel { color: #fff; }
   .seg button.sel small { color: rgba(255, 255, 255, .8); }
@@ -83,14 +84,14 @@
   .stepper span { min-width: 62px; text-align: center; font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
   .presets { display: flex; gap: 2px; }
   .presets button { padding: 5px 8px; border-radius: 99px; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .45); box-shadow: inset 0 0 0 1px transparent; }
-  .presets button.sel { color: rgba(255, 255, 255, .95); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .35); }
+  .presets button.sel { color: #fff; box-shadow: inset 0 0 0 1px var(--accent); }
   .sessions { display: flex; align-items: center; gap: 7px; }
   .dots { display: flex; gap: 4px; }
-  .dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .14); }
-  .dots i.on { background: var(--accent); }
+  .dots i { width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid var(--muted); }
+  .dots i.on { background: var(--accent); border-color: var(--accent); }
   .sessions small { font-size: 10.5px; color: rgba(255, 255, 255, .5); }
   .ctl { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 84px; flex: none; }
-  .play { width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: #fff; box-shadow: 0 3px 10px color-mix(in srgb, var(--tint) 45%, transparent); transition: transform .1s; }
+  .play { width: 60px; height: 60px; border-radius: 50%; display: grid; place-items: center; background: var(--tint); color: #fff; box-shadow: 0 6px 20px color-mix(in srgb, var(--tint) 45%, transparent); transition: transform .1s; }
   .play:active { transform: scale(.94); }
   .reset { display: flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; color: rgba(255, 255, 255, .6); }
   .reset:disabled { opacity: .35; }

@@ -41,12 +41,12 @@ pub fn check(pending: &Pending) -> Result<Option<String>, String> {
 }
 
 pub fn download(pending: &Pending) -> Result<(), String> {
-    let info = pending.0.lock().unwrap().clone().ok_or("Belum ada pembaruan")?;
+    let info = pending.0.lock().unwrap().clone().ok_or("No update available yet")?;
     manager()?.download_updates(&info, None).map_err(|e| e.to_string())
 }
 
 /// Memasang pembaruan yang sudah diunduh dan memulai ulang app. Tidak kembali bila berhasil.
 pub fn apply(pending: &Pending) -> Result<(), String> {
-    let info = pending.0.lock().unwrap().clone().ok_or("Belum ada pembaruan")?;
+    let info = pending.0.lock().unwrap().clone().ok_or("No update available yet")?;
     manager()?.apply_updates_and_restart(&info).map_err(|e| e.to_string())
 }

@@ -75,17 +75,17 @@ pub fn restore(app: &AppHandle) {
 
 fn hide_taskbar(app: &AppHandle) -> Result<(), String> {
     let state = app.state::<TaskDock>();
-    let mut from = state.hidden_from.lock().map_err(|_| "Keadaan taskbar tidak terbaca".to_string())?;
+    let mut from = state.hidden_from.lock().map_err(|_| "Couldn't read the taskbar state".to_string())?;
     let original = match *from {
         Some(o) => o,
         None => {
-            let o = winsys::taskbar_state().ok_or_else(|| "Taskbar Windows tidak ditemukan".to_string())?;
+            let o = winsys::taskbar_state().ok_or_else(|| "Windows taskbar not found".to_string())?;
             // Penanda ditulis lebih dulu: kalau app macet sesudahnya, taskbar tetap bisa dipulihkan.
             if let Some(path) = marker_path(app) {
                 if let Some(dir) = path.parent() {
                     let _ = std::fs::create_dir_all(dir);
                 }
-                std::fs::write(path, o.to_string()).map_err(|e| format!("Penanda taskbar gagal ditulis: {e}"))?;
+                std::fs::write(path, o.to_string()).map_err(|e| format!("Couldn't write the taskbar marker: {e}"))?;
             }
             o
         }

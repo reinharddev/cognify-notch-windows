@@ -2,6 +2,7 @@ import { untrack } from 'svelte';
 import { reportRect, onHover, on, cmd, windowKind } from './bridge';
 import { ticker } from './store.svelte';
 import { ui } from './ui.svelte';
+import { lyrics } from './lyrics.svelte';
 import { news } from './news.svelte';
 import { load, save } from './store.svelte';
 import { device, features } from './system.svelte';
@@ -10,7 +11,7 @@ import { agenda } from './agenda.svelte';
 import { clock } from './store.svelte';
 import { relativeShort } from './relative';
 import { anchors, hideOffset, hotZone, pillCenter, pillLimits, place, type AnchorX, type AnchorY, type Edge } from './geometry';
-import { EDGE_MARGIN } from './ui.svelte';
+import { EDGE_MARGIN, snapCenter } from './ui.svelte';
 
 // Ukuran tiap bentuk (piksel CSS). Jendela Tauri lebarnya 720 dan tingginya 300.
 export const WINDOW = { w: 720, h: 300 };
@@ -20,10 +21,11 @@ export const SIZES = {
   idle: { w: 190, h: 36, r: 12 },
   news: { w: 400, h: 46, r: 18 },
   media: { w: 270, h: 36, r: 14 },
-  open: { w: 680, h: 260, r: 30 },
+  open: { w: 620, h: 224, r: 28 },
 } as const;
 
 export const HEAD = 42;
+export const LYRIC_W = 216;
 
 class Notch {
   open = $state(false);
@@ -70,6 +72,16 @@ class Notch {
         });
       });
     });
+    // Tab awal pilihan pengguna dipasang saat notch tertutup, jadi sudah siap ketika dibuka lagi (seperti di Mac).
+    $effect.root(() => {
+      $effect(() => {
+        const open = this.open, id = ui.startTab;
+        untrack(() => {
+          const i = ui.pages.findIndex((p) => p.id === id);
+          if (!open && i >= 0 && i !== this.page) this.select(i);
+        });
+      });
+    });
     // Sembunyi otomatis: bentuk menghilang setelah tidak dipakai sebentar, dan muncul lagi bila ada kabar atau pengingat.
     $effect.root(() => {
       $effect(() => {
@@ -95,7 +107,7 @@ class Notch {
         // Saat diam, area sambutan sedikit lebih lebar dari pil supaya mudah dikenai kursor.
         const pad = this.open ? 0 : 28;
         if (!this.pill) return reportRect(g.x - pad, 0, g.w + pad * 2, g.h + (this.open ? 0 : 10));
-        reportRect(g.x - pad, g.y - pad, g.w + pad * 2, g.h + pad * 2);
+        reportRect(g.x - pad, g.y - pad, g.w + this.lyricGroup + pad * 2, g.h + pad * 2);
       });
     });
   }
@@ -163,7 +175,8 @@ class Notch {
     const w0 = ui.pillWidth, h0 = SIZES.idle.h;
     const { cx, cy } = pillCenter(ui.pillX, ui.pillY, vw, vh, w0, h0, EDGE_MARGIN);
     const a = anchors(cx, cy, vw, vh, SIZES.open.w * ui.scale, EDGE_MARGIN);
-    return { ...place(cx, cy, w0, h0, s.w, s.h, vw, vh, a, EDGE_MARGIN), r: s.r, ...a };
+    const box = place(cx, cy, w0, h0, s.w, s.h, vw, vh, a, EDGE_MARGIN);
+    return { ...box, x: box.x - this.lyricGroup / 2, r: s.r, ...a };
   }
 
   /** Tepi layar tempat bentuk bersembunyi (yang terdekat). */
@@ -177,11 +190,25 @@ class Notch {
     return { ...g, x: g.x + o.dx, y: g.y + o.dy };
   }
 
-  /** Mode pill yang sedang diam: tampil sebagai kepala bulat (mata + mulut), bukan pil kosong. */
+  /**
+   * Gaya Floating face, sama dengan Mac: saat tertutup tetap wajah bulat. Aktivitas, volume, dan charging tampil
+   * sebagai cincin dan lencana di sekelilingnya (lihat FaceExtras.svelte). Kabar lain tetap tampil sebagai kartu.
+   */
   get headMode() {
-    // Lagu yang diputar sendirian tidak menggantikan kepala: kepala justru ikut menikmati (lihat vibe.svelte.ts).
-    return this.pill && features.companion && !this.open && !news.level && !news.current && !this.live;
+    return this.pill && ui.face && features.companion && !this.open && (!news.current || this.charging !== null);
   }
+
+  /** Persen baterai selama kabar "mengisi daya" tampil. */
+  get charging(): number | null {
+    const c = news.current;
+    return c?.icon === 'zap' && c.value ? parseInt(c.value, 10) : null;
+  }
+
+  /** Baris lirik di samping wajah. Wajah dan gelembungnya satu grup yang dipusatkan di posisi pilihan pengguna. */
+  get faceLyric() {
+    return this.headMode && features.lyrics && features.lyricsWing && this.wings && lyrics.state.kind === 'synced';
+  }
+  get lyricGroup() { return this.faceLyric ? 12 + LYRIC_W : 0; }
 
   get size() {
     if (this.headMode) return { w: HEAD, h: HEAD, r: HEAD / 2 };
@@ -227,7 +254,7 @@ class Notch {
     if (!this.dragging) return;
     this.dragMoved = true;
     const lim = pillLimits(this.viewport, this.viewportH, ui.pillWidth, SIZES.idle.h, EDGE_MARGIN);
-    ui.pillX = Math.min(lim.maxX, Math.max(lim.minX, px / this.viewport));
+    ui.pillX = Math.min(lim.maxX, Math.max(lim.minX, snapCenter(px / this.viewport, this.viewport)));
     ui.pillY = Math.min(lim.maxY, Math.max(lim.minY, py / this.viewportH));
   }
 

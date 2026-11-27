@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { FilePlus, Search, StickyNote } from '@lucide/svelte';
+  import Input from '../ui/Input.svelte';
+  import { FilePlus, Pin, Search, StickyNote } from '@lucide/svelte';
   import { hub, currentOrNext } from '../hub.svelte';
   import { ticker } from '../store.svelte';
   import { timeText } from '../relative';
@@ -23,68 +24,61 @@
   const open = (id: string) => void hub.open(id);
 </script>
 
-<div class="col" style="height:100%">
-  <div class="row">
-    <label class="find"><Search size={12} />
-      <input type="text" bind:value={q} oninput={onInput} placeholder={L('Cari dokumen di Cognify…', 'Search documents in Cognify…')} aria-label={L('Cari dokumen', 'Search documents')}
-        onkeydown={(e) => { if (e.ctrlKey || e.metaKey) e.stopPropagation(); }} />
-    </label>
-    <button class="btn" onclick={() => void hub.newDoc()}><FilePlus size={12} /> {L('Dokumen', 'Doc')}</button>
-    <button class="btn" onclick={() => void hub.newSticky()}><StickyNote size={12} /> {L('Catatan melayang', 'Sticky')}</button>
+<div class="three">
+  <div class="card scroll">
+    <div class="lb">{L('Pelajaran hari ini', "Today's lessons")}</div>
+    {#if slot}
+      <div class="lesson">
+        <span class="one">{slot.lesson.title}</span>
+        <small>{timeText(new Date(slot.lesson.start))} - {timeText(new Date(slot.lesson.end))}{slot.lesson.room ? ` · ${slot.lesson.room}` : ''}</small>
+        <small class="when">{slot.ongoing ? L(`Selesai ${left(Date.parse(slot.lesson.end))} lagi`, `Ends in ${left(Date.parse(slot.lesson.end))}`) : L(`Mulai ${left(Date.parse(slot.lesson.start))} lagi`, `Starts in ${left(Date.parse(slot.lesson.start))}`)}</small>
+      </div>
+    {:else}<span class="ph">{L('Pelajaran hari ini sudah habis.', 'No more lessons today.')}</span>{/if}
+    <div class="acts">
+      <button class="btn" onclick={() => void hub.newDoc()}><FilePlus size={12} /> {L('Dokumen', 'Doc')}</button>
+      <button class="btn" onclick={() => void hub.newSticky()}><StickyNote size={12} /> {L('Catatan', 'Notes')}</button>
+    </div>
   </div>
-  {#if q.trim() && (hub.searching || hub.hits)}
-    <div class="list">
+
+  <div class="card scroll">
+    <div class="lb">{L('Cari catatan', 'Search notes')}</div>
+    <label class="find">
+      <Input bare bind:value={q} oninput={onInput} placeholder={L('Ketik kata kunci', 'Type a keyword')} aria-label={L('Cari dokumen', 'Search documents')}
+        onkeydown={(e) => { if (e.ctrlKey || e.metaKey) e.stopPropagation(); }} />
+      <Search size={13} />
+    </label>
+    {#if q.trim() && (hub.searching || hub.hits)}
       {#if hub.searching}<span class="ph">{L('Mencari…', 'Searching…')}</span>
-      {:else if hub.hits?.length === 0}<span class="ph">{L('Tidak ada hasil.', 'No results.')}</span>
-      {:else}{#each hub.hits ?? [] as h (h.id)}
-        <button class="item" onclick={() => open(h.id)}><span class="t">{h.title}</span>{#if h.snippet}<small>{h.snippet}</small>{/if}</button>
-      {/each}{/if}
+      {:else if hub.hits?.length === 0}<span class="ph">{L('Tidak ketemu.', 'No results.')}</span>
+      {:else}{#each hub.hits ?? [] as h (h.id)}<button class="li doc" onclick={() => open(h.id)}><span class="one">{h.title}</span></button>{/each}{/if}
+    {:else}
+      {#each docs as d (d.id)}<button class="li doc" onclick={() => open(d.id)}>{#if d.pin}<Pin size={11} />{/if}<span class="one">{d.title}</span></button>
+      {:else}<span class="ph">{L('Belum ada.', 'None yet.')}</span>{/each}
+    {/if}
+  </div>
+
+  <div class="card scroll">
+    <div class="lb">{L('Alat', 'Tools')}</div>
+    <div class="tools">
+      {#each data?.tools ?? [] as t (t.id)}<button class="btn" onclick={() => void hub.tool(t.id)}><span class="one">{t.name}</span></button>
+      {:else}<span class="ph">{L('Belum ada.', 'None yet.')}</span>{/each}
     </div>
-  {:else}
-    <div class="cols">
-      <section>
-        <span class="label">{L('Hari ini', 'Today')}</span>
-        {#if slot}
-          <div class="lesson">
-            <span class="t">{slot.lesson.title}</span>
-            <small>{timeText(new Date(slot.lesson.start))} - {timeText(new Date(slot.lesson.end))}{slot.lesson.room ? ` · ${slot.lesson.room}` : ''}</small>
-            <small class="when">{slot.ongoing ? L(`Selesai ${left(Date.parse(slot.lesson.end))} lagi`, `Ends in ${left(Date.parse(slot.lesson.end))}`) : L(`Mulai ${left(Date.parse(slot.lesson.start))} lagi`, `Starts in ${left(Date.parse(slot.lesson.start))}`)}</small>
-          </div>
-        {:else}<span class="ph">{L('Tidak ada pelajaran lagi.', 'No more lessons today.')}</span>{/if}
-      </section>
-      <section>
-        <span class="label">{L('Dokumen', 'Documents')}</span>
-        <div class="list">
-          {#each docs as d (d.id)}<button class="item" onclick={() => open(d.id)}><span class="t">{d.pin ? '★ ' : ''}{d.title}</span></button>
-          {:else}<span class="ph">{L('Belum ada.', 'None yet.')}</span>{/each}
-        </div>
-      </section>
-      <section>
-        <span class="label">{L('Alat', 'Tools')}</span>
-        <div class="list">
-          {#each data?.tools ?? [] as t (t.id)}<button class="item" onclick={() => void hub.tool(t.id)}><span class="t">{t.name}</span></button>
-          {:else}<span class="ph">{L('Belum ada.', 'None yet.')}</span>{/each}
-        </div>
-      </section>
-    </div>
-  {/if}
+  </div>
 </div>
 
 <style>
-  .find { flex: 1; display: flex; align-items: center; gap: 6px; padding: 0 10px; height: 26px; border-radius: 99px; background: rgba(255, 255, 255, .08); color: rgba(255, 255, 255, .45); }
-  .find:focus-within { background: rgba(255, 255, 255, .12); }
-  .find input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: #fff; font: inherit; font-size: 11.5px; }
-  .btn { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-  .cols { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; min-height: 0; flex: 1; }
-  section { display: flex; flex-direction: column; gap: 5px; min-width: 0; min-height: 0; }
-  .label { padding-left: 6px; font-size: 9.5px; letter-spacing: .06em; font-weight: 600; text-transform: uppercase; color: rgba(255, 255, 255, .42); }
-  .list { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; min-height: 0; }
-  .list::-webkit-scrollbar { width: 0; }
-  .item { display: flex; flex-direction: column; gap: 1px; text-align: left; border: 0; border-radius: 8px; padding: 5px 9px; background: rgba(255, 255, 255, .06); color: inherit; font: inherit; cursor: pointer; flex: none; }
-  .item:hover { background: rgba(255, 255, 255, .12); }
-  .t { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  small { font-size: 10px; color: rgba(255, 255, 255, .5); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .lesson { display: flex; flex-direction: column; gap: 2px; padding: 7px 10px; border-radius: 9px; background: rgba(255, 255, 255, .07); }
-  .when { color: var(--accent); font-weight: 600; }
-  .ph { padding-left: 6px; font-size: 11.5px; color: rgba(255, 255, 255, .5); }
+  .three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; height: 164px; }
+  .card { gap: 6px; }
+  .lb { margin: 2px 4px 0; flex: none; }
+  .lesson { display: flex; flex-direction: column; flex: none; min-width: 0; padding: 4px 8px; border-radius: 12px; background: var(--soft); font-size: 12px; }
+  .when { color: var(--hi); }
+  .acts { display: flex; gap: 4px; }
+  .find { display: flex; align-items: center; gap: 6px; height: 30px; flex: none; padding: 0 10px 0 12px; border-radius: 99px; background: rgba(0, 0, 0, .6); border: 1px solid rgba(255, 255, 255, .09); color: var(--muted); }
+  .find:focus-within { border-color: var(--accent); }
+  .find :global(input) { flex: 1; min-width: 0; color: var(--ink, #fff); font-size: 11px; }
+  .doc { border: 0; color: inherit; font: inherit; font-size: 11px; text-align: left; cursor: pointer; }
+  .doc:hover { background: rgba(255, 255, 255, .12); }
+  .tools { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 6px; }
+  .tools .btn { height: 32px; width: 100%; padding: 0 6px; }
+  .ph { padding: 0 4px; font-size: 11.5px; color: var(--muted); }
 </style>

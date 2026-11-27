@@ -37,8 +37,8 @@ async function legacyCheck(quiet: boolean) {
     update.url = r.html_url;
     update.stage = 'found';
     update.text = L(`Versi ${update.version} tersedia.`, `Version ${update.version} is available.`);
-    announceOnce(quiet, L('Buka Pengaturan untuk mengunduh', 'Open Settings to download'));
-  } else if (!quiet) update.text = L('Sudah versi terbaru.', 'You are up to date.');
+    announceOnce(quiet, L('Buka Pengaturan buat mengunduh', 'Open Settings to download'));
+  } else if (!quiet) update.text = L('Sudah versi paling baru.', 'You\'re up to date.');
 }
 
 function announceOnce(quiet: boolean, sub: string) {
@@ -59,11 +59,11 @@ export async function checkUpdate(quiet = false) {
         update.version = v; update.stage = 'found';
         update.text = L(`Versi ${v} tersedia.`, `Version ${v} is available.`);
         if (features.autoInstall) void downloadInBackground();
-        else announceOnce(quiet, L('Buka Pengaturan untuk memperbarui', 'Open Settings to update'));
-      } else if (!quiet) update.text = L('Sudah versi terbaru.', 'You are up to date.');
+        else announceOnce(quiet, L('Buka Pengaturan buat memperbarui', 'Open Settings to update'));
+      } else if (!quiet) update.text = L('Sudah versi paling baru.', 'You\'re up to date.');
     } else await legacyCheck(quiet);
   } catch {
-    if (!quiet) update.text = L('Tidak bisa memeriksa sekarang.', 'Can\'t check right now.');
+    if (!quiet) update.text = L('Belum bisa cek sekarang.', 'Can\'t check right now.');
   }
 }
 
@@ -93,14 +93,14 @@ async function downloadInBackground() {
   update.stage = 'ready';
   update.text = L(`Versi ${update.version} siap dipasang.`, `Version ${update.version} is ready to install.`);
   if (features.autoInstall) scheduleApply(1);
-  else announceOnce(true, L('Buka Pengaturan untuk memperbarui', 'Open Settings to update'));
+  else announceOnce(true, L('Buka Pengaturan buat memperbarui', 'Open Settings to update'));
 }
 
 // Pasang saat notch tertutup dan tidak dipakai, supaya tidak memotong apa yang sedang kamu lakukan.
 // Bila gagal: pesan galat tampil dan dicoba lagi tiap menit (5 kali), lalu tombol "Perbarui dan mulai ulang"
 // di Pengaturan tetap bisa dipakai.
 function scheduleApply(attempt: number) {
-  if (attempt === 1) news.announce(L(`Versi ${update.version} siap`, `Version ${update.version} is ready`), L('Dipasang saat notch tidak dipakai', 'Installs when the notch is idle'));
+  if (attempt === 1) news.announce(L(`Versi ${update.version} siap`, `Version ${update.version} is ready`), L('Dipasang saat notch lagi nganggur', 'Installs while the notch is idle'));
   const timer = setInterval(async () => {
     if (notch.open || notch.pinned) return;
     clearInterval(timer);

@@ -27,7 +27,8 @@
     box.animate(move[0], { duration: move[1], easing: 'ease-out' });
   });
 
-  const gap = $derived(Math.round(notch.closed.idle.w * 0.42));
+  // Gaya Notch: mata di ujung kiri dan kanan (seperti di mockup); kapsul: berdekatan di tengah.
+  const gap = $derived(notch.pill ? Math.round(notch.closed.idle.w * 0.2) : notch.closed.idle.w - 44);
   // Bergoyang mengikuti musik: seluruh wajah mengangguk pelan, mata mendenyut dan mulut membuka mengikuti kerasnya suara.
   const pulse = $derived(face.groove ? Math.min(1, device.level * 1.8) : 0);
   const p = $derived.by(() => {

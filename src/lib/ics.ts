@@ -114,7 +114,7 @@ export function parseIcs(text: string, from: number, to: number): AgendaEvent[] 
       if (s && get('STATUS')?.value !== 'CANCELLED') {
         const e = get('DTEND') && parseDate(get('DTEND')!);
         const length = e ? e.t - s.t : s.allDay ? 864e5 : 0;
-        const title = unescape(get('SUMMARY')?.value ?? '(tanpa judul)');
+        const title = unescape(get('SUMMARY')?.value ?? '(untitled)');
         const meeting = meetingUrl(get('URL')?.value, unescape(get('LOCATION')?.value ?? ''), unescape(get('DESCRIPTION')?.value ?? ''));
         const uid = get('UID')?.value ?? title;
         const ex = new Set(cur.filter((p) => p.name === 'EXDATE').flatMap((p) => p.value.split(',').map((v) => parseDate({ ...p, value: v })?.t ?? 0)));

@@ -82,9 +82,9 @@ class Pomodoro {
     this.remainingAtPause = this.total;
     this.saveRun();
     news.ring(
-      finished === 'focus' ? L('Waktu fokus selesai', 'Focus time is up') : L('Istirahat selesai', 'Break is over'),
+      finished === 'focus' ? L('Sesi fokus selesai', 'Focus session done') : L('Istirahatnya selesai', 'Break\'s over'),
       finished === 'focus'
-        ? L(`Istirahat ${this.restMin} menit dulu, lalu lanjut lagi.`, `Take a ${this.restMin} minute break, then keep going.`)
+        ? L(`Rehat ${this.restMin} menit dulu, habis itu lanjut.`, `Take ${this.restMin} minutes off, then get back to it.`)
         : L('Siap fokus lagi?', 'Ready to focus again?'),
       {
         page: 'timer',
@@ -162,7 +162,7 @@ class ClockTools {
     this.alarms = this.alarms.map((a) => (due.includes(a) ? { ...a, firedOn: key, enabled: a.days.length ? a.enabled : false } : a));
     this.saveAlarms();
     const pad = (n: number) => String(n).padStart(2, '0');
-    for (const a of due) news.ring(a.label || L(`Alarm ${pad(a.hour)}:${pad(a.minute)}`, `Alarm ${pad(a.hour)}:${pad(a.minute)}`), L('Waktunya!', "Time's up!"), { icon: 'timer' });
+    for (const a of due) news.ring(a.label || L(`Alarm ${pad(a.hour)}:${pad(a.minute)}`, `Alarm ${pad(a.hour)}:${pad(a.minute)}`), L('Waktunya habis!', "Time's up!"), { icon: 'timer' });
   }
   get nearest() { return [...this.countdowns].sort((a, b) => a.end - b.end)[0]; }
   private persist() { save('countdowns', this.countdowns); }
@@ -172,7 +172,7 @@ class ClockTools {
     if (!done.length) { this.arm(); return; }
     this.countdowns = this.countdowns.filter((c) => !done.includes(c));
     this.persist();
-    for (const c of done) news.ring(L(`Timer ${c.label} selesai`, `${c.label} timer done`), L('Waktunya!', "Time's up!"), { icon: 'timer' });
+    for (const c of done) news.ring(L(`Timer ${c.label} selesai`, `${c.label} timer done`), L('Waktunya habis!', "Time's up!"), { icon: 'timer' });
     this.arm();
   }
 }

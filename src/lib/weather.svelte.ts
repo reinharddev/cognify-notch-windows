@@ -66,12 +66,12 @@ class Weather {
   /** Minta lokasi PC ini sekali (izin Lokasi Windows). */
   detect(): Promise<void> {
     return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) { reject(new Error(L('Lokasi tidak tersedia di perangkat ini.', 'Location is not available on this device.'))); return; }
+      if (!navigator.geolocation) { reject(new Error(L('Perangkat ini tidak mendukung lokasi.', 'Location isn\'t available on this device.'))); return; }
       navigator.geolocation.getCurrentPosition(
         (p) => { this.setCoords(p.coords.latitude, p.coords.longitude); resolve(); },
         (e) => reject(new Error(e.code === 1
-          ? L('Izin lokasi ditolak. Aktifkan Layanan Lokasi di Pengaturan Windows → Privasi.', 'Location permission denied. Turn on Location services in Windows Settings → Privacy.')
-          : L('Lokasi tidak bisa dibaca. Coba lagi.', 'Couldn\'t read your location. Try again.'))),
+          ? L('Izin lokasi ditolak. Nyalakan Layanan Lokasi di Pengaturan Windows → Privasi.', 'Location access was denied. Turn on Location services in Windows Settings → Privacy.')
+          : L('Lokasi gagal dibaca. Coba lagi.', 'Couldn\'t read your location. Try again.'))),
         { timeout: 15000, maximumAge: 600000 },
       );
     });
@@ -82,7 +82,7 @@ class Weather {
     this.gen++;
     this.now = null;
     if (!features.weather) { this.problem = ''; return; }
-    if (!this.city && !this.coords) { this.problem = L('Isi nama kota di Pengaturan', 'Enter a city in Settings'); return; }
+    if (!this.city && !this.coords) { this.problem = L('Isi dulu nama kota di Pengaturan', 'Add a city in Settings'); return; }
     void this.refresh();
     this.timer = window.setInterval(() => void this.refresh(), 30 * 60_000);
   }
@@ -101,7 +101,7 @@ class Weather {
         const g = await (await fetch(`https://geocoding-api.open-meteo.com/v1/search?${new URLSearchParams({ name: this.city, count: '1', language: L('id', 'en') })}`)).json();
         if (gen !== this.gen) return;
         const item = g.results?.[0];
-        if (!item) { this.problem = L(`Kota "${this.city}" tidak ditemukan`, `City "${this.city}" not found`); this.now = null; return; }
+        if (!item) { this.problem = L(`Kota "${this.city}" tidak ketemu`, `Couldn't find "${this.city}"`); this.now = null; return; }
         this.place = { lat: item.latitude, lon: item.longitude, name: item.name };
       }
       const { lat, lon, name } = this.place;
@@ -117,7 +117,7 @@ class Weather {
       this.problem = '';
     } catch {
       if (gen !== this.gen) return;
-      this.problem = L('Cuaca tidak bisa dimuat', 'Couldn\'t load weather');
+      this.problem = L('Cuaca gagal dimuat', 'Couldn\'t load the weather');
     }
   }
 }

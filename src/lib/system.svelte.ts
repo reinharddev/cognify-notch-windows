@@ -20,7 +20,7 @@ class Features {
   clipboardLimit = $state(40);
   charger = $state(true); devices = $state(true); downloads = $state(true); keys = $state(true); network = $state(true);
   hideFullscreen = $state(true);
-  spectrum = $state(true); camera = $state(true); shortcuts = $state(true); hud = $state(true); hotkey = $state(true);
+  spectrum = $state(true); camera = $state(true); micTest = $state(true); shortcuts = $state(true); hud = $state(true); hotkey = $state(true);
   water = $state(true); todo = $state(true); clockTools = $state(true); calculator = $state(true); lyricsWing = $state(true);
   companion = $state(true); // mata saat notch diam
   updates = $state(true);
@@ -35,7 +35,7 @@ class Features {
   reload() { Object.assign(this, load('features', {})); }
   persist() {
     save('features', { media: this.media, lyrics: this.lyrics, clipboard: this.clipboard, unlimitedClipboard: this.unlimitedClipboard, clipboardLimit: this.clipboardLimit, weather: this.weather, charger: this.charger,
-      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, spectrum: this.spectrum, camera: this.camera, shortcuts: this.shortcuts, hud: this.hud, hotkey: this.hotkey,
+      devices: this.devices, downloads: this.downloads, keys: this.keys, network: this.network, hideFullscreen: this.hideFullscreen, spectrum: this.spectrum, camera: this.camera, micTest: this.micTest, shortcuts: this.shortcuts, hud: this.hud, hotkey: this.hotkey,
       water: this.water, todo: this.todo, clockTools: this.clockTools, calculator: this.calculator, lyricsWing: this.lyricsWing, companion: this.companion, updates: this.updates, autoInstall: this.autoInstall });
     void cmd('set_clipboard_watch', { on: this.clipboard });
     void cmd('set_hide_fullscreen', { on: this.hideFullscreen });
@@ -91,7 +91,7 @@ class Device {
         for (const level of [20, 10]) {
           if (p.percent <= level && !this.warned.has(level)) {
             this.warned.add(level);
-            news.device(L('Baterai lemah', 'Low battery'), L('Colok charger sebentar lagi', 'Plug in the charger soon'), 'battery-low', TINT.red, { value: pct, seconds: 6 });
+            news.device(L('Baterai lemah', 'Low battery'), L('Segera colok charger', 'Time to plug in'), 'battery-low', TINT.red, { value: pct, seconds: 6 });
             break;
           }
         }
@@ -123,15 +123,15 @@ class Device {
     on<boolean>('fullscreen', (h) => (this.hidden = h));
     on<boolean>('online', (o) => {
       if (features.network && o !== this.online) {
-        if (o) news.device(L('Internet tersambung', 'Back online'), L('Koneksi pulih', 'Connection restored'), 'wifi', TINT.green);
-        else news.device(L('Internet terputus', 'Offline'), L('Periksa Wi-Fi atau kabel', 'Check Wi-Fi or cable'), 'wifi-off', TINT.orange, { seconds: 4 });
+        if (o) news.device(L('Internet nyambung lagi', 'Back online'), L('Koneksi sudah balik', 'Connection is back'), 'wifi', TINT.green);
+        else news.device(L('Internet putus', 'You\'re offline'), L('Cek Wi-Fi atau kabelnya', 'Check your Wi-Fi or cable'), 'wifi-off', TINT.orange, { seconds: 4 });
       }
       this.online = o;
     });
     on<boolean>('caps', (c) => {
       if (features.keys && c !== this.caps) {
         news.device(c ? L('Caps Lock nyala', 'Caps Lock on') : L('Caps Lock mati', 'Caps Lock off'),
-          c ? L('HURUF BESAR SEMUA', 'TYPING IN CAPITALS') : L('Huruf biasa lagi', 'Back to normal'), c ? 'caps-on' : 'caps-off', c ? TINT.accent : TINT.gray);
+          c ? L('SEMUA JADI HURUF BESAR', 'YOU\'RE TYPING IN CAPS') : L('Huruf kecil lagi', 'Back to normal'), c ? 'caps-on' : 'caps-off', c ? TINT.accent : TINT.gray);
       }
       this.caps = c;
     });
@@ -145,7 +145,7 @@ class Device {
     on<{ name: string; bytes: number } | null>('download-progress', (p) => { this.download = features.downloads ? p : null; });
     on<{ kind: 'failed' | 'canceled'; name: string }>('download-result', (r) => {
       if (!features.downloads) return;
-      news.device(r.kind === 'failed' ? L('Unduhan gagal', 'Download failed') : L('Unduhan dibatalkan', 'Download canceled'), r.name, 'triangle-alert', TINT.orange);
+      news.device(r.kind === 'failed' ? L('Unduhan gagal', 'Download fails') : L('Unduhan dibatalkan', 'Download is canceled'), r.name, 'triangle-alert', TINT.orange);
     });
     on<string>('download', (name) => { if (features.downloads) news.device(L('Unduhan selesai', 'Download complete'), name, 'circle-check', TINT.green); });
     void cmd('set_clipboard_watch', { on: features.clipboard });

@@ -12,7 +12,7 @@ export const CLOSED_MIN = 70, CLOSED_MAX = 200, CLOSED_DEFAULT = 130;
 export const CLOSED_H_MIN = 24, CLOSED_H_MAX = 56, CLOSED_H_DEFAULT = 36;
 /** Perbandingan lebar:tinggi panel terbuka; dipakai untuk memotong gambar latar. */
 export const clampScale = (v: unknown) => Math.min(1.5, Math.max(0.7, Number(v) || 1));
-export const PANEL_RATIO = 680 / 260;
+export const PANEL_RATIO = 620 / 224;
 
 const mode = (v: unknown): Mode => (v === 'custom' || v === 'fixed' ? v : 'dynamic');
 const emotion = (v: unknown): Emotion => ((EMOTIONS as readonly string[]).includes(v as string) ? (v as Emotion) : 'happy');
@@ -20,7 +20,6 @@ const pickMap = (v: unknown): Record<string, string> => (v && typeof v === 'obje
 
 export type EyesMode = 'blink' | 'follow';
 export type Display = 'main' | 'active';
-export type Lang = 'auto' | 'id' | 'en';
 export type Style = 'notch' | 'pill';
 /** Jarak aman bentuk dari tepi layar, supaya tidak terpotong. */
 export const EDGE_MARGIN = 12;
@@ -102,6 +101,10 @@ class Ui {
   /** 'notch': menempel di tengah atas. 'pill': mengambang bulat penuh, posisinya diatur di Pengaturan. */
   style = $state<Style>(load<string>('ui.style', 'notch') === 'pill' ? 'pill' : 'notch');
   /** Pusat pill sebagai pecahan lebar dan tinggi layar (0 sampai 1). */
+  /** Gaya Floating face: kapsul melayang yang saat diam tampil sebagai wajah bulat. */
+  face = $state(load('ui.face', true));
+  /** Halaman yang tampil saat notch dibuka; kosong = halaman terakhir. */
+  startTab = $state(load('ui.startTab', ''));
   pillX = $state(Number(load('ui.pillX', 0.5)));
   pillY = $state(Number(load('ui.pillY', 0.06)));
   /** Lebar pill saat tertutup (sama dengan lebar notch, dengan rentang yang sama). */
@@ -114,7 +117,6 @@ class Ui {
   companionBlink = $state(load('ui.companionBlink', true));
   companionMap = $state<Record<string, string>>(pickMap(load('ui.companionMap', {})));
   tabOrder = $state<string[]>(load('ui.tabOrder', PAGES.map((p) => p.id as string)));
-  lang = $state<Lang>(((v) => (v === 'id' || v === 'en' ? v : 'auto'))(load<string | null>('lang', null)));
 
   /** Pasang warna aksen ke variabel CSS --accent (dipakai semua komponen). */
   applyAccent() {
@@ -127,10 +129,9 @@ class Ui {
     save('ui.hoverDelay', this.hoverDelay); save('ui.closeDelay', this.closeDelay); save('ui.scale', this.scale); save('ui.roundness', this.roundness); save('ui.equalizerColor', this.equalizerColor); save('ui.accentColor', this.accentColor); save('ui.lyricAuto', this.lyricAuto); save('ui.equalizerAuto', this.equalizerAuto); save('ui.lyricActive', this.lyricActive); save('ui.lyricIdle', this.lyricIdle);
     save('ui.display', this.display); save('ui.tabOrder', this.tabOrder);
     save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur); save('ui.bgPosX', this.bgPosX); save('ui.bgPosY', this.bgPosY); save('ui.bgZoom', this.bgZoom); save('ui.bgAspect', this.bgAspect); save('ui.bgSettings', this.bgSettings); save('ui.idleThemed', this.idleThemed);
-    save('ui.style', this.style); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
+    save('ui.style', this.style); save('ui.face', this.face); save('ui.startTab', this.startTab); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
     save('ui.companionMode', this.companionMode); save('ui.companionFixed', this.companionFixed);
     save('ui.companionBlink', this.companionBlink); save('ui.companionMap', $state.snapshot(this.companionMap));
-    save('lang', this.lang === 'auto' ? null : this.lang);
   }
   reload() {
     this.closedWidth = clampW(load('ui.closedWidth', CLOSED_DEFAULT));
@@ -164,6 +165,8 @@ class Ui {
     this.display = load<string>('ui.display', 'main') === 'active' ? 'active' : 'main';
     this.tabOrder = load('ui.tabOrder', PAGES.map((p) => p.id as string));
     this.style = load<string>('ui.style', 'notch') === 'pill' ? 'pill' : 'notch';
+    this.face = load('ui.face', true);
+    this.startTab = load('ui.startTab', '');
     this.pillX = Number(load('ui.pillX', 0.5));
     this.pillY = Number(load('ui.pillY', 0.06));
     this.pillWidth = clampW(load('ui.pillWidth', CLOSED_DEFAULT));
@@ -186,7 +189,7 @@ class Ui {
   get pages() {
     const on = (id: string) => {
       switch (id) {
-        case 'mirror': return features.camera;
+        case 'mirror': return features.camera || features.micTest;
         case 'shortcuts': return features.shortcuts;
         case 'clipboard': return features.clipboard;
         case 'music': return features.media;
@@ -213,6 +216,8 @@ class Ui {
     this.tabOrder = order;
   }
 }
+/** Posisi mendatar kapsul (0 sampai 1): menempel ke tengah dalam jarak 24 px, sama dengan Mac. */
+export const snapCenter = (x: number, screenWidth: number) => (Math.abs(x - 0.5) * screenWidth < 24 ? 0.5 : x);
 function clampH(h: number) { return Math.min(CLOSED_H_MAX, Math.max(CLOSED_H_MIN, Math.round(Number(h) || CLOSED_H_DEFAULT))); }
 function clampW(w: number) { return Math.min(CLOSED_MAX, Math.max(CLOSED_MIN, Math.round(Number(w) || CLOSED_DEFAULT))); }
 export const ui = new Ui();
