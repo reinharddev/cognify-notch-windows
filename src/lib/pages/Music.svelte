@@ -143,7 +143,7 @@
   .lyr { overflow-y: auto; position: relative; padding: 66px 8px; scroll-padding-block: 66px; mask-image: linear-gradient(transparent, #000 18%, #000 82%, transparent); }
   .lyr::-webkit-scrollbar { width: 0; }
   .audio-error { color: #ffb4a8; font-size: 10px; }
-  .empty-music { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .empty-music { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; }
   .empty-output { display: flex; align-items: center; gap: 8px; color: rgba(255,255,255,.56); font-size: 10px; }
   .lyric-line { margin: 0 0 6px; }
   .lyr .ln { display: block; width: 100%; max-width: 100%; box-sizing: border-box; border: 0; background: none; padding: 0 8px; text-align: left; margin: 0; font-family: inherit; font-size: 13px; font-weight: 700; line-height: 1.35; white-space: normal; overflow-wrap: anywhere; color: var(--off, rgba(255, 255, 255, .32)); cursor: pointer; transition: color .25s, transform .25s; transform-origin: center; }

@@ -393,10 +393,10 @@ fn dock_target(window: &WebviewWindow) -> Option<(PhysicalPosition<i32>, Physica
         return Some((*monitor.position(), PhysicalSize::new(size.width.saturating_sub(2), size.height.saturating_sub(2))));
     }
     let scale = monitor.scale_factor();
-    // Panel terbuka 620 x 224 dikalikan skala pilihan; jendela minimal 800 x 330 dan tidak lebih lebar dari layar.
+    // Panel terbuka 620 x 244 dikalikan skala pilihan; jendela minimal 800 x 330 dan tidak lebih lebar dari layar.
     let pct = window.app_handle().state::<Shared>().panel_scale.load(Ordering::Relaxed).max(1) as f64 / 100.0;
     let win_w = WIN_W.max(620.0 * pct + 40.0);
-    let win_h = WIN_H.max(224.0 * pct + 70.0);
+    let win_h = WIN_H.max(244.0 * pct + 70.0);
     let size = PhysicalSize::new(((win_w * scale).round() as u32).min(monitor.size().width), (win_h * scale).round() as u32);
     let origin = monitor.position();
     let x = origin.x + (monitor.size().width as i32 - size.width as i32) / 2;

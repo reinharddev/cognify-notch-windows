@@ -345,7 +345,7 @@
   .shell.ax-right .layer.openl { transform-origin: 100% 0; }
   /* Tiap bentuk punya lapisan berukuran tetap, menempel di atas tengah; notch yang membesar hanya memotongnya. */
   .layer { position: absolute; top: 0; left: 50%; width: var(--lw); height: var(--lh); margin-left: calc(var(--lw) / -2); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
-  .layer.openl { transform: scale(var(--sc, 1)); transform-origin: 50% 0; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0 0 6px; }
+  .layer.openl { transform: scale(var(--sc, 1)); transform-origin: 50% 0; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; }
   .wings { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
   .art { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 12px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
@@ -370,7 +370,8 @@
     .song.scrolling::-webkit-scrollbar { display: none; }
     .song.scrolling > span { animation: none; }
   }
-  header { white-space: nowrap; height: 32px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
+  /* Susunan panel 244 = pita atas 40 + isi 164 + pita titik 40. Judul sejajar dengan label di dalam kartu (12 + 16). */
+  header { white-space: nowrap; height: 40px; flex: none; display: flex; align-items: center; justify-content: space-between; padding: 0 28px; }
   .title { font-size: 13px; }
   .right { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: color-mix(in srgb, var(--ink, #fff) 62%, transparent); }
   .clock { color: var(--ink, #fff); font-variant-numeric: tabular-nums; }
@@ -389,7 +390,7 @@
   .btxt small { font-size: 11.5px; color: rgba(255, 255, 255, .6); display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
   .bact { border: 0; border-radius: 99px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #fff; background: color-mix(in srgb, var(--accent) 90%, transparent); cursor: pointer; flex: none; transition: transform .12s; }
   .bact:active { transform: scale(.95); }
-  .pg { position: absolute; left: 8px; right: 8px; top: 8px; bottom: 0; }
+  .pg { position: absolute; left: 12px; right: 12px; top: 0; bottom: 0; }
   /* Musik: glow sampul boleh melewati tepi area konten (dipotong bentuk notch), supaya tidak ada sisi persegi yang tajam. */
   .page.bleed { overflow: visible; }
   .page { flex: 1; min-height: 0; position: relative; overflow: hidden; }

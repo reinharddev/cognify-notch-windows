@@ -27,13 +27,13 @@
 </nav>
 
 <style>
-  nav { position: relative; display: flex; justify-content: center; height: 18px; width: fit-content; min-width: 340px; margin: 0 auto; flex: none; z-index: 3; }
+  nav { position: relative; display: flex; justify-content: center; height: 40px; width: fit-content; min-width: 340px; margin: 0 auto; flex: none; z-index: 3; }
   /* Area sambut setinggi bar supaya kursor tidak keluar saat bar muncul. */
   nav:hover::before { content: ''; position: absolute; left: -12px; right: -12px; bottom: 0; height: 40px; }
   .dots { display: flex; align-items: center; gap: 5px; align-self: center; transition: opacity .22s ease, transform .38s cubic-bezier(.32, .72, 0, 1); }
   .dots i { width: 5px; height: 5px; border-radius: 99px; background: rgba(255, 255, 255, .22); transition: width .38s cubic-bezier(.32, .72, 0, 1), background-color .28s ease; }
   .dots i.on { width: 16px; background: var(--accent); }
-  .pgbar { position: absolute; bottom: -4px; left: 50%; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 99px; background: #1f1f22; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(6px) scale(.92); transform-origin: 50% 100%; transition: opacity .22s ease, transform .38s cubic-bezier(.32, .72, 0, 1); }
+  .pgbar { position: absolute; bottom: 6px; left: 50%; display: flex; align-items: center; gap: 2px; padding: 2px; border-radius: 99px; background: #1f1f22; opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(6px) scale(.92); transform-origin: 50% 100%; transition: opacity .22s ease, transform .38s cubic-bezier(.32, .72, 0, 1); }
   nav:hover .dots, nav:focus-within .dots { opacity: 0; transform: scale(1.15); }
   nav:hover .pgbar, nav:focus-within .pgbar { opacity: 1; transform: translateX(-50%); pointer-events: auto; }
   button { position: relative; display: flex; align-items: center; justify-content: center; gap: 6px; flex: none; min-width: 24px; height: 24px; padding: 0; border: 0; border-radius: 99px; background: transparent; color: #a1a1a6; cursor: pointer; }

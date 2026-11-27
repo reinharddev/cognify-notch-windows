@@ -21,7 +21,7 @@ export const SIZES = {
   idle: { w: 190, h: 36, r: 12 },
   news: { w: 400, h: 46, r: 18 },
   media: { w: 270, h: 36, r: 14 },
-  open: { w: 620, h: 224, r: 28 },
+  open: { w: 620, h: 244, r: 28 },
 } as const;
 
 export const HEAD = 42;

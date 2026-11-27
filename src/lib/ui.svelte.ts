@@ -12,7 +12,7 @@ export const CLOSED_MIN = 70, CLOSED_MAX = 200, CLOSED_DEFAULT = 130;
 export const CLOSED_H_MIN = 24, CLOSED_H_MAX = 56, CLOSED_H_DEFAULT = 36;
 /** Perbandingan lebar:tinggi panel terbuka; dipakai untuk memotong gambar latar. */
 export const clampScale = (v: unknown) => Math.min(1.5, Math.max(0.7, Number(v) || 1));
-export const PANEL_RATIO = 620 / 224;
+export const PANEL_RATIO = 620 / 244;
 
 const mode = (v: unknown): Mode => (v === 'custom' || v === 'fixed' ? v : 'dynamic');
 const emotion = (v: unknown): Emotion => ((EMOTIONS as readonly string[]).includes(v as string) ? (v as Emotion) : 'happy');
