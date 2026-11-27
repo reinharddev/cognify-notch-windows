@@ -154,7 +154,7 @@
   // Isi baru muncul sedikit setelah notch mulai bergerak (skala 0,96 dari atas), isi lama memudar cepat.
   const enter = (_node: Element) => ({
     delay: 60, duration: 420, easing: springEase,
-    css: (t: number) => `opacity:${Math.min(1, t * 1.6)};transform:scale(${0.96 + 0.04 * t});transform-origin:50% 0`,
+    css: (t: number) => `opacity:${Math.min(1, t * 1.6)};transform:scale(${0.96 + 0.04 * t})`,
   });
   const leave = (_node: Element) => ({ duration: 120, css: (t: number) => `opacity:${t}` });
   // Pindah halaman seperti di Mac: halaman lama memudar cepat, halaman baru masuk bergeser 24 poin
@@ -344,8 +344,9 @@
   .shell.ax-left .layer.openl { transform-origin: 0 0; }
   .shell.ax-right .layer.openl { transform-origin: 100% 0; }
   /* Tiap bentuk punya lapisan berukuran tetap, menempel di atas tengah; notch yang membesar hanya memotongnya. */
-  .layer { position: absolute; top: 0; left: 50%; width: var(--lw); height: var(--lh); margin-left: calc(var(--lw) / -2); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
-  .layer.openl { transform: scale(var(--sc, 1)); transform-origin: 50% 0; flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; }
+  .layer { position: absolute; top: 0; left: 50%; width: var(--lw); height: var(--lh); margin-left: calc(var(--lw) / -2); box-sizing: border-box; display: flex; align-items: center; justify-content: center; transform-origin: 50% 0; }
+  /* Ukuran panel memakai `scale`, bukan `transform`: animasi masuk menimpa `transform` sehingga isinya sempat tampil ukuran penuh. */
+  .layer.openl { scale: var(--sc, 1); flex-direction: column; align-items: stretch; justify-content: flex-start; padding: 0; }
   .wings { width: 100%; display: flex; align-items: center; gap: 9px; padding: 0 12px; }
   .art { width: 22px; height: 22px; border-radius: 6px; background: rgba(255, 255, 255, .12); overflow: hidden; flex: none; display: grid; place-items: center; font-size: 12px; }
   .art img { width: 100%; height: 100%; object-fit: cover; }
