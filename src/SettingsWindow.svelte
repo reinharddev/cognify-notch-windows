@@ -477,6 +477,8 @@
     </Group>
 
     <Group title={L('Lirik dan equalizer', 'Lyrics and equalizer')}>
+      <Setting toggle title={L('Lirik di bawah notch', 'Lyrics below the notch')} desc={L('Baris kedua di bawah notch atau kapsul tertutup. Menghilang saat kursor di atasnya.', 'A second line under the closed notch or pill. Hides when the pointer is on it.')}
+        disabled={!features.lyrics || !features.lyricsWing} why={L('Nyalakan dulu Lirik lagu dan Lirik di notch tertutup di Fitur.', 'First turn on Synced lyrics and Lyrics in the closed notch in Features.')} bind:checked={ui.lyricsBelow} onchange={setUi} />
       <Setting toggle title={L('Warna equalizer dari sampul', 'Equalizer color from the album cover')} bind:checked={ui.equalizerAuto} onchange={setUi} />
       {#if !ui.equalizerAuto}
         <Setting title={L('Warna equalizer', 'Equalizer color')}>

@@ -105,6 +105,8 @@ class Ui {
   face = $state(load('ui.face', true));
   /** Halaman yang tampil saat notch dibuka; kosong = halaman terakhir. */
   startTab = $state(load('ui.startTab', ''));
+  /** Lirik di baris kedua di bawah notch atau kapsul (bawaan mati). */
+  lyricsBelow = $state(load('ui.lyricsBelow', false));
   pillX = $state(Number(load('ui.pillX', 0.5)));
   pillY = $state(Number(load('ui.pillY', 0.06)));
   /** Lebar pill saat tertutup (sama dengan lebar notch, dengan rentang yang sama). */
@@ -129,7 +131,7 @@ class Ui {
     save('ui.hoverDelay', this.hoverDelay); save('ui.closeDelay', this.closeDelay); save('ui.scale', this.scale); save('ui.roundness', this.roundness); save('ui.equalizerColor', this.equalizerColor); save('ui.accentColor', this.accentColor); save('ui.lyricAuto', this.lyricAuto); save('ui.equalizerAuto', this.equalizerAuto); save('ui.lyricActive', this.lyricActive); save('ui.lyricIdle', this.lyricIdle);
     save('ui.display', this.display); save('ui.tabOrder', this.tabOrder);
     save('ui.bgMode', this.bgMode); save('ui.bgColor', this.bgColor); save('ui.bgColor2', this.bgColor2); save('ui.bgAngle', this.bgAngle); save('ui.bgImage', this.bgImage); save('ui.bgDim', this.bgDim); save('ui.bgBlur', this.bgBlur); save('ui.bgPosX', this.bgPosX); save('ui.bgPosY', this.bgPosY); save('ui.bgZoom', this.bgZoom); save('ui.bgAspect', this.bgAspect); save('ui.bgSettings', this.bgSettings); save('ui.idleThemed', this.idleThemed);
-    save('ui.style', this.style); save('ui.face', this.face); save('ui.startTab', this.startTab); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
+    save('ui.style', this.style); save('ui.face', this.face); save('ui.startTab', this.startTab); save('ui.lyricsBelow', this.lyricsBelow); save('ui.pillX', this.pillX); save('ui.pillY', this.pillY); save('ui.pillWidth', this.pillWidth); save('ui.autoHide', this.autoHide);
     save('ui.companionMode', this.companionMode); save('ui.companionFixed', this.companionFixed);
     save('ui.companionBlink', this.companionBlink); save('ui.companionMap', $state.snapshot(this.companionMap));
   }
@@ -167,6 +169,7 @@ class Ui {
     this.style = load<string>('ui.style', 'notch') === 'pill' ? 'pill' : 'notch';
     this.face = load('ui.face', true);
     this.startTab = load('ui.startTab', '');
+    this.lyricsBelow = load('ui.lyricsBelow', false);
     this.pillX = Number(load('ui.pillX', 0.5));
     this.pillY = Number(load('ui.pillY', 0.06));
     this.pillWidth = clampW(load('ui.pillWidth', CLOSED_DEFAULT));

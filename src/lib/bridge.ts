@@ -29,6 +29,15 @@ export function reportRect(x: number, y: number, w: number, h: number) {
   if (inTauri) void invoke('set_hit_rect', { rect: { x, y, w, h } });
 }
 
+/** Baris lirik di bawah notch: Rust memberi tahu saat kursor ada di atasnya; area itu sendiri tembus klik. */
+export function reportFade(x: number, y: number, w: number, h: number) {
+  if (inTauri) void invoke('set_fade_rect', { rect: { x, y, w, h } });
+}
+
+export function onLyricHover(handler: (over: boolean) => void) {
+  if (inTauri) void listen<boolean>('lyric-hover', (e) => handler(e.payload));
+}
+
 export function onHover(handler: (inside: boolean) => void) {
   if (inTauri) void listen<boolean>('notch-hover', (e) => handler(e.payload));
 }

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { notch, SIZES, HEAD, type LiveItem } from './lib/notch.svelte';
+  import { notch, SIZES, HEAD, LYRIC_ROW, type LiveItem } from './lib/notch.svelte';
   import { Spring, springEase } from './lib/spring';
   import { onMount } from 'svelte';
   import { cubicOut } from 'svelte/easing';
@@ -77,7 +77,8 @@
     const i = ls.lines.findLastIndex((l) => l.time <= pos + 0.25);
     return i >= 0 ? ls.lines[i].text : '';
   });
-  const wingLabel = $derived(wingLine || device.media?.title || '');
+  // Lirik di bawah: sayap hanya sampul dan equalizer.
+  const wingLabel = $derived(notch.lyricRow ? '' : wingLine || device.media?.title || '');
   let wingView = $state<HTMLSpanElement>();
   let wingText = $state<HTMLSpanElement>();
   let wingOverflow = $state(0);
@@ -287,7 +288,7 @@
         </div>
       {/key}
     {:else if notch.wings && device.media}
-      <div class="layer center" style:--lw="{(notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
+      <div class="layer center" style:--lw="{notch.lyricRow && !notch.pill ? Math.max((notch.paired ? notch.closed.pair : notch.closed.media).w, LYRIC_ROW.w) : (notch.paired ? notch.closed.pair : notch.closed.media).w}px" style:--lh="{notch.closed.media.h}px" in:enter out:leave>
         <div class="wings">
           <span class="art">{#if device.media.thumb}<img src={device.media.thumb} alt="" />{:else}♪{/if}</span>
           <span class="song" class:scrolling={wingOverflow > 0} bind:this={wingView} title={wingLabel}
@@ -323,6 +324,11 @@
     {/if}
   </div>
   {#if notch.headMode && !notch.autoHidden}<FaceExtras line={wingLine} />{/if}
+  {#if notch.lyricRow && !notch.autoHidden}
+    <!-- Gaya Notch: baris kedua di dalam bentuk. Kapsul: kapsul kecil terpisah di bawahnya. -->
+    <div class="lyricrow" class:chip={notch.pill} class:gone={notch.lyricHidden} style:left="{notch.pos.x + notch.pos.w / 2}px" style:top="{notch.pos.y + notch.closed.media.h + (notch.pill ? 6 : 0)}px"
+      style:max-width="{notch.pill ? 232 : Math.max(notch.pos.w - 24, 0)}px">{wingLine || '♪'}</div>
+  {/if}
 </main>
 
 <style>
@@ -350,6 +356,9 @@
   .lap { font-size: 9.5px; font-weight: 800; line-height: 1; padding: 2px 5px; border-radius: 99px; background: var(--tint, #ff9f0a); color: #000; font-variant-numeric: tabular-nums; }
   .dlb.dim { opacity: .55; }
   .more { flex: none; padding: 0 5px; border-radius: 99px; background: rgba(255, 255, 255, .18); font-size: 9px; font-weight: 700; line-height: 14px; }
+  .lyricrow { position: absolute; z-index: 2; transform: translateX(-50%); box-sizing: border-box; height: 26px; padding: 0 12px; line-height: 26px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #fff; font-size: 12px; font-weight: 600; pointer-events: none; transition: opacity .2s; }
+  .lyricrow.chip { height: 22px; line-height: 22px; border-radius: 99px; background: rgba(0, 0, 0, .9); }
+  .lyricrow.gone { opacity: 0; }
   .vsep { width: 1px; height: 12px; background: rgba(255, 255, 255, .16); flex: none; }
   .dlb { font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; color: rgba(255, 255, 255, .75); flex: none; }
   .song { flex: 1; min-width: 0; padding-inline: 4px; font-size: 11px; font-weight: 600; white-space: nowrap; overflow: hidden; color: rgba(255, 255, 255, .85); }

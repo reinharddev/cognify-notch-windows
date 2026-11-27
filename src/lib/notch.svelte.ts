@@ -1,5 +1,5 @@
 import { untrack } from 'svelte';
-import { reportRect, onHover, on, cmd, windowKind } from './bridge';
+import { reportRect, reportFade, onHover, onLyricHover, on, cmd, windowKind } from './bridge';
 import { ticker } from './store.svelte';
 import { ui } from './ui.svelte';
 import { lyrics } from './lyrics.svelte';
@@ -26,6 +26,7 @@ export const SIZES = {
 
 export const HEAD = 42;
 export const LYRIC_W = 216;
+export const LYRIC_ROW = { w: 300, h: 26 };
 
 class Notch {
   open = $state(false);
@@ -94,6 +95,7 @@ class Notch {
         });
       });
     });
+    onLyricHover((over) => (this.lyricHidden = over));
     // Area sentuh mengikuti bentuk yang sedang dituju.
     $effect.root(() => {
       $effect(() => ticker.setActive(this.open || this.lives.length > 0 || (this.wings && features.lyrics && features.lyricsWing)));
@@ -106,6 +108,12 @@ class Notch {
         }
         // Saat diam, area sambutan sedikit lebih lebar dari pil supaya mudah dikenai kursor.
         const pad = this.open ? 0 : 28;
+        if (this.lyricRow) {
+          const bar = this.closed.media.h;
+          reportRect(g.x - 8, this.pill ? g.y - 8 : 0, g.w + 16, bar + (this.pill ? 8 : 0));
+          return reportFade(g.x, g.y + bar, g.w, LYRIC_ROW.h + (this.pill ? 8 : 0));
+        }
+        reportFade(0, 0, 0, 0);
         if (!this.pill) return reportRect(g.x - pad, 0, g.w + pad * 2, g.h + (this.open ? 0 : 10));
         reportRect(g.x - pad, g.y - pad, g.w + this.lyricGroup + pad * 2, g.h + pad * 2);
       });
@@ -204,6 +212,13 @@ class Notch {
     return c?.icon === 'zap' && c.value ? parseInt(c.value, 10) : null;
   }
 
+  /** Kursor ada di baris lirik: disembunyikan supaya tidak menghalangi (area itu tembus klik). */
+  lyricHidden = $state(false);
+  /** Lirik di bawah notch atau kapsul (Pengaturan > Appearance). Wajah melayang tetap memakai gelembung di samping. */
+  get lyricRow() {
+    return ui.lyricsBelow && !this.open && !this.headMode && !news.level && !news.current && features.lyrics && features.lyricsWing && this.wings && lyrics.state.kind === 'synced';
+  }
+
   /** Baris lirik di samping wajah. Wajah dan gelembungnya satu grup yang dipusatkan di posisi pilihan pengguna. */
   get faceLyric() {
     return this.headMode && features.lyrics && features.lyricsWing && this.wings && lyrics.state.kind === 'synced';
@@ -212,6 +227,11 @@ class Notch {
 
   get size() {
     if (this.headMode) return { w: HEAD, h: HEAD, r: HEAD / 2 };
+    if (this.lyricRow && !this.pill) {
+      // Baris lirik menambah tinggi bentuk, dan lebarnya dibuat cukup untuk lirik.
+      const base = this.paired ? this.closed.pair : this.closed.media;
+      return { w: Math.max(base.w, LYRIC_ROW.w), h: base.h + (this.lyricHidden ? 0 : LYRIC_ROW.h), r: base.r };
+    }
     return this.open ? { w: SIZES.open.w * ui.scale, h: SIZES.open.h * ui.scale, r: ui.roundness * ui.scale } : news.level ? this.closed.hud : news.current ? this.closed.card : this.paired ? this.closed.pair : this.live || this.wings ? this.closed.media : this.closed.idle;
   }
 

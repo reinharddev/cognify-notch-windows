@@ -37,6 +37,8 @@ struct HitRect {
 #[derive(Default)]
 struct Shared {
     rect: Mutex<HitRect>,
+    /// Baris lirik di bawah notch: tidak menangkap klik, hanya disembunyikan saat kursor di atasnya.
+    fade: Mutex<HitRect>,
     clipboard_on: AtomicBool,
     hide_fullscreen: AtomicBool,
     /// Dibuka lewat pintasan keyboard: tetap terbuka walau kursor di luar.
@@ -155,6 +157,11 @@ async fn open_settings(app: AppHandle) {
 #[tauri::command]
 fn set_hit_rect(state: State<Shared>, rect: HitRect) {
     *state.rect.lock().unwrap() = rect;
+}
+
+#[tauri::command]
+fn set_fade_rect(state: State<Shared>, rect: HitRect) {
+    *state.fade.lock().unwrap() = rect;
 }
 
 #[tauri::command]
@@ -452,6 +459,7 @@ fn ensure_docked(window: &WebviewWindow) {
 fn watch_cursor(app: AppHandle, window: WebviewWindow) {
     std::thread::spawn(move || {
         let mut inside = false;
+        let mut faded = false;
         let mut wait = 50u64;
         // Untuk mata: tidur setelah 2,5 menit tanpa gerakan kursor, bangun saat bergerak lagi, dan (bila
         // diminta) arah pandang kontinu, dikirim saat gerakannya cukup terasa.
@@ -503,6 +511,12 @@ fn watch_cursor(app: AppHandle, window: WebviewWindow) {
             let near = now || (rect.w > 0.0 && x >= rect.x - 120.0 && x <= rect.x + rect.w + 120.0 && y >= rect.y - 120.0 && y <= rect.y + rect.h + 120.0);
             wait = if near { 8 } else { 50 };
             shared.inside.store(now, Ordering::Relaxed);
+            let fade = *shared.fade.lock().unwrap();
+            let over = fade.w > 0.0 && x >= fade.x && x <= fade.x + fade.w && y >= fade.y && y <= fade.y + fade.h;
+            if over != faded {
+                faded = over;
+                let _ = app.emit("lyric-hover", over);
+            }
             if now != inside {
                 inside = now;
                 let _ = window.set_ignore_cursor_events(!now);
@@ -820,6 +834,7 @@ pub fn run() {
             skins::skins_hover,
             skins::skins_notice,
             set_hit_rect,
+            set_fade_rect,
             open_settings,
             set_eyes_follow,
             uptime_days,
