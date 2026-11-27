@@ -6,7 +6,7 @@
   import { fly } from 'svelte/transition';
   import { Bell, Brain, Coffee, Download, Hourglass, Leaf, Timer , Settings } from '@lucide/svelte';
   const LIVE_ICONS = { download: Download, brain: Brain, coffee: Coffee, hourglass: Hourglass, bell: Bell, stopwatch: Timer } as const;
-  import { cmd, cmdTry, emitPrefs, inTauri, on, openSettings } from './lib/bridge';
+  import { cmd, cmdTry, emitPrefs, inTauri, on, onPrefs, openSettings } from './lib/bridge';
   import { ui } from './lib/ui.svelte';
   import { L } from './lib/i18n';
   import { news } from './lib/news.svelte';
@@ -58,7 +58,7 @@
   $effect.root(() => { $effect(() => { void cmd('set_panel_scale', { percent: Math.round(ui.scale * 100) }); }); });
   // Timer cepat di dock selesai: kartu di notch (bunyinya sudah dimainkan oleh dock).
   on<number>('dock-timer-done', (minutes) => news.device(L('Timer selesai', 'Timer done'), L(`${minutes} menit sudah habis`, `${minutes} minutes are up`), 'timer', TINT.accent));
-  on<string>('prefs-changed', (scope) => {
+  onPrefs((scope) => {
     if (scope === 'features') { features.reload(); weather.reload(); syncEyes(); hotkey.apply(); }
     else if (scope === 'weather') weather.reload();
     else if (scope === 'agenda') agenda.reload();
@@ -326,7 +326,7 @@
   {#if notch.headMode && !notch.autoHidden}<FaceExtras line={wingLine} />{/if}
   {#if notch.lyricRow && !notch.autoHidden}
     <!-- Gaya Notch: baris kedua di dalam bentuk. Kapsul: kapsul kecil terpisah di bawahnya. -->
-    <div class="lyricrow" class:chip={notch.pill} class:gone={notch.lyricHidden} style:left="{notch.pos.x + notch.pos.w / 2}px" style:top="{notch.pos.y + notch.closed.media.h + (notch.pill ? 6 : 0)}px"
+    <div class="lyricrow" class:chip={notch.pill} class:gone={notch.lyricHidden} style:left="{notch.pos.x + notch.pos.w / 2}px" style:top="{notch.lyricAbove ? notch.pos.y - LYRIC_ROW.h - 2 : notch.pos.y + notch.closed.media.h + (notch.pill ? 6 : 0)}px"
       style:max-width="{notch.pill ? 232 : Math.max(notch.pos.w - 24, 0)}px">{wingLine || '♪'}</div>
   {/if}
 </main>

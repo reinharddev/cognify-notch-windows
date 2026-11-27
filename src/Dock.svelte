@@ -8,7 +8,7 @@
   import { scale } from 'svelte/transition';
   import { backOut } from 'svelte/easing';
   import { ChevronUp, LayoutGrid, Pin, PinOff, Plus, SlidersHorizontal, X, ArrowLeft, ArrowRight, Ellipsis } from '@lucide/svelte';
-  import { cmd, emitPrefs, inTauri, on, openSettings } from './lib/bridge';
+  import { cmd, emitPrefs, inTauri, on, onPrefs, openSettings } from './lib/bridge';
   import { MODULE_INFO } from './lib/dockModules';
   import { dock } from './lib/dock.svelte';
   import { features } from './lib/system.svelte';
@@ -296,7 +296,7 @@
     void dock.start();
     if (!inTauri) demo();
     ui.applyAccent();
-    on<string>('prefs-changed', (scope) => {
+    onPrefs((scope) => {
       if (scope === 'ui') { ui.reload(); ui.applyAccent(); }
       else if (scope === 'features') { features.reload(); weather.reload(); }
       else if (scope === 'weather') weather.reload();

@@ -10,8 +10,32 @@ export function load<T>(key: string, fallback: T): T {
 
 export function save(key: string, value: unknown) {
   try {
-    localStorage.setItem('cn.' + key, JSON.stringify(value));
+    const name = 'cn.' + key, raw = JSON.stringify(value);
+    if (localStorage.getItem(name) === raw) return;
+    localStorage.setItem(name, raw);
+    changed[name] = raw;
   } catch {}
+}
+
+// Jendela lain tidak boleh mengandalkan penyimpanan bersama saat diberi tahu ada perubahan: di WebView2 tulisan
+// satu jendela bisa terlambat terbaca di jendela lain (terasa di laptop lambat), jadi nilainya ikut dikirim.
+let changed: Record<string, string> = {};
+
+/** Nilai yang berubah sejak terakhir diambil, untuk dikirim ke jendela lain. */
+export function takeChanges() {
+  const out = changed;
+  changed = {};
+  return out;
+}
+
+/** Terapkan nilai kiriman jendela lain sebelum memuat ulang. */
+export function applyChanges(changes: Record<string, string>) {
+  for (const [name, raw] of Object.entries(changes)) {
+    try {
+      localStorage.setItem(name, raw);
+    } catch {}
+    delete changed[name]; // nilai lama milik jendela ini tidak boleh dikirim balik
+  }
 }
 
 // Detik yang berdetak, dipakai halaman yang menampilkan jam berjalan. Hanya berdetak (4 kali per detik)

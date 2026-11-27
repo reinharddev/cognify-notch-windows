@@ -3,7 +3,8 @@
   import Input from './lib/ui/Input.svelte';
   import { features } from './lib/system.svelte';
   import { clipboard } from './lib/shelf.svelte';
-  import { cmd, emitPrefs, inTauri, pickFiles } from './lib/bridge';
+  import { cmd, emitPrefs, inTauri, onPrefs, pickFiles } from './lib/bridge';
+  import { save } from './lib/store.svelte';
   import { agenda } from './lib/agenda.svelte';
   import { hotkey, HOTKEYS } from './lib/hotkey.svelte';
   import { L } from './lib/i18n';
@@ -115,6 +116,8 @@
 
   const setUi = () => { ui.persist(); ui.applyAccent(); void emitPrefs('ui'); };
   const setDock = () => { dock.persist(); void emitPrefs('dock'); };
+  // Jendela lain juga mengubah pengaturan (kapsul diseret, modul dock dihapus); tanpa ini nilai lama di sini menimpanya.
+  onPrefs((scope) => { if (scope === 'ui') ui.reload(); else if (scope === 'dock') dock.reload(); });
   const restoreTaskbar = async () => { await cmd('taskbar_hide', { hidden: false }); dock.hideTaskbar = false; setDock(); };
   // Lebar layar tempat dock tampil (piksel CSS). Dock hanya satu baris dan tidak boleh melewatinya.
   const screenW = window.screen.availWidth;
@@ -189,7 +192,7 @@
   }
   function doImport() {
     const root = JSON.parse(confirmImport ?? '{}');
-    for (const [k, v] of Object.entries(root.data as Record<string, unknown>)) if (isBackupKey(k)) localStorage.setItem(k, JSON.stringify(v));
+    for (const [k, v] of Object.entries(root.data as Record<string, unknown>)) if (isBackupKey(k)) save(k.slice(3), v);
     confirmImport = null;
     void emitPrefs('reload');
     setTimeout(() => location.reload(), 150);

@@ -2,6 +2,7 @@
 // dilewati dan hover memakai peristiwa pointer biasa; ini memudahkan merancang tampilan.
 import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
+import { applyChanges, takeChanges } from './store.svelte';
 
 export const inTauri = '__TAURI_INTERNALS__' in window;
 
@@ -18,11 +19,20 @@ export function openSettings() {
   else window.open('?w=settings', '_blank');
 }
 
-/** Bagian pengaturan yang berubah; jendela notch memuat ulang bagian itu dari penyimpanan bersama. */
+/** Bagian pengaturan yang berubah; jendela lain memuat ulang bagian itu setelah menerima nilai barunya. */
 export type PrefScope = 'features' | 'weather' | 'agenda' | 'hotkey' | 'ui' | 'dock' | 'reload';
 export async function emitPrefs(scope: PrefScope) {
   if (!inTauri) return;
-  void emit('prefs-changed', scope);
+  void emit('prefs-changed', { scope, from: windowKind, changes: takeChanges() });
+}
+
+/** Dengarkan perubahan pengaturan dari jendela lain; kiriman sendiri diabaikan. */
+export function onPrefs(handler: (scope: PrefScope) => void) {
+  on<{ scope: PrefScope; from: WindowKind; changes: Record<string, string> }>('prefs-changed', (e) => {
+    if (e.from === windowKind) return;
+    applyChanges(e.changes);
+    handler(e.scope);
+  });
 }
 
 export function reportRect(x: number, y: number, w: number, h: number) {

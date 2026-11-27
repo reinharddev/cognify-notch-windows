@@ -110,8 +110,9 @@ class Notch {
         const pad = this.open ? 0 : 28;
         if (this.lyricRow) {
           const bar = this.closed.media.h;
-          reportRect(g.x - 8, this.pill ? g.y - 8 : 0, g.w + 16, bar + (this.pill ? 8 : 0));
-          return reportFade(g.x, g.y + bar, g.w, LYRIC_ROW.h + (this.pill ? 8 : 0));
+          const above = this.lyricAbove;
+          reportRect(g.x - 8, this.pill ? g.y - (above ? 0 : 8) : 0, g.w + 16, bar + (this.pill ? 8 : 0));
+          return reportFade(g.x, above ? g.y - LYRIC_ROW.h - 8 : g.y + bar, g.w, LYRIC_ROW.h + (this.pill ? 8 : 0));
         }
         reportFade(0, 0, 0, 0);
         if (!this.pill) return reportRect(g.x - pad, 0, g.w + pad * 2, g.h + (this.open ? 0 : 10));
@@ -184,7 +185,10 @@ class Notch {
     const { cx, cy } = pillCenter(ui.pillX, ui.pillY, vw, vh, w0, h0, EDGE_MARGIN);
     const a = anchors(cx, cy, vw, vh, SIZES.open.w * ui.scale, EDGE_MARGIN);
     const box = place(cx, cy, w0, h0, s.w, s.h, vw, vh, a, EDGE_MARGIN);
-    return { ...box, x: box.x - this.lyricGroup / 2, r: s.r, ...a };
+    // Wajah dan gelembung liriknya dipusatkan sebagai satu grup, dan grupnya tidak boleh keluar layar.
+    const group = this.lyricGroup;
+    const x = group ? Math.max(EDGE_MARGIN, Math.min(box.x - group / 2, vw - EDGE_MARGIN - box.w - group)) : box.x;
+    return { ...box, x, r: s.r, ...a };
   }
 
   /** Tepi layar tempat bentuk bersembunyi (yang terdekat). */
@@ -218,6 +222,9 @@ class Notch {
   get lyricRow() {
     return ui.lyricsBelow && !this.open && !this.headMode && !news.level && !news.current && features.lyrics && features.lyricsWing && this.wings && lyrics.state.kind === 'synced';
   }
+
+  /** Kapsul di bagian bawah layar: baris lirik pindah ke atasnya supaya tidak keluar layar. */
+  get lyricAbove() { return this.pill && this.geo.ay === 'bottom'; }
 
   /** Baris lirik di samping wajah. Wajah dan gelembungnya satu grup yang dipusatkan di posisi pilihan pengguna. */
   get faceLyric() {

@@ -2,7 +2,7 @@
 // Pengaturan disimpan di penyimpanan bersama webview, jadi jendela notch, Pengaturan, dan dock
 // membacanya dari sumber yang sama. Hanya jendela notch yang membuka dan menutup dock.
 import { load, save } from './store.svelte';
-import { cmd, cmdTry, inTauri, on, windowKind } from './bridge';
+import { cmd, cmdTry, inTauri, on, onPrefs, windowKind } from './bridge';
 import { buildItems, cleanPins, keyOf, movePin, togglePin, type DockItem, type DockWindow, type Pin } from './dockItems';
 import { cleanStyle, type DockStyleCfg } from './dockStyle';
 import {
@@ -106,7 +106,7 @@ class DockStore {
   async start() {
     if (windowKind !== 'taskdock') return;
     on<DockWindow[]>('taskdock-windows', (list) => { this.windows = list; this.rebuild(); });
-    on<string>('prefs-changed', (scope) => { if (scope === 'dock' || scope === 'ui') this.reload(); });
+    onPrefs((scope) => { if (scope === 'dock' || scope === 'ui') this.reload(); });
     const first = await cmd<DockWindow[]>('taskdock_snapshot');
     if (first) { this.windows = first; }
     this.rebuild();
